@@ -276,7 +276,7 @@ export function CalendarWorkspace({
           </div>
         </dl>
         <p className="note-panel">{detail.note}</p>
-        {!preview && <PlaceSearch />}
+        {!preview && <PlaceSearch initialQuery={detail.place || ""} />}
         {detail.photo && (
           <details className="photo-metadata">
             <summary>사진 정보</summary>

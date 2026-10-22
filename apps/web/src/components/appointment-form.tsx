@@ -50,7 +50,7 @@ export function AppointmentForm({
           </p>
         </div>
       )}
-      <PlaceSearch />
+      <PlaceSearch initialQuery={fields.place} />
       <form action={action} className="username-login">
         <input type="hidden" name="id" value={appointment?.id || ""} />
         <input type="hidden" name="version" value={appointment?.version || ""} />

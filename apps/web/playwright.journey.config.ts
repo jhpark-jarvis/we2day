@@ -21,9 +21,6 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       ...server.env,
-      WE2DAY_NAVER_SEARCH_ENABLED: "false",
-      WE2DAY_NAVER_SEARCH_CLIENT_ID: "",
-      WE2DAY_NAVER_SEARCH_CLIENT_SECRET: "",
       WE2DAY_NAVER_MAPS_CLIENT_ID: "",
     },
   })),

@@ -15,9 +15,6 @@ export default defineConfig({
     env: {
       ...server.env,
       WE2DAY_NAVER_MAPS_CLIENT_ID: "synthetic-maps-key",
-      WE2DAY_NAVER_SEARCH_ENABLED: "false",
-      WE2DAY_NAVER_SEARCH_CLIENT_ID: "",
-      WE2DAY_NAVER_SEARCH_CLIENT_SECRET: "",
     },
   })),
 });
