@@ -25,7 +25,7 @@ uv run --project apps/api python -m we2day_api.preflight --compose
 docker compose -f compose.yaml -f apps/api/deployment/compose.production.example.yaml config --quiet
 ```
 
-전체 백업은 [Supabase 공식 안내](https://supabase.com/docs/guides/platform/backups)에 따라 데이터베이스와 사진 파일을 각각 보관하고 복원할 수 있어야 합니다. 앱에서 받는 기록 JSON과 사진 ZIP은 선택한 자료만 포함하므로 전체 백업을 대신하지 않습니다. 아래 암호화 도구도 이미 준비한 파일 하나를 보호하는 기능이며, DB와 사진을 자동으로 수집하거나 복구하지는 않습니다.
+전체 백업은 [Supabase 공식 안내](https://supabase.com/docs/guides/platform/backups)에 따라 데이터베이스와 사진 파일을 각각 보관하고 복원할 수 있어야 합니다. 앱에서 받는 기록 JSON과 사진 ZIP은 선택한 자료만 포함하므로 전체 백업을 대신하지 않습니다. 아래 서버 수집 도구는 DB 덤프와 사진을 암호화 사본으로 만들며, 오프라인 묶음 도구는 준비된 파일의 검사·복구를 제공합니다. 예약 실행과 전체 서비스 복원은 별도로 검증해야 합니다.
 
 ## VM에 배포
 
@@ -239,7 +239,43 @@ uv run --project apps/api python -m we2day_api.local_archive decrypt --key /priv
 
 키와 암호화 사본은 서로 다른 디렉터리에 보관해야 하며, 같은 PC 고장에 대비한 별도 키 보관이 필요합니다. 입력/키/대조 원본은 작업 중 수정하지 않는 일반 파일, 출력은 아직 존재하지 않는 파일이어야 합니다. 원본과 키가 같은 파일을 가리키면 하드 링크 별칭도 거부합니다. 입력·대조 원본의 크기/수정 정보가 읽는 중 달라져도 실패하며, 검사 동안 파일을 닫아 두어야 합니다. 기존 파일·원본·키를 덮어쓰지 않고 잘못된 키/손상 시 최종 복호화 파일을 남기지 않습니다. 복호화 중 출력 디렉터리에 임시 평문이 생길 수 있으므로 접근 제한·디스크 암호화를 적용한 로컬 경로를 사용합니다. 강제 종료 시 남은 `.we2day-partial-*`는 자동 재사용하지 않으며 운영자가 확인/정리해야 합니다. 도구는 Windows ACL·BitLocker·오프라인 키 보관을 자동 설정하지 않습니다.
 
-백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 아래 도구로 보관 개수는 계산할 수 있지만, 예약 생성과 사본 삭제는 아직 제공하지 않습니다. DB와 사진 전체 수집, 암호화 키의 별도 보관, 분리된 환경에서의 복원까지 확인한 뒤 연결해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
+백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 아래 도구로 수집과 보관 개수 계산은 가능하지만, 예약 생성과 사본 삭제는 아직 제공하지 않습니다. DB와 사진 전체 수집, 암호화 키의 별도 보관, 분리된 환경에서의 복원까지 확인한 뒤 연결해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
+
+<a id="backup-collection"></a>
+## 서버에서 DB·사진 수집
+
+`backup_collect`는 PostgreSQL 17 클라이언트가 있는 별도 실행 환경에서 DB 덤프와 `we2day-photos`의 실제 파일을 수집해 암호화 묶음을 만듭니다. 원본에는 읽기 전용 DB 접속과 Storage GET 요청만 사용합니다. PostgreSQL 역할은 비밀번호를 제외하고 내보내므로 역할 로그인 비밀번호와 Supabase 공급자 설정은 별도로 복구해야 합니다.
+
+수집 도구의 `roles.sql`은 `pg_dumpall --roles-only --no-role-passwords` 결과이며 관리형 역할도 포함합니다. Supabase CLI가 가공한 역할 덤프와는 다릅니다. 새 환경에서는 관리형 역할·권한 부여 주체가 달라 그대로 실행하면 실패할 수 있습니다. 이 파일은 검토용 원본으로 보존하고, 복원 대상이 제공하는 기본 역할과 사용자 정의 역할을 구분해 적용해야 합니다. 테이블·사진 복구 검사만 통과한 것을 역할 권한이나 Auth/Storage 서비스 전체 복구 완료로 판단하지 마세요.
+
+먼저 [백업 설정 예시](../apps/api/deployment/backup/.env.example)를 저장소 밖의 보호된 파일로 복사하고 본인만 읽도록 권한을 제한합니다. `PGHOST`·`PGUSER`는 Supabase 상단 **Connect → Session pooler**의 값을 사용하고, `PGPORT=5432`로 설정합니다. `WE2DAY_BACKUP_DB_PASSWORD`에는 프로젝트 DB 비밀번호를 넣습니다. 이름 오타·빈 값은 연결 전에 거부하며 비밀번호를 자동 재설정하지 않습니다.
+
+사진 수집 키는 **Project Settings → API Keys → Secret keys**에서 백업용으로 별도 생성합니다. `WE2DAY_BACKUP_STORAGE_SECRET_KEY`에는 키 이름이 아닌 `sb_secret_...` 값을 넣습니다. 이 키는 읽기 전용 키가 아니라 RLS를 우회하는 전체 접근 권한이 있으므로 서버 백업 설정에만 보관하고, 브라우저 설정·Git·명령 인자·채팅에 넣지 마세요. 도구의 DB 비밀번호도 명령 인자에 넣지 않습니다. 설정 파일은 셸에서 `source`하거나 실행하지 않고 dotenv 형식으로 읽습니다.
+
+TLS는 `verify-full`이며 Supabase 공식 CA 파일을 `PGSSLROOTCERT` 경로에 준비해야 합니다. 기존 앱 이미지를 빌드한 뒤 별도 백업 이미지를 만듭니다.
+
+```sh
+docker build -f apps/api/deployment/Dockerfile.backup --build-arg WE2DAY_API_BASE=we2day-api:local -t we2day-backup:local .
+```
+
+실행 예시는 아래와 같습니다. `/private/config`, `/private/keys`, `/private/copies`는 미리 준비하고 본인만 접근하도록 제한합니다. `runtime.env`는 위 예시를 채운 설정 파일, `archive.key`는 `local_archive keygen`으로 생성한 별도 키입니다. 출력 파일은 새 이름이어야 합니다.
+
+```sh
+docker run --rm --read-only --user "$(id -u):$(id -g)" \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --memory 192m --memory-swap 256m --cpus 0.25 --pids-limit 64 \
+  --tmpfs /tmp:size=16m,mode=1777 \
+  --mount type=bind,src=/private/config,dst=/run/config,readonly \
+  --mount type=bind,src=/private/config/supabase-ca.crt,dst=/run/source/supabase-ca.crt,readonly \
+  --mount type=bind,src=/private/keys,dst=/run/keys,readonly \
+  --mount type=bind,src=/private/copies,dst=/copies \
+  we2day-backup:local --config /run/config/runtime.env \
+  --key /run/keys/archive.key --output /copies/we2day-first.enc
+```
+
+DB 스키마·데이터 덤프는 같은 exported snapshot을 사용합니다. 사진은 그 스냅샷의 전체 객체 목록과 크기로 내려받고 수집 뒤 최신 목록·메타데이터를 다시 대조합니다. 변경·누락·다운로드 실패가 발견되면 백업 생성을 중단합니다. DB와 Storage 간 원자적 백업을 보장하지는 않으므로 첫 수집은 사진 수정·삭제를 멈춘 상태에서 실행하세요. 다른 버킷을 운영한다면 이 도구의 사진 수집 범위 밖이므로 별도 백업이 필요합니다.
+
+작업 중 사본 디렉터리에 임시 SQL·사진·ZIP이 생깁니다. 보호된 충분한 공간에서 실행하고 강제 종료 시 잔여 파일을 확인해야 합니다. 정상 종료와 일반 실패에서는 작업 임시 디렉터리를 정리하며, 기존 사본·원본·키는 덮어쓰지 않습니다. 생성 성공은 수집·암호화 검증 결과이며 **전체 서비스 복원 완료가 아닙니다.** 관리형 확장, Auth/Storage 서비스, OAuth 설정과 역할 비밀번호는 복원 대상 환경에서 따로 검증해야 합니다.
 
 <a id="backup-bundles"></a>
 ## DB·사진 백업 묶음과 파일 복구
