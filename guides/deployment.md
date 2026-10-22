@@ -239,6 +239,65 @@ uv run --project apps/api python -m we2day_api.local_archive decrypt --key /priv
 
 키와 암호화 사본은 서로 다른 디렉터리에 보관해야 하며, 같은 PC 고장에 대비한 별도 키 보관이 필요합니다. 입력/키/대조 원본은 작업 중 수정하지 않는 일반 파일, 출력은 아직 존재하지 않는 파일이어야 합니다. 원본과 키가 같은 파일을 가리키면 하드 링크 별칭도 거부합니다. 입력·대조 원본의 크기/수정 정보가 읽는 중 달라져도 실패하며, 검사 동안 파일을 닫아 두어야 합니다. 기존 파일·원본·키를 덮어쓰지 않고 잘못된 키/손상 시 최종 복호화 파일을 남기지 않습니다. 복호화 중 출력 디렉터리에 임시 평문이 생길 수 있으므로 접근 제한·디스크 암호화를 적용한 로컬 경로를 사용합니다. 강제 종료 시 남은 `.we2day-partial-*`는 자동 재사용하지 않으며 운영자가 확인/정리해야 합니다. 도구는 Windows ACL·BitLocker·오프라인 키 보관을 자동 설정하지 않습니다.
 
-백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 이 예약·정리 기능은 아직 구현되지 않았습니다. DB와 사진 전체 수집, 암호화 키의 별도 보관, 분리된 환경에서의 복원까지 확인한 뒤 연결해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
+백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 아래 도구로 보관 개수는 계산할 수 있지만, 예약 생성과 사본 삭제는 아직 제공하지 않습니다. DB와 사진 전체 수집, 암호화 키의 별도 보관, 분리된 환경에서의 복원까지 확인한 뒤 연결해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
+
+<a id="backup-bundles"></a>
+## DB·사진 백업 묶음과 파일 복구
+
+`backup_bundle`은 **운영자가 준비한 DB 덤프와 사진 파일**을 하나로 묶고 암호화하는 오프라인 도구입니다. Supabase에 접속해 자료를 수집하거나 SQL을 실행하지 않습니다. 형식은 `WE2DAY-BACKUP-1`, 전체 자료 한도는 8GiB·사진 20,000개입니다. 파일별 SHA-256과 크기, 사진 목록과 실제 파일의 일치를 확인합니다. 누락·추가 파일, 중복 이름, 경로 탈출, 심볼릭 링크·junction, 압축된 ZIP 항목과 기존 출력 덮어쓰기를 거부합니다.
+
+### 1. 전체 원본 준비
+
+[Supabase 백업·복원 안내](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)에 따라 `roles.sql`, `schema.sql`, `data.sql`을 준비합니다. DB 백업에는 사진의 실제 파일이 포함되지 않으므로 `we2day-photos` 버킷의 파일도 별도로 내려받아야 합니다. 일반 사용자 세션은 RLS로 자료가 제한되므로 전체 수집에 사용할 수 없습니다. 전체 읽기를 허용한 별도 접속 설정을 보호된 위치에 준비하고, 기존 계정 비밀번호나 실행 중인 앱 설정을 임의로 바꾸지 마세요.
+
+쓰기 작업을 멈춘 일관된 시점의 DB와 Storage 목록·파일을 준비하고, 수집 전후 객체 목록과 크기를 대조해야 합니다. 누락된 목록을 그대로 입력하면 도구가 원래 프로젝트의 누락까지 찾아낼 수는 없습니다. 성공 결과는 입력 묶음의 무결성을 뜻하며, SQL 내용·덤프의 전체성·계정 비밀번호 복구를 보증하지 않습니다. 특히 역할 비밀번호는 별도 복구 절차가 필요합니다.
+
+저장소·동기화 폴더 밖의 보호된 디렉터리에 다음 구조로 준비합니다. 예시 이름은 실제 객체 이름으로 바꾸세요. 사진이 없으면 `objects`는 빈 배열로 둡니다. 별도 설명 파일 등은 이 디렉터리에 넣지 않습니다.
+
+```text
+/private/staging/export/
+  roles.sql
+  schema.sql
+  data.sql
+  storage-inventory.json
+  storage/couple-id/photo-id.webp
+```
+
+`storage-inventory.json`은 전체 객체 목록에서 작성하며 `size`는 실제 파일 바이트 수입니다.
+
+```json
+{"bucket":"we2day-photos","objects":[{"name":"couple-id/photo-id.webp","size":100}]}
+```
+
+### 2. 암호화·검사·새 디렉터리 복구
+
+`/private/keys`, `/private/copies`, `/private/recovery`는 미리 만들고 본인만 접근하도록 제한합니다. 키는 앞 절의 `keygen`으로 한 번 생성하고 별도 복구 사본을 보관합니다. 아래 출력 파일과 복구 디렉터리는 존재하지 않아야 합니다.
+
+```sh
+uv run --project apps/api python -m we2day_api.backup_bundle snapshot --input /private/staging/export --key /private/keys/archive.key --output /private/copies/we2day-first.enc
+uv run --project apps/api python -m we2day_api.backup_bundle verify-encrypted --input /private/copies/we2day-first.enc --key /private/keys/archive.key
+uv run --project apps/api python -m we2day_api.backup_bundle restore --input /private/copies/we2day-first.enc --key /private/keys/archive.key --output /private/recovery/first
+```
+
+`snapshot`은 묶음을 만든 뒤 암호화 사본과 원본 내용을 대조합니다. `verify-encrypted`는 인증 검사 후 내부 목록·해시까지 확인합니다. 이 과정에는 사본 디렉터리 아래 **임시 평문 ZIP**이 생깁니다. 단일 파일의 `local_archive verify`와 다르므로, 접근 제한과 디스크 암호화를 적용한 충분한 공간에서 실행해야 합니다. 정상 종료 시 임시 디렉터리는 정리되지만 강제 종료 후 잔여 파일은 직접 확인해야 합니다. 도구가 Windows ACL이나 디스크 암호화를 설정하지는 않습니다.
+
+`restore`는 **파일만** 새 디렉터리에 복구합니다. 실패 중 생성된 디렉터리는 `.incomplete` 표시와 함께 남을 수 있으며 완료본으로 사용하면 안 됩니다. 복구 SQL은 검토 후 분리된 시험 DB에서만 실행하고, 사진 파일도 시험 Storage에 올려 DB 참조·개수·내용·공유 권한을 확인하세요. 실제 운영 DB나 기존 사진을 덮어쓰는 명령은 제공하지 않습니다. CLI의 `live_restore: false`도 운영 복원을 실행하지 않았다는 뜻입니다.
+
+합성 자료를 사용하는 로컬 DB 복원 검사는 다음 명령으로 재현할 수 있습니다. Docker가 필요하며 소유한 일회용 PostgreSQL 컨테이너만 생성·종료합니다. 시험용 Auth/Storage 스키마를 사용하므로 실제 Supabase 프로젝트와 인증 서비스 전체의 복원 검증을 대신하지 않습니다.
+
+```sh
+uv sync --project apps/api --group dev
+uv run --project apps/api pytest apps/api/tests/test_backup_restore_database.py --database -q
+```
+
+### 3. 보관 기준 확인
+
+```sh
+uv run --project apps/api python -m we2day_api.backup_retention --directory /private/copies --key /private/keys/archive.key
+```
+
+이 명령은 `we2day-*.enc`에 해당하는 사본을 모두 인증·검사하고, 묶음 생성 시각을 한국 시간 기준으로 계산합니다. 하루의 최신 1개씩 최근 7일과 ISO 주의 최신 1개씩 최근 4주를 합쳐 보관하므로 실제 보관 수는 중복 여부에 따라 달라집니다. 같은 시각이면 파일명 역순으로 하나를 선택합니다. 파일명 날짜나 수정 시각은 기준으로 쓰지 않습니다. **미래 시각·손상된 사본이 있으면 계산을 중단하며 어떤 파일도 삭제하지 않습니다.** 검사 상한은 256개입니다. 다른 이름의 파일은 검사·정리 대상이 아닙니다.
+
+출력에는 확인한 사본 수·보관 수·추가 검토 대상 수만 나오며 파일명이나 자료 내용은 표시하지 않습니다. `review_candidates`는 삭제 승인이 아닙니다. 새 운영 백업의 전체 복원과 키 복구를 확인하기 전에는 기존 사본을 지우거나 예약 정리를 켜지 마세요.
 
 [README로 돌아가기](../README.md)
