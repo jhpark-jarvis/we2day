@@ -32,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href === "/"
               ? pathname === "/" ||
                 pathname === "/preview" ||
+                pathname === "/anniversaries" ||
                 pathname.startsWith("/plans") ||
                 pathname === "/wishlist" ||
                 pathname === "/today" ||
@@ -43,7 +44,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   pathname === "/goals" ||
                   pathname.startsWith("/questions") ||
                   pathname.startsWith("/roulette")
-                : pathname.startsWith(href) || (href === "/settings" && pathname === "/timezones");
+                : pathname.startsWith(href) ||
+                  (href === "/settings" &&
+                    ["/timezones", "/account", "/couple", "/login"].includes(pathname));
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined}>
               <Icon size={19} aria-hidden="true" />

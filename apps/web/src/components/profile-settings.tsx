@@ -48,7 +48,7 @@ export function ProfileSettings({
         });
       }}
     >
-      <div>
+      <div className="auth-field">
         <label htmlFor="display-name">사용자 이름</label>
         <input
           id="display-name"

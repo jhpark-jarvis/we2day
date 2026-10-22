@@ -75,7 +75,10 @@ summary { min-height: 44px; padding: 9px 12px; border: 1px solid var(--control-b
 details[open] > summary { border-color: var(--accent); background: var(--soft); }
 ::selection { background: var(--soft); color: var(--foreground); }
 h1, h2, h3, p { margin: 0; }
-button { color: var(--foreground); }
+h1 { word-break: keep-all; font-size: 28px; font-weight: 500; line-height: 1.3; letter-spacing: -1px; margin-block: 6px 12px; overflow-wrap: anywhere; }
+h2 { font-size: 20px; font-weight: 500; line-height: 1.4; }
+h3 { font-size: 17px; font-weight: 500; line-height: 1.5; }
+button { appearance: none; color: var(--foreground); }
 .app-shell { max-width: 1100px; min-height: 100svh; margin: 0 auto; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr; }
 .app-header { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 24px; padding: 28px 30px; border-bottom: 1px solid var(--line); }
 .wordmark { display: inline-block; font-family: Arial, sans-serif; font-size: 25px; font-weight: 600; letter-spacing: -.065em; line-height: 1.2; }
@@ -86,7 +89,7 @@ button { color: var(--foreground); }
 .skip-link { position: absolute; left: 12px; top: -100px; background: var(--surface); padding: 10px 16px; z-index: 3; }
 .skip-link:focus { top: 12px; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 32px; }
-.page-heading h1 { font-size: 28px; font-weight: 500; letter-spacing: -1.3px; margin: 3px 0 6px; line-height: 1.3; }
+.page-heading h1 { word-break: keep-all; font-size: 28px; font-weight: 500; letter-spacing: -1.3px; margin: 3px 0 6px; line-height: 1.3; }
 .eyebrow { font-size: 11px; letter-spacing: 1.8px; color: var(--muted); margin-bottom: 7px; }
 .muted { color: var(--muted); font-size: 13px; }
 .preview-badge { border: 1px solid var(--line); border-radius: 20px; padding: 4px 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
@@ -137,7 +140,7 @@ button { color: var(--foreground); }
 .text-button + .text-button, .primary-button + .text-button { margin-inline-start: 8px; }
 .calendar-toolbar > .text-button { margin: 0; }
 .appointment-detail .eyebrow { margin-top: 25px; }
-.appointment-detail h1 { font-size: 28px; font-weight: 500; letter-spacing: -1px; margin-bottom: 8px; }
+.appointment-detail h1 { word-break: keep-all; font-size: 28px; font-weight: 500; letter-spacing: -1px; margin-bottom: 8px; }
 .detail-photo { display: block; width: 100%; height: auto; max-height: 350px; object-fit: cover; margin-top: 25px; border-radius: 15px; }
 .detail-list { margin: 23px 0; }
 .detail-list > div { display: grid; grid-template-columns: 75px minmax(0, 1fr); gap: 15px; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
@@ -415,4 +418,48 @@ button.plan-card { border-color: var(--control-border); }
   :is(.primary-button, .auth-button):not(:disabled):hover { border-color: var(--foreground); background: var(--foreground); color: var(--on-accent); }
   .inline-link:hover { text-decoration-thickness: 2px; }
   .calendar-day:not([aria-pressed="true"]):hover .day-number { background: var(--soft); }
+}
+
+/* Content must shrink inside grid/flex tracks, including user-written titles. */
+.page-heading > div, .plan-card, .day-workspace, .photo-story-caption > div { min-width: 0; }
+.page-heading, .plan-review, .plan-card, .auth-panel, .photo-story-caption, .note-panel, .memory-day-list { overflow-wrap: anywhere; }
+.detail-list dd { min-width: 0; flex-wrap: wrap; }
+.archive-links { max-width: 100%; flex-wrap: wrap; }
+.map-role { min-width: 0; flex-wrap: wrap; }
+.map-role label, .annual-option { min-height: 44px; }
+.check-field input, .annual-option input { flex-shrink: 0; }
+input, textarea, select { scroll-margin-block: 100px; }
+html { scroll-padding-bottom: 100px; }
+
+@media (max-width: 640px) {
+  /* A 16px editable font avoids Safari's automatic focus zoom. */
+  .app-main input:not([type="checkbox"]):not([type="radio"]), .app-main select, .app-main textarea { font-size: 16px; }
+  .app-main input[type="date"], .app-main input[type="time"], .app-main input[type="month"] { display: block; min-inline-size: 0; max-inline-size: 100%; }
+  .app-header { padding-top: max(23px, env(safe-area-inset-top)); padding-left: max(21px, env(safe-area-inset-left)); padding-right: max(21px, env(safe-area-inset-right)); }
+  .app-main { padding-left: max(21px, env(safe-area-inset-left)); padding-right: max(21px, env(safe-area-inset-right)); }
+  .app-navigation { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .page-heading { align-items: flex-start; flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+  .form-columns, .plan-basics, .coordinate-fields { grid-template-columns: minmax(0, 1fr); }
+  .calendar-toolbar { gap: 8px; }
+  .calendar-toolbar > .primary-button { flex-basis: 100%; }
+  .calendar-toolbar > .workspace-refresh, .calendar-toolbar > .checklist-refresh { margin-inline-start: auto; }
+  .anniversary-list li { align-items: flex-start; flex-wrap: wrap; }
+  .anniversary-count { margin-inline-start: auto; }
+  .route-point, .plan-activity { padding: 12px; }
+}
+
+.calendar-toolbar:has(.auth-field) { align-items: flex-end; }
+.calendar-toolbar > .auth-field { flex: 1 1 180px; }
+@media (max-width: 640px) {
+  h1 { font-size: 25px; }
+  .schedule-tools nav { left: 0; right: auto; max-width: calc(100vw - 42px); }
+  .settings-hint, .photo-local-notice, .place-search-panel .muted { font-size: 13px; }
+}
+
+@media (max-width: 640px) {
+  .app-navigation a:has(.navigation-pending) > svg { visibility: hidden; }
+  .app-navigation .navigation-pending { top: 7px; line-height: 19px; }
 }

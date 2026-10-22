@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   icons: { apple: "/pwa-icon/180" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const theme = resolveTheme((await cookies()).get(THEME_COOKIE)?.value);
