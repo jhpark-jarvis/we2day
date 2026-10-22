@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PhotoWorkspace } from "@/components/photo-workspace";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, previousYearDate, seoulToday } from "@/lib/calendar";
 import { type ProfileView, profileNames } from "@/lib/profiles";

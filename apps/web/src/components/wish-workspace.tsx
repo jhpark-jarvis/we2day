@@ -1,7 +1,7 @@
 "use client";
-import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { saveWish } from "@/app/actions/wishlist";
+import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { Wish, WishContent } from "@/lib/wishlist";
 export function WishWorkspace({

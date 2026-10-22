@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { AuthSubmit } from "@/components/auth-submit";
 import { ProfileSettings } from "@/components/profile-settings";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { createAuthClient } from "@/lib/auth/server";
 import type { ProfileView } from "@/lib/profiles";

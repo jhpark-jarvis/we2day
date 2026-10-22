@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from "@/components/progress-link";
 import { type AnniversaryList, countdown } from "@/lib/anniversaries";
 import { seoulToday } from "@/lib/calendar";
 

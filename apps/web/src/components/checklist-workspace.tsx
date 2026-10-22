@@ -1,8 +1,8 @@
 "use client";
 import { RefreshCw } from "lucide-react";
-import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { saveChecklist } from "@/app/actions/checklists";
+import Link from "@/components/progress-link";
 import type { Checklist, ChecklistContent, ChecklistItem } from "@/lib/checklists";
 
 export function ChecklistWorkspace({

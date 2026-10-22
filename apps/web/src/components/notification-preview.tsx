@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import type { AnniversaryNotificationPreview } from "@/lib/reminders";
 
 export function NotificationPreview({

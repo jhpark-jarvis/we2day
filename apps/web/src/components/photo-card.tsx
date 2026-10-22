@@ -8,8 +8,8 @@ import { koreanTimestamp, type SharedPhoto } from "@/lib/photos";
 function ActionSubmit({ children, ready }: { children: string; ready: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button className="text-button" type="submit" disabled={!ready || pending}>
-      {pending ? "처리 중…" : children}
+    <button className="text-button" type="submit" disabled={!ready || pending} aria-busy={pending}>
+      {children}
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { TodayWorkspace } from "@/components/today-workspace";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";

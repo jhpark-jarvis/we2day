@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { LoadingRegion } from "@/components/loading-region";
 
 type Configuration = {
   configured: boolean;
@@ -35,7 +36,7 @@ export function PushSettings() {
   const [enabled, setEnabled] = useState(false);
   const [automatic, setAutomatic] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(true);
   const [notice, setNotice] = useState("");
   const refresh = useCallback(async () => {
     setPending(true);
@@ -190,78 +191,74 @@ export function PushSettings() {
       <p className="settings-hint">
         iPhone: HTTPS 주소를 Safari에서 열고 홈 화면에 추가한 뒤, 홈 화면 앱에서 켜 주세요.
       </p>
-      {!supported && (
-        <p className="settings-hint">
-          이 화면에서는 기기 알림을 사용할 수 없어요. HTTPS·홈 화면 앱·브라우저 지원을 확인해
-          주세요.
+      <LoadingRegion busy={pending} label="기기 알림 상태를 확인하는 중">
+        <p className="settings-hint push-capability-note">
+          {config === null
+            ? "\u00a0"
+            : !supported
+              ? "이 화면에서는 기기 알림을 사용할 수 없어요. HTTPS·홈 화면 앱·브라우저 지원을 확인해 주세요."
+              : !config.configured
+                ? "서버 알림 설정을 준비 중이에요. 아직 기기 권한을 요청하지 않아요."
+                : enabled
+                  ? "이 기기에 등록된 알림이 있어요."
+                  : "이 기기에는 알림이 꺼져 있어요."}
         </p>
-      )}
-      {config && !config.configured && (
-        <p className="settings-hint">
-          서버 알림 설정을 준비 중이에요. 아직 기기 권한을 요청하지 않아요.
-        </p>
-      )}
-      {supported && config?.configured && (
-        <>
-          <p className="settings-hint">
-            {enabled ? "이 기기에 등록된 알림이 있어요." : "이 기기에는 알림이 꺼져 있어요."}
-          </p>
-          <button type="button" className="primary-button" disabled={pending} onClick={enable}>
+        <div className="calendar-toolbar">
+          <button
+            type="button"
+            className="primary-button"
+            disabled={pending || !supported || !config?.configured}
+            onClick={enable}
+          >
             {enabled ? "기기 등록 갱신" : "이 기기에서 알림 켜기"}
           </button>
-          {enabled && (
-            <div className="auth-options">
-              <button
-                type="button"
-                className="text-button"
-                disabled={pending}
-                onClick={() => act("test")}
-              >
-                테스트 알림 보내기
-              </button>
-            </div>
-          )}
-          {enabled && config.automatic_available && (
-            <div className="account-settings">
-              <h3>기념일 알림</h3>
-              <p className="settings-hint">
-                한국 시간 오전 9시, 기념일 7일 전·1일 전·당일에 받아요. 이 기기에서 별도로 켠
-                경우에만 자동으로 보내요.
-              </p>
-              <button
-                type="button"
-                className="text-button notification-switch"
-                role="switch"
-                aria-checked={automatic}
-                aria-label="자동 기념일 알림"
-                disabled={pending}
-                onClick={() => act(automatic ? "automatic_off" : "automatic_on")}
-              >
-                <span>자동 기념일 알림</span>
-                <span className="notification-switch-track" aria-hidden="true" />
-                <span>{automatic ? "켜짐" : "꺼짐"}</span>
-              </button>
-              <p className="settings-hint">
-                지난 예약은 몰아서 보내지 않아요. 발송은 오전 10시까지 시도하며, 기기와 통신 상태에
-                따라 도착이 늦거나 전달되지 않을 수 있어요.
-              </p>
-            </div>
-          )}
-        </>
-      )}
-      {supported && hasSubscription && (
-        <button
-          type="button"
-          className="text-button"
-          disabled={pending}
-          onClick={() => act("remove")}
-        >
-          이 기기 알림 끄기
-        </button>
-      )}
-      <button type="button" className="text-button" disabled={pending} onClick={refresh}>
-        알림 상태 다시 확인
-      </button>
+          <button
+            type="button"
+            className="text-button"
+            disabled={pending || !supported || !enabled}
+            onClick={() => act("test")}
+          >
+            테스트 알림 보내기
+          </button>
+        </div>
+        <div className="account-settings">
+          <h3>기념일 알림</h3>
+          <p className="settings-hint">
+            한국 시간 오전 9시, 기념일 7일 전·1일 전·당일에 받아요. 이 기기에서 별도로 켠 경우에만
+            자동으로 보내요.
+          </p>
+          <button
+            type="button"
+            className="text-button notification-switch"
+            role="switch"
+            aria-checked={automatic}
+            aria-label="자동 기념일 알림"
+            disabled={pending || !supported || !enabled || !config?.automatic_available}
+            onClick={() => act(automatic ? "automatic_off" : "automatic_on")}
+          >
+            <span>자동 기념일 알림</span>
+            <span className="notification-switch-track" aria-hidden="true" />
+            <span>{automatic ? "켜짐" : "꺼짐"}</span>
+          </button>
+          <p className="settings-hint">
+            지난 예약은 몰아서 보내지 않아요. 발송은 오전 10시까지 시도하며, 기기와 통신 상태에 따라
+            도착이 늦거나 전달되지 않을 수 있어요.
+          </p>
+        </div>
+        <div className="calendar-toolbar">
+          <button
+            type="button"
+            className="text-button"
+            disabled={pending || !supported || !hasSubscription}
+            onClick={() => act("remove")}
+          >
+            이 기기 알림 끄기
+          </button>
+          <button type="button" className="text-button" disabled={pending} onClick={refresh}>
+            알림 상태 다시 확인
+          </button>
+        </div>
+      </LoadingRegion>
       {notice && (
         <p role="status" className="settings-hint">
           {notice}
@@ -270,7 +267,6 @@ export function PushSettings() {
       <p className="settings-hint">
         등록은 30일간 유효해요. 로그아웃하면 이 계정의 모든 기기 알림이 해지되어 다시 켜야 해요.
         테스트는 1분에 한 번 보낼 수 있어요.
-        {!config?.automatic_available && " 기념일 자동 예약 발송은 아직 준비 중이에요."}
       </p>
     </section>
   );

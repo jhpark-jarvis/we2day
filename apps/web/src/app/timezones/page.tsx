@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { NextAppointment } from "@/components/next-appointment";
+import Link from "@/components/progress-link";
 import { TimezoneSettings } from "@/components/timezone-settings";
 import { callApi } from "@/lib/api";
 import type { TimezoneView } from "@/lib/timezones";

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import Link from "@/components/progress-link";
 import { ReportWorkspace } from "@/components/report-workspace";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";

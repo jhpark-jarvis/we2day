@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { saveReport } from "@/app/actions/reports";
+import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import type { DatePlan } from "@/lib/plans";
 import type { DateReport, ReportContent } from "@/lib/reports";

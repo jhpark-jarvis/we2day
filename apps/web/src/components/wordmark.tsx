@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 
 export function Wordmark() {
   return (

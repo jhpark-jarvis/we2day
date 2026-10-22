@@ -396,19 +396,11 @@ button.plan-card { border-color: var(--control-border); }
 .schedule-tools nav { position: absolute; top: 100%; right: 0; z-index: 6; width: 200px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--background); }
 .schedule-tools a { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: 8px; }
 .schedule-tools a:hover { background: var(--panel); }
-.page-loading { padding: 10px 0; }
-.page-loading > p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
-.loading-heading, .loading-line, .loading-panel { background: var(--panel); border-radius: 8px; }
-.loading-heading { height: 30px; width: 160px; margin-bottom: 16px; }
-.loading-line { height: 14px; width: min(280px, 80%); margin-bottom: 32px; }
-.loading-panel { height: 220px; width: 100%; }
 .app-navigation a { position: relative; }
-.navigation-pending { position: absolute; top: 100%; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--accent); white-space: nowrap; }
 .archive-links { display: inline-flex; border: 1px solid var(--control-border); padding: 3px; border-radius: 12px; background: var(--panel); margin: 0 0 20px; }
 .archive-links a { min-height: 44px; padding: 8px 16px; border-radius: 9px; display: flex; align-items: center; }
 .archive-links [aria-current="page"] { background: var(--accent); color: var(--on-accent); }
 @media (max-width: 640px) {
-  .navigation-pending { top: 0; font-size: 10px; }
   .together-grid { grid-template-columns: 1fr; gap: 12px; }
   .together-card { padding: 20px; padding-right: 48px; }
 }
@@ -459,7 +451,33 @@ html { scroll-padding-bottom: 100px; }
   .settings-hint, .photo-local-notice, .place-search-panel .muted { font-size: 13px; }
 }
 
+/* Loading indicators never take space away from the content they describe. */
+.loading-region { position: relative; min-width: 0; isolation: isolate; }
+.loading-region > [inert] { pointer-events: none; user-select: none; }
+.loading-veil { position: absolute; inset: 0; z-index: 2; display: block; border-radius: 10px; background: color-mix(in srgb, var(--background) 66%, transparent); cursor: progress; }
+.loading-veil > .loading-spinner { display: block; position: sticky; top: 40svh; margin: 24px auto; }
+.loading-spinner, button[aria-busy="true"]::after { display: inline-block; width: 20px; height: 20px; box-sizing: border-box; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: loading-spin .8s linear infinite; }
+button[aria-busy="true"] { position: relative; color: transparent !important; }
+button[aria-busy="true"] > svg { visibility: hidden; }
+button[aria-busy="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; }
+.loading-results { min-height: 160px; }
+.navigation-pending { position: fixed; inset: 0 0 auto; height: 3px; background: var(--line); z-index: 100; overflow: hidden; }
+.navigation-pending::after { content: ""; display: block; width: 35%; height: 100%; background: var(--accent); animation: loading-travel 1.2s ease-in-out infinite alternate; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@keyframes loading-travel { from { transform: translateX(0); } to { transform: translateX(186%); } }
 @media (max-width: 640px) {
-  .app-navigation a:has(.navigation-pending) > svg { visibility: hidden; }
-  .app-navigation .navigation-pending { top: 7px; line-height: 19px; }
+  .app-navigation a:has(.navigation-pending) > svg { visibility: visible; }
+  .app-navigation .navigation-pending { position: fixed; top: 0; line-height: normal; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner, button[aria-busy="true"]::after, .navigation-pending::after { animation: none; }
+}
+.push-capability-note { min-height: 4.8em; }
+
+.pwa-install-state { min-height: 3.2em; }
+.loading-region[data-loading="true"] .loading-region .loading-veil { display: none; }
+.loading-veil::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: var(--accent); opacity: .6; }
+.auth-field select, .record-search-fields select { appearance: none; padding-inline-end: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%2378695d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; }
+/* WebKit can lose inherited color variables on native selects after navigation. */
+.auth-field select, .record-search-fields select { border: 1px solid #e7ded2; background-color: #fffdf9; color: #46392f; }
+html[data-theme="white"] :is(.auth-field, .record-search-fields) select { border-color: #e4e7e1; background-color: #ffffff; color: #30342f; }

@@ -1,9 +1,8 @@
 "use client";
 
 import { CalendarDays, Heart, Images, Settings2 } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NavigationPending } from "@/components/navigation-pending";
+import Link from "@/components/progress-link";
 import { Wordmark } from "@/components/wordmark";
 
 const navigation = [
@@ -51,7 +50,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link key={href} href={href} aria-current={active ? "page" : undefined}>
               <Icon size={19} aria-hidden="true" />
               <span>{label}</span>
-              <NavigationPending />
             </Link>
           );
         })}

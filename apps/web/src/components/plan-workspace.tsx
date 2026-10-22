@@ -1,9 +1,9 @@
 "use client";
-import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { changePlan } from "@/app/actions/plans";
 import { PlaceSearch } from "@/components/place-search";
 import { PlanChecks } from "@/components/plan-checks";
+import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import {
   type Activity,
@@ -541,8 +541,8 @@ function PlanEditor({
                 onChange={(event) => setPreparation(event.target.value)}
               />
             </div>
-            <button type="submit" className="primary-button">
-              {pending ? "처리 중…" : "플랜 저장"}
+            <button type="submit" className="primary-button" aria-busy={pending}>
+              {"플랜 저장"}
             </button>
             <p className="settings-hint">저장만으로 달력 약속은 바뀌지 않아요.</p>
             {plan && (

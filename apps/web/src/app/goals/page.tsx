@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { GoalWorkspace } from "@/components/goal-workspace";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import type { Goal } from "@/lib/goals";
 import type { Couple } from "@/lib/shared-calendar";

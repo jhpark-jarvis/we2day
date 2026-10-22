@@ -1,7 +1,7 @@
 "use client";
-import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { saveGoal } from "@/app/actions/goals";
+import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { Goal, GoalContent, GoalStep } from "@/lib/goals";
 import { goalProgress } from "@/lib/goals";

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.use({ serviceWorkers: "block" });
+
 test("transient place lookup preserves the appointment and rejects unsafe links", async ({
   page,
 }, testInfo) => {

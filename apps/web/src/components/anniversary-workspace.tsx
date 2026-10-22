@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { AnniversaryForm } from "@/components/anniversary-form";
 import { useAnniversaryDay } from "@/components/anniversary-summary";
+import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import { type Anniversary, type AnniversaryList, countdown, kinds } from "@/lib/anniversaries";
 

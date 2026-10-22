@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LoadingRegion } from "@/components/loading-region";
 import { type PreparedPhoto, preparePhoto } from "@/lib/photo-preparation";
 import type { SharedPhoto } from "@/lib/photos";
 
@@ -131,52 +132,56 @@ export function PhotoPreparation({
           ? "미리보기는 이 기기에만 있어요. ‘둘의 사진으로 저장’을 누르면 압축본과 아래 사진 정보가 둘의 공간에 저장돼요. 원본은 전송하지 않아요."
           : "지금은 이 기기에서만 사진을 준비해요. 공유 공간에 저장되거나 상대에게 전송되지 않으며, 새로고침하면 선택이 사라져요."}
       </p>
-      <div className="photo-controls">
-        <div className="auth-field">
-          <label htmlFor="photo-date">만난 날짜</label>
-          <input
-            id="photo-date"
-            type="date"
-            min="2000-01-01"
-            max="2100-12-31"
-            required
-            disabled={!ready || saving || locked}
-            value={date}
-            onChange={(event) => {
-              setDate(event.target.value);
-              onDateChange?.(event.target.value);
-            }}
-          />
+      <LoadingRegion busy={busy} label="사진을 기기에서 압축하고 있어요">
+        <div className="photo-controls">
+          <div className="auth-field">
+            <label htmlFor="photo-date">만난 날짜</label>
+            <input
+              id="photo-date"
+              type="date"
+              min="2000-01-01"
+              max="2100-12-31"
+              required
+              disabled={!ready || saving || locked}
+              value={date}
+              onChange={(event) => {
+                setDate(event.target.value);
+                onDateChange?.(event.target.value);
+              }}
+            />
+          </div>
+          <div className="auth-field">
+            <label htmlFor="photo-file">사진 선택</label>
+            <input
+              ref={input}
+              id="photo-file"
+              type="file"
+              disabled={!ready || saving || locked}
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                void select(file);
+              }}
+            />
+            <p className="muted">JPEG·PNG·WebP · 한 장씩 · 최대 20MB</p>
+          </div>
         </div>
-        <div className="auth-field">
-          <label htmlFor="photo-file">사진 선택</label>
-          <input
-            ref={input}
-            id="photo-file"
-            type="file"
-            disabled={!ready || saving || locked}
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              void select(file);
-            }}
-          />
-          <p className="muted">JPEG·PNG·WebP · 한 장씩 · 최대 20MB</p>
-        </div>
-      </div>
+      </LoadingRegion>
       {!validDate && <p className="error-message">2000~2100년 사이의 만난 날짜를 선택해 주세요.</p>}
-      {busy && <p role="status">사진을 기기에서 압축하고 있어요…</p>}
       {error && (
         <p className="error-message" role="alert">
           {error}
         </p>
       )}
-      {(busy || photo || error) && (
-        <button className="text-button" type="button" disabled={saving} onClick={clear}>
-          선택 해제
-        </button>
-      )}
+      <button
+        className="text-button"
+        type="button"
+        disabled={saving || (!busy && !photo && !error)}
+        onClick={clear}
+      >
+        선택 해제
+      </button>
       {photo && (
         <>
           <figure className="photo-draft-story">
@@ -255,16 +260,11 @@ export function PhotoPreparation({
               <button
                 className="primary-button"
                 type="button"
+                aria-busy={saving}
                 disabled={!validDate || saving || saved}
                 onClick={() => void save()}
               >
-                {saved
-                  ? "저장 완료"
-                  : saving
-                    ? "사진 저장 중…"
-                    : saveError
-                      ? "같은 사진 다시 저장"
-                      : "둘의 사진으로 저장"}
+                {saved ? "저장 완료" : saveError ? "같은 사진 다시 저장" : "둘의 사진으로 저장"}
               </button>
               {saved && (
                 <p role="status">

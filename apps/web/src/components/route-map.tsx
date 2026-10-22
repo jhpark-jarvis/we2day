@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { LoadingRegion } from "@/components/loading-region";
 import { loadNaverMap, type MapInstance } from "@/lib/naver-map";
 import type { RouteContent } from "@/lib/routes";
 export function RouteMap({
@@ -143,17 +144,19 @@ export function RouteMap({
           {error}
         </p>
       )}
-      <div className="route-map-frame" ref={frame}>
-        <section
-          ref={element}
-          className="route-map-canvas"
-          aria-label={
-            onPoint
-              ? "출발점과 도착점을 지정하는 네이버 지도"
-              : "저장한 두 점을 표시하는 네이버 지도"
-          }
-        />
-      </div>
+      <LoadingRegion busy={!ready && !error} label="지도를 불러오는 중">
+        <div className="route-map-frame" ref={frame}>
+          <section
+            ref={element}
+            className="route-map-canvas"
+            aria-label={
+              onPoint
+                ? "출발점과 도착점을 지정하는 네이버 지도"
+                : "저장한 두 점을 표시하는 네이버 지도"
+            }
+          />
+        </div>
+      </LoadingRegion>
       <p className="settings-hint">
         두 점 사이의 직선입니다. 실제 이동 경로나 거리를 뜻하지 않아요.
       </p>

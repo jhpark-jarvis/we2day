@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { QuestionForm } from "@/components/question-forms";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";

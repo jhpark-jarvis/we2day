@@ -1,8 +1,9 @@
 "use client";
 import Image from "next/image";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { searchPhotos } from "@/app/actions/photo-search";
+import { LoadingRegion } from "@/components/loading-region";
+import Link from "@/components/progress-link";
 import type { PhotoSearchPage, PhotoSearchQuery } from "@/lib/photo-search";
 import { zonedTimestamp } from "@/lib/timezones";
 
@@ -20,11 +21,11 @@ export function PhotoSearch({ start, end }: { start: string; end: string }) {
   const input = { start_date: startDate, end_date: endDate, query: query.trim(), field, uploader };
   const changed = submitted && JSON.stringify(input) !== JSON.stringify(submitted);
   function search(next: number, conditions: PhotoSearchQuery) {
-    setError("");
     run(async () => {
       try {
         const response = await searchPhotos(conditions, next);
         if (response.data) {
+          setError("");
           setResult(response.data);
           setSubmitted(conditions);
           setOffset(next);
@@ -35,7 +36,7 @@ export function PhotoSearch({ start, end }: { start: string; end: string }) {
     });
   }
   return (
-    <>
+    <LoadingRegion busy={pending} label="사진을 찾는 중">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -114,12 +115,11 @@ export function PhotoSearch({ start, end }: { start: string; end: string }) {
           <p className="settings-hint">
             한 번에 최대 366일을 찾아요. 검색어를 비우면 해당 기간의 사진을 모두 찾아요.
           </p>
-          <button className="primary-button" type="submit">
+          <button className="primary-button" type="submit" aria-busy={pending}>
             사진 검색
           </button>
         </fieldset>
       </form>
-      {pending && <p role="status">사진을 찾고 있어요.</p>}
       {error && (
         <p role="alert" className="error-message">
           {error} 입력한 조건은 유지돼요.
@@ -202,6 +202,6 @@ export function PhotoSearch({ start, end }: { start: string; end: string }) {
       <p className="settings-hint">
         같은 공간의 저장 완료된 사진만 찾아요. 휴지통의 사진은 휴지통에서 확인해 주세요.
       </p>
-    </>
+    </LoadingRegion>
   );
 }

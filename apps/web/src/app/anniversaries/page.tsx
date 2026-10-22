@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AnniversaryWorkspace } from "@/components/anniversary-workspace";
+import Link from "@/components/progress-link";
 import type { AnniversaryList } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";
 import type { Couple } from "@/lib/shared-calendar";

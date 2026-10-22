@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { QuestionSearch } from "@/components/question-search";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";

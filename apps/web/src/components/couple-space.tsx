@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
 import { acceptInvite, createCouple, createInvite } from "@/app/actions/couple";
 import { AuthSubmit } from "@/components/auth-submit";
+import Link from "@/components/progress-link";
 import type { Couple } from "@/lib/shared-calendar";
 
 export function CoupleSpace({ couple }: { couple: Couple | null }) {

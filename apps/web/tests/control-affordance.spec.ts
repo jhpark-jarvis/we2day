@@ -330,6 +330,8 @@ test("mobile navigation keeps pending feedback separate from menu labels", async
       .click();
     const pending = page.locator(".app-navigation .navigation-pending");
     await expect(pending).toBeVisible();
+    await expect(page.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
+    await expect(page.locator(".page-loading")).toHaveCount(0);
     expect(
       await pending.evaluate((element) => {
         const link = element.closest("a");
@@ -338,7 +340,7 @@ test("mobile navigation keeps pending feedback separate from menu labels", async
         return (
           !!icon &&
           !!label &&
-          getComputedStyle(icon).visibility === "hidden" &&
+          getComputedStyle(icon).visibility === "visible" &&
           element.getBoundingClientRect().bottom <= label.getBoundingClientRect().top
         );
       }),

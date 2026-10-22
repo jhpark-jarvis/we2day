@@ -1,6 +1,6 @@
 "use client";
-import Link from "next/link";
 import { useState } from "react";
+import Link from "@/components/progress-link";
 import { downloadRecord } from "@/lib/file-download";
 
 const kinds = {
@@ -164,8 +164,13 @@ export function RecordExport({ today }: { today: string }) {
             />
             파일에 메모·사진 참고 정보·선택한 기록의 좌표가 들어갈 수 있음을 확인했어요
           </label>
-          <button className="primary-button" type="submit" disabled={!confirmed}>
-            {pending ? "파일 만드는 중…" : "기록 사본 다운로드"}
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={!confirmed}
+            aria-busy={pending}
+          >
+            {"기록 사본 다운로드"}
           </button>
         </fieldset>
       </form>

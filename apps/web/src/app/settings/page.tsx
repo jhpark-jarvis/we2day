@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { PushSettings } from "@/components/push-settings";
 import { PwaSettings } from "@/components/pwa-settings";
 import { ThemePicker } from "@/components/theme-picker";

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { PlanWorkspace } from "@/components/plan-workspace";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
 import type { DatePlan, PlanContent } from "@/lib/plans";

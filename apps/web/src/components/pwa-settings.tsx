@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { LoadingRegion } from "@/components/loading-region";
 
 type InstallPrompt = Event & { prompt: () => Promise<{ outcome: "accepted" | "dismissed" }> };
 export function PwaSettings() {
@@ -110,46 +111,50 @@ export function PwaSettings() {
   }
   return (
     <section className="settings-section account-settings">
-      <h2>홈 화면에 설치</h2>
-      <p className="muted">
-        {installed
-          ? "홈 화면 앱으로 사용 중이에요."
-          : "휴대폰의 홈 화면에서 WE2DAY를 바로 열어보세요."}
-      </p>
-      {!installed && (
-        <>
-          <p className="settings-hint">
-            iPhone·iPad: Safari의 공유 메뉴 → 홈 화면에 추가
-            <br />
-            Android·Chrome: 브라우저 메뉴 → 앱 설치 또는 홈 화면에 추가
-          </p>
-          {prompt && (
-            <button type="button" className="primary-button" disabled={pending} onClick={install}>
-              WE2DAY 설치
-            </button>
-          )}
-        </>
-      )}
-      <button type="button" className="text-button" disabled={pending} onClick={checkUpdate}>
-        업데이트 확인
-      </button>
-      {waiting && (
-        <>
-          <p className="settings-hint">다른 화면에서 작성 중인 내용도 먼저 저장해 주세요.</p>
-          <button type="button" className="primary-button" onClick={update}>
-            업데이트 적용 후 새로고침
-          </button>
-        </>
-      )}
-      {notice && (
-        <p role="status" className="settings-hint">
-          {notice}
+      <LoadingRegion busy={pending} label="앱 준비를 확인하는 중">
+        <h2>홈 화면에 설치</h2>
+        <p className="muted pwa-install-state">
+          {installed
+            ? "홈 화면 앱으로 사용 중이에요."
+            : "휴대폰의 홈 화면에서 WE2DAY를 바로 열어보세요."}
         </p>
-      )}
-      <p className="settings-hint">
-        연결이 끊기면 연결 안내 화면을 표시해요. 일정·사진·회고의 오프라인 열람과 편집은 아직
-        지원하지 않아요.
-      </p>
+        <p className="settings-hint">
+          iPhone·iPad: Safari의 공유 메뉴 → 홈 화면에 추가
+          <br />
+          Android·Chrome: 브라우저 메뉴 → 앱 설치 또는 홈 화면에 추가
+        </p>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={pending || !prompt || installed}
+          onClick={install}
+        >
+          WE2DAY 설치
+        </button>
+        <button type="button" className="text-button" disabled={pending} onClick={checkUpdate}>
+          업데이트 확인
+        </button>
+        <p className="settings-hint">
+          새 버전이 준비되면 적용할 수 있어요. 작성 중인 내용은 먼저 저장해 주세요.
+        </p>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={!waiting || pending}
+          onClick={update}
+        >
+          업데이트 적용 후 새로고침
+        </button>
+        {notice && (
+          <p role="status" className="settings-hint">
+            {notice}
+          </p>
+        )}
+        <p className="settings-hint">
+          연결이 끊기면 연결 안내 화면을 표시해요. 일정·사진·회고의 오프라인 열람과 편집은 아직
+          지원하지 않아요.
+        </p>
+      </LoadingRegion>
     </section>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
 import { useState } from "react";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
+import Link from "@/components/progress-link";
 import { VisitProgressPanel } from "@/components/visit-progress";
 import type { DatePlan } from "@/lib/plans";
 import { planBudget } from "@/lib/timeline";

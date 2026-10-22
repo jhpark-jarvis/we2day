@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { RouletteEditor } from "@/components/roulette-editor";
 import { callApi } from "@/lib/api";
 import type { RouletteWheel } from "@/lib/roulette";

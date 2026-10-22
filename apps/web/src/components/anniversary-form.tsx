@@ -159,8 +159,8 @@ function Buttons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
   return (
     <>
-      <button type="submit" className="auth-button" disabled={pending}>
-        {pending ? "저장 중…" : "기념일 저장하기"}
+      <button type="submit" className="auth-button" disabled={pending} aria-busy={pending}>
+        {"기념일 저장하기"}
       </button>
       <button type="button" className="text-button" disabled={pending} onClick={onCancel}>
         취소

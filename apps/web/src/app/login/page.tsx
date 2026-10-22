@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { signIn } from "@/app/actions/auth";
 import { AuthSubmit } from "@/components/auth-submit";
+import Link from "@/components/progress-link";
 import { UsernameLoginForm } from "@/components/username-login-form";
 import { getAuthConfig } from "@/lib/auth/config";
 

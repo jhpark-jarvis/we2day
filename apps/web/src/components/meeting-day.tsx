@@ -9,8 +9,8 @@ import type { MeetingDay } from "@/lib/meetings";
 function SubmitMeeting() {
   const { pending } = useFormStatus();
   return (
-    <button className="primary-button" type="submit" disabled={pending}>
-      {pending ? "만남 기록 저장 중…" : "만남 기록 저장"}
+    <button className="primary-button" type="submit" disabled={pending} aria-busy={pending}>
+      {"만남 기록 저장"}
     </button>
   );
 }

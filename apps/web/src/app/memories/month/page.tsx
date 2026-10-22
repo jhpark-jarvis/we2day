@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
 import type { MonthlyMemories } from "@/lib/monthly";

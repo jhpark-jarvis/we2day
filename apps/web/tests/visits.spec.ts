@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.use({ serviceWorkers: "block" });
+
 test("shared visit progress preserves previous publications and handles conflicts and retries", async ({
   page,
   browser,
@@ -7,6 +9,7 @@ test("shared visit progress preserves previous publications and handles conflict
   test.setTimeout(180_000);
   page.setDefaultTimeout(15_000);
   const partnerContext = await browser.newContext({
+    serviceWorkers: "block",
     baseURL: "http://127.0.0.1:3100",
     viewport: { width: 390, height: 844 },
   });
@@ -41,8 +44,23 @@ test("shared visit progress preserves previous publications and handles conflict
     await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
     await expect(page.getByRole("heading", { name: "합성 방문 플랜", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
+    await page.route("**/api/visits?*", (request) =>
+      request.fulfill({ status: 503, json: { error: "합성 방문 조회 실패" } }),
+    );
     await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
     await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
+    await page.goto(`/today?date=${date}`);
+    const initialProgress = page.getByRole("region", { name: "공동 방문 진행", exact: true });
+    await expect(initialProgress.getByRole("alert")).toBeVisible();
+    await expect(initialProgress.locator(".plan-card strong").first()).toHaveText("확인 필요");
+    await expect(
+      initialProgress.getByRole("button", { name: "방문 완료", exact: true }).first(),
+    ).toBeDisabled();
+    await page.unroute("**/api/visits?*");
+    await initialProgress
+      .getByRole("button", { name: "최신 방문 진행 불러오기", exact: true })
+      .click();
+    await expect(initialProgress.locator(".plan-card strong").first()).toHaveText("예정");
     for (const view of [page, partner]) {
       await view.goto(`/today?date=${date}`);
       await expect(

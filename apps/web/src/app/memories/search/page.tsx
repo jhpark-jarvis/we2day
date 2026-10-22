@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { PhotoSearch } from "@/components/photo-search";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
 import type { Couple } from "@/lib/shared-calendar";

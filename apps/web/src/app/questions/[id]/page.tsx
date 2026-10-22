@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { AnswerEditor, AnswerRefresh } from "@/components/question-forms";
 import { callApi } from "@/lib/api";
 import type { QuestionView } from "@/lib/questions";

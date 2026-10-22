@@ -69,8 +69,9 @@ export function ProfileSettings({
         className="primary-button"
         type="submit"
         disabled={pending || !!loadError || !name.trim()}
+        aria-busy={pending}
       >
-        {pending ? "저장 중…" : "이름 저장"}
+        {"이름 저장"}
       </button>
       {notice && <p role="status">{notice}</p>}
       {error && (

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { CalendarExport } from "@/components/calendar-export";
+import Link from "@/components/progress-link";
 import { seoulToday } from "@/lib/calendar";
 export default function CalendarExportPage() {
   return (

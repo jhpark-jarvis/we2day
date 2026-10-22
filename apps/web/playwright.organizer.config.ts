@@ -21,5 +21,6 @@ export default defineConfig({
     "home-summary.spec.ts",
     "calendar-controls.spec.ts",
     "control-affordance.spec.ts",
+    "loading-stability.spec.ts",
   ],
 });

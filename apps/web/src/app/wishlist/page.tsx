@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/progress-link";
 import { WishWorkspace } from "@/components/wish-workspace";
 import { callApi } from "@/lib/api";
 import type { Couple } from "@/lib/shared-calendar";

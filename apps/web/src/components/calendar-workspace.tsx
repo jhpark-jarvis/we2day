@@ -10,13 +10,14 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { AppointmentForm } from "@/components/appointment-form";
+import { LoadingRegion } from "@/components/loading-region";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
 import { MeetingDayEditor } from "@/components/meeting-day";
 import { PhotoStory } from "@/components/photo-story";
 import { PlaceSearch } from "@/components/place-search";
+import Link from "@/components/progress-link";
 import { RouteWorkspace } from "@/components/route-workspace";
 import { calendarDate, daysInMonth, parseDate } from "@/lib/calendar";
 import type { MeetingDay } from "@/lib/meetings";
@@ -151,14 +152,15 @@ export function CalendarWorkspace({
     if (preview || status !== "ready") return;
     const controller = new AbortController();
     setMeetingLoading(true);
-    setMeetingError("");
-    setMeetings([]);
     setMeetingNotice("");
     fetch(`/api/meetings?month=${monthKey}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "만난 날을 불러오지 못했어요.");
-        if (!controller.signal.aborted) setMeetings(body);
+        if (!controller.signal.aborted) {
+          setMeetingError("");
+          setMeetings(body);
+        }
       })
       .catch((failure) => {
         if (!controller.signal.aborted) setMeetingError(failure.message);
@@ -184,12 +186,14 @@ export function CalendarWorkspace({
     }
     const controller = new AbortController();
     setLoading(true);
-    setError("");
     fetch(`/api/appointments?month=${monthKey}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "일정을 불러오지 못했어요.");
-        if (!controller.signal.aborted) setSavedEvents(body);
+        if (!controller.signal.aborted) {
+          setError("");
+          setSavedEvents(body);
+        }
       })
       .catch((failure) => {
         if (!controller.signal.aborted)
@@ -363,180 +367,183 @@ export function CalendarWorkspace({
           {error}
         </p>
       )}
-      {loading && (
-        <p className="muted" role="status">
-          일정을 불러오는 중…
-        </p>
-      )}
-      <div className="calendar-workspace">
-        <section className="month-calendar" aria-label="월 달력">
-          <div className="month-heading">
-            <h2 aria-live="polite" aria-atomic="true">
-              {year}년 {month + 1}월
-            </h2>
-            <div className="month-actions">
-              <button className="today-button" type="button" onClick={() => setSelected(today)}>
-                오늘
-              </button>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => changeMonth(-1)}
-                aria-label="이전 달"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => changeMonth(1)}
-                aria-label="다음 달"
-              >
-                <ChevronRight size={18} />
-              </button>
-              {!preview && status === "ready" && (
-                <button
-                  className="icon-button calendar-refresh"
-                  type="button"
-                  aria-label="일정 새로고침"
-                  title="일정 새로고침"
-                  aria-busy={loading}
-                  disabled={loading}
-                  onClick={() => setRefresh((value) => value + 1)}
-                >
-                  <RefreshCw size={18} aria-hidden="true" />
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="weekdays" aria-hidden="true">
-            {weekdays.map((label) => (
-              <span key={label}>{label}</span>
-            ))}
-          </div>
-          <p id={keyboardHelpId} className="sr-only">
-            방향키로 날짜와 주를 이동하고, Home·End로 주의 처음과 끝, Page Up·Down으로 월을
-            이동해요. Shift와 Page Up·Down은 연도를 이동해요.
-          </p>
-          <div className="calendar-days" ref={calendarElement}>
-            {weekdays.slice(0, leading).map((weekday) => (
-              <span key={`blank-${weekday}`} aria-hidden="true" />
-            ))}
-            {Array.from({ length: daysInMonth(year, month) }, (_, i) => {
-              const value = i + 1,
-                key = calendarDate(year, month, value),
-                hasEvent = events.some((event) => event.date === key),
-                hasMet =
-                  !preview && meetings.some((meeting) => meeting.date === key && meeting.met);
-              return (
-                <button
-                  className={`calendar-day${(leading + i) % 7 === 0 ? " sunday" : ""}${hasMet ? " has-meeting" : ""}`}
-                  key={key}
-                  type="button"
-                  aria-label={`${month + 1}월 ${value}일${hasEvent ? ", 약속 있음" : ""}${hasMet ? ", 만난 날" : ""}`}
-                  aria-pressed={key === selected}
-                  aria-current={key === today ? "date" : undefined}
-                  aria-describedby={key === selected ? keyboardHelpId : undefined}
-                  data-date={key}
-                  tabIndex={key === selected ? 0 : -1}
-                  onKeyDown={moveDate}
-                  onClick={() => {
-                    setSelected(key);
-                    setMeetingNotice("");
-                  }}
-                >
-                  <span className="day-number">
-                    <span className="day-label">{value}</span>
-                    <span className={`day-dot${hasEvent ? " has-event" : ""}`} aria-hidden="true" />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="calendar-caption">
-            {preview || status !== "ready"
-              ? "둘의 시간을 한곳에"
-              : "작은 점은 약속 · 밑줄은 만난 날"}
-          </p>
-        </section>
-        <div className="day-workspace">
-          <section className="agenda" aria-label="선택한 날짜의 약속">
-            <header className="agenda-heading">
-              <h2 aria-live="polite">
-                {month + 1}월 {day}일 <small>{weekday}요일</small>
+      <LoadingRegion busy={loading} label="일정을 불러오는 중">
+        <div className="calendar-workspace">
+          <section className="month-calendar" aria-label="월 달력">
+            <div className="month-heading">
+              <h2 aria-live="polite" aria-atomic="true">
+                {year}년 {month + 1}월
               </h2>
-              <span className="muted">약속 {dayEvents.length}</span>
-            </header>
-            {dayEvents.length ? (
-              dayEvents.map((event) => (
-                <button
-                  className="appointment-row"
-                  type="button"
-                  key={event.id}
-                  onClick={() => setDetail(event)}
-                >
-                  <time>{event.time}</time>
-                  <span>
-                    <strong>{event.title}</strong>
-                    <small>{event.note}</small>
-                  </span>
-                  <ChevronRight size={16} aria-hidden="true" />
+              <div className="month-actions">
+                <button className="today-button" type="button" onClick={() => setSelected(today)}>
+                  오늘
                 </button>
-              ))
-            ) : (
-              <div className="empty-state">
-                <CalendarDays size={24} aria-hidden="true" />
-                <h3>아직 약속이 없어요</h3>
-                <p>함께할 시간을 담아갈 공간이에요.</p>
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() => changeMonth(-1)}
+                  aria-label="이전 달"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() => changeMonth(1)}
+                  aria-label="다음 달"
+                >
+                  <ChevronRight size={18} />
+                </button>
+                {!preview && status === "ready" && (
+                  <button
+                    className="icon-button calendar-refresh"
+                    type="button"
+                    aria-label="일정 새로고침"
+                    title="일정 새로고침"
+                    aria-busy={loading}
+                    disabled={loading}
+                    onClick={() => setRefresh((value) => value + 1)}
+                  >
+                    <RefreshCw size={18} aria-hidden="true" />
+                  </button>
+                )}
               </div>
-            )}
+            </div>
+            <div className="weekdays" aria-hidden="true">
+              {weekdays.map((label) => (
+                <span key={label}>{label}</span>
+              ))}
+            </div>
+            <p id={keyboardHelpId} className="sr-only">
+              방향키로 날짜와 주를 이동하고, Home·End로 주의 처음과 끝, Page Up·Down으로 월을
+              이동해요. Shift와 Page Up·Down은 연도를 이동해요.
+            </p>
+            <div className="calendar-days" ref={calendarElement}>
+              {weekdays.slice(0, leading).map((weekday) => (
+                <span key={`blank-${weekday}`} aria-hidden="true" />
+              ))}
+              {Array.from({ length: daysInMonth(year, month) }, (_, i) => {
+                const value = i + 1,
+                  key = calendarDate(year, month, value),
+                  hasEvent = events.some((event) => event.date === key),
+                  hasMet =
+                    !preview && meetings.some((meeting) => meeting.date === key && meeting.met);
+                return (
+                  <button
+                    className={`calendar-day${(leading + i) % 7 === 0 ? " sunday" : ""}${hasMet ? " has-meeting" : ""}`}
+                    key={key}
+                    type="button"
+                    aria-label={`${month + 1}월 ${value}일${hasEvent ? ", 약속 있음" : ""}${hasMet ? ", 만난 날" : ""}`}
+                    aria-pressed={key === selected}
+                    aria-current={key === today ? "date" : undefined}
+                    aria-describedby={key === selected ? keyboardHelpId : undefined}
+                    data-date={key}
+                    tabIndex={key === selected ? 0 : -1}
+                    onKeyDown={moveDate}
+                    onClick={() => {
+                      setSelected(key);
+                      setMeetingNotice("");
+                    }}
+                  >
+                    <span className="day-number">
+                      <span className="day-label">{value}</span>
+                      <span
+                        className={`day-dot${hasEvent ? " has-event" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="calendar-caption">
+              {preview || status !== "ready"
+                ? "둘의 시간을 한곳에"
+                : "작은 점은 약속 · 밑줄은 만난 날"}
+            </p>
           </section>
-          {!preview && status === "ready" && (
-            <>
-              {meetingLoading ? (
-                <p className="settings-hint">만난 날을 불러오는 중…</p>
-              ) : meetingError ? (
-                <p className="settings-hint">
-                  만남 기록을 불러오지 못했어요. 일정 새로고침으로 다시 시도해 주세요.
-                </p>
-              ) : (
-                <MeetingDayEditor
-                  key={`${selected}:${meetings.find((item) => item.date === selected)?.version || 0}`}
-                  date={selected}
-                  today={today}
-                  record={meetings.find((item) => item.date === selected)}
-                  onSaved={onMeetingSaved}
-                  onReload={() => setRefresh((value) => value + 1)}
-                />
-              )}
-              <RouteWorkspace key={selected} date={selected} today={today} apiKey={mapsKey} />
-              {meetingNotice && (
-                <p className="settings-hint" role="status">
-                  {meetingNotice}
-                </p>
-              )}
-            </>
-          )}
-          {preview ? (
-            <section className="memory-section" aria-label="지난 기록">
-              <h2>지난 기록</h2>
-              <PhotoStory onOpen={() => setDetail(examples[0])} />
-              <p className="preview-label">생성된 예시 사진 · 실제 사진이 아닙니다</p>
-            </section>
-          ) : (
-            <section className="memory-section">
-              <header>
-                <Images size={17} aria-hidden="true" />
-                <h2>함께한 날의 사진</h2>
+          <div className="day-workspace">
+            <section className="agenda" aria-label="선택한 날짜의 약속">
+              <header className="agenda-heading">
+                <h2 aria-live="polite">
+                  {month + 1}월 {day}일 <small>{weekday}요일</small>
+                </h2>
+                <span className="muted">약속 {dayEvents.length}</span>
               </header>
-              <p className="muted">이 날의 사진을 함께 모아보세요.</p>
-              <Link className="text-button" href={`/memories?date=${selected}`}>
-                {month + 1}월 {day}일 사진 보기·남기기
-              </Link>
+              {dayEvents.length ? (
+                dayEvents.map((event) => (
+                  <button
+                    className="appointment-row"
+                    type="button"
+                    key={event.id}
+                    onClick={() => setDetail(event)}
+                  >
+                    <time>{event.time}</time>
+                    <span>
+                      <strong>{event.title}</strong>
+                      <small>{event.note}</small>
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <CalendarDays size={24} aria-hidden="true" />
+                  <h3>아직 약속이 없어요</h3>
+                  <p>함께할 시간을 담아갈 공간이에요.</p>
+                </div>
+              )}
             </section>
-          )}
+            {!preview && status === "ready" && (
+              <>
+                {meetingError && (
+                  <p className="error-message" role="alert">
+                    만남 기록을 불러오지 못했어요. 일정 새로고침으로 다시 시도해 주세요.
+                  </p>
+                )}
+                <LoadingRegion
+                  busy={meetingLoading}
+                  disabled={Boolean(meetingError)}
+                  label="만남 기록을 불러오는 중"
+                >
+                  <MeetingDayEditor
+                    key={`${selected}:${meetings.find((item) => item.date === selected)?.version || 0}`}
+                    date={selected}
+                    today={today}
+                    record={meetings.find((item) => item.date === selected)}
+                    onSaved={onMeetingSaved}
+                    onReload={() => setRefresh((value) => value + 1)}
+                  />
+                </LoadingRegion>
+                <RouteWorkspace key={selected} date={selected} today={today} apiKey={mapsKey} />
+                {meetingNotice && (
+                  <p className="settings-hint" role="status">
+                    {meetingNotice}
+                  </p>
+                )}
+              </>
+            )}
+            {preview ? (
+              <section className="memory-section" aria-label="지난 기록">
+                <h2>지난 기록</h2>
+                <PhotoStory onOpen={() => setDetail(examples[0])} />
+                <p className="preview-label">생성된 예시 사진 · 실제 사진이 아닙니다</p>
+              </section>
+            ) : (
+              <section className="memory-section">
+                <header>
+                  <Images size={17} aria-hidden="true" />
+                  <h2>함께한 날의 사진</h2>
+                </header>
+                <p className="muted">이 날의 사진을 함께 모아보세요.</p>
+                <Link className="text-button" href={`/memories?date=${selected}`}>
+                  {month + 1}월 {day}일 사진 보기·남기기
+                </Link>
+              </section>
+            )}
+          </div>
         </div>
-      </div>
+      </LoadingRegion>
       {preview && (
         <p className="preview-label">
           화면 미리보기 · 저장되지 않는 예시 일정 · <Link href="/">빈 일정 화면으로</Link>

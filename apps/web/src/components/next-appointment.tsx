@@ -1,9 +1,9 @@
 "use client";
 import { RefreshCw } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
+import Link from "@/components/progress-link";
 import type { TimezoneView } from "@/lib/timezones";
 import { type NextAppointment as Data, remainingAppointment } from "@/lib/upcoming";
 export function NextAppointment({

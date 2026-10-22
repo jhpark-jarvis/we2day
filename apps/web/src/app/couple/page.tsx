@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CoupleSpace } from "@/components/couple-space";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import type { Couple } from "@/lib/shared-calendar";
 

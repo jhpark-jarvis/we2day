@@ -1,7 +1,8 @@
 "use client";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { searchQuestions } from "@/app/actions/question-search";
+import { LoadingRegion } from "@/components/loading-region";
+import Link from "@/components/progress-link";
 import type { QuestionSearchPage, QuestionSearchQuery } from "@/lib/question-search";
 
 export function QuestionSearch({ start, end }: { start: string; end: string }) {
@@ -16,11 +17,11 @@ export function QuestionSearch({ start, end }: { start: string; end: string }) {
   const input = { start_date: startDate, end_date: endDate, query: query.trim() };
   const changed = submitted && JSON.stringify(input) !== JSON.stringify(submitted);
   function search(next: number, conditions: QuestionSearchQuery) {
-    setError("");
     run(async () => {
       try {
         const response = await searchQuestions(conditions, next);
         if (response.data) {
+          setError("");
           setResult(response.data);
           setSubmitted(conditions);
           setOffset(next);
@@ -31,7 +32,7 @@ export function QuestionSearch({ start, end }: { start: string; end: string }) {
     });
   }
   return (
-    <>
+    <LoadingRegion busy={pending} label="질문을 찾는 중">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -77,12 +78,11 @@ export function QuestionSearch({ start, end }: { start: string; end: string }) {
           <p className="settings-hint">
             최대 366일을 찾아요. 검색어를 비우면 해당 기간의 질문을 모두 찾아요.
           </p>
-          <button className="primary-button" type="submit">
+          <button className="primary-button" type="submit" aria-busy={pending}>
             질문 검색
           </button>
         </fieldset>
       </form>
-      {pending && <p role="status">질문을 찾고 있어요.</p>}
       {error && (
         <p role="alert" className="error-message">
           {error} 입력한 조건은 유지돼요.
@@ -140,6 +140,6 @@ export function QuestionSearch({ start, end }: { start: string; end: string }) {
       <p className="settings-hint">
         둘의 공간에 추가한 질문 문구만 찾아요. 답변은 각 질문을 열어 확인할 수 있어요.
       </p>
-    </>
+    </LoadingRegion>
   );
 }

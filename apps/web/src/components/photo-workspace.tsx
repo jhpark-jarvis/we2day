@@ -1,9 +1,9 @@
 "use client";
-
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LoadingRegion } from "@/components/loading-region";
 import { PhotoCard } from "@/components/photo-card";
 import { PhotoPreparation } from "@/components/photo-preparation";
+import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import { isSupportedDate } from "@/lib/calendar";
 import type { PhotoPage, SharedPhoto } from "@/lib/photos";
@@ -21,11 +21,13 @@ export function PhotoWorkspace({
 }) {
   const [date, setDate] = useState(today);
   const [items, setItems] = useState<SharedPhoto[]>([]);
+  const [loadedAlbum, setLoadedAlbum] = useState("");
   const [after, setAfter] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(canSave);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [trash, setTrash] = useState(false);
+  const album = trash ? "trash" : date;
   const [notice, setNotice] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
@@ -90,12 +92,7 @@ export function PhotoWorkspace({
     const controller = new AbortController();
     active.current = controller;
     setLoading(true);
-    setError("");
     if (!cursor) {
-      setItems([]);
-      setAfter(null);
-      setSelected([]);
-      setExportError("");
       exportRequest.current?.abort();
       setExporting(false);
     }
@@ -113,6 +110,10 @@ export function PhotoWorkspace({
         setError(body.error || "사진을 불러오지 못했어요.");
         return;
       }
+      setError("");
+      setExportError("");
+      if (!cursor) setSelected([]);
+      setLoadedAlbum(trash ? "trash" : day);
       setItems((previous) => (cursor ? [...previous, ...body.items] : body.items));
       setAfter(body.next_after);
     } catch {
@@ -148,7 +149,10 @@ export function PhotoWorkspace({
         <PhotoPreparation
           today={today}
           canSave={canSave}
-          onDateChange={setDate}
+          onDateChange={(day) => {
+            setLoading(canSave);
+            setDate(day);
+          }}
           onSaved={() => setRefresh((value) => value + 1)}
         />
       </div>
@@ -174,8 +178,7 @@ export function PhotoWorkspace({
                   onClick={() => {
                     if (trash === value) return;
                     active.current?.abort();
-                    setItems([]);
-                    setAfter(null);
+                    setLoading(true);
                     setTrash(value);
                     setNotice("");
                   }}
@@ -189,7 +192,6 @@ export function PhotoWorkspace({
               pending={loading}
               disabled={!trash && !isSupportedDate(date)}
               onClick={() => {
-                setNotice("");
                 setRefresh((value) => value + 1);
               }}
             />
@@ -201,76 +203,83 @@ export function PhotoWorkspace({
               삭제는 하지 않아요.
             </p>
           )}
-          {loading && <p role="status">사진을 불러오고 있어요…</p>}
-          {error && (
-            <p className="error-message" role="alert">
-              {error}
-            </p>
-          )}
-          {!trash && items.length > 0 && (
-            <div className="photo-export-toolbar">
-              <button
-                className="auth-button"
-                type="button"
-                disabled={exporting || selected.length === 0}
-                onClick={() => void exportSelected()}
-              >
-                {exporting ? "사진 묶음 준비 중…" : `선택한 사진 ${selected.length}장 ZIP 내보내기`}
-              </button>
-              <p className="settings-hint">
-                한 번에 최대20장 · 압축본과 원본 찾기 정보가 포함돼요. 원본 파일과 앱 복원 기능은
-                포함하지 않아요.
+          <LoadingRegion busy={loading} label="사진을 불러오는 중" className="loading-results">
+            {error && (
+              <p className="error-message" role="alert">
+                {error}
               </p>
-              {exportError && (
-                <p className="error-message" role="alert">
-                  {exportError}
+            )}
+            <div
+              inert={loadedAlbum !== album}
+              style={{ visibility: loadedAlbum && loadedAlbum !== album ? "hidden" : undefined }}
+            >
+              {!trash && items.length > 0 && (
+                <div className="photo-export-toolbar">
+                  <button
+                    aria-busy={exporting}
+                    className="auth-button"
+                    type="button"
+                    disabled={exporting || selected.length === 0}
+                    onClick={() => void exportSelected()}
+                  >
+                    {`선택한 사진 ${selected.length}장 ZIP 내보내기`}
+                  </button>
+                  <p className="settings-hint">
+                    한 번에 최대20장 · 압축본과 원본 찾기 정보가 포함돼요. 원본 파일과 앱 복원
+                    기능은 포함하지 않아요.
+                  </p>
+                  {exportError && (
+                    <p className="error-message" role="alert">
+                      {exportError}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!error && items.length === 0 && (
+                <p className="muted">
+                  {trash
+                    ? "휴지통이 비어 있어요."
+                    : "아직 이 날의 사진이 없어요. 첫 장면을 남겨보세요."}
                 </p>
               )}
+              <div className="shared-photo-grid">
+                {items.map((photo) => (
+                  <PhotoCard
+                    authorName={names[photo.created_by]}
+                    key={`${photo.id}:${photo.lifecycle_version}`}
+                    photo={photo}
+                    userId={userId}
+                    trash={trash}
+                    onChanged={changed}
+                    selected={selected.includes(photo.id)}
+                    selectingDisabled={exporting}
+                    onSelect={() => {
+                      if (!selected.includes(photo.id) && selected.length >= 20) {
+                        setExportError("한 번에 최대20장까지 선택해 주세요.");
+                        return;
+                      }
+                      setExportError("");
+                      setSelected((current) =>
+                        current.includes(photo.id)
+                          ? current.filter((id) => id !== photo.id)
+                          : [...current, photo.id],
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+              {after && (
+                <button
+                  className="auth-button"
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void load(date, after)}
+                >
+                  사진 더 보기
+                </button>
+              )}
             </div>
-          )}
-          {!loading && !error && items.length === 0 && (
-            <p className="muted">
-              {trash
-                ? "휴지통이 비어 있어요."
-                : "아직 이 날의 사진이 없어요. 첫 장면을 남겨보세요."}
-            </p>
-          )}
-          <div className="shared-photo-grid">
-            {items.map((photo) => (
-              <PhotoCard
-                authorName={names[photo.created_by]}
-                key={`${photo.id}:${photo.lifecycle_version}`}
-                photo={photo}
-                userId={userId}
-                trash={trash}
-                onChanged={changed}
-                selected={selected.includes(photo.id)}
-                selectingDisabled={exporting}
-                onSelect={() => {
-                  if (!selected.includes(photo.id) && selected.length >= 20) {
-                    setExportError("한 번에 최대20장까지 선택해 주세요.");
-                    return;
-                  }
-                  setExportError("");
-                  setSelected((current) =>
-                    current.includes(photo.id)
-                      ? current.filter((id) => id !== photo.id)
-                      : [...current, photo.id],
-                  );
-                }}
-              />
-            ))}
-          </div>
-          {after && (
-            <button
-              className="auth-button"
-              type="button"
-              disabled={loading}
-              onClick={() => void load(date, after)}
-            >
-              사진 더 보기
-            </button>
-          )}
+          </LoadingRegion>
         </section>
       )}
     </>

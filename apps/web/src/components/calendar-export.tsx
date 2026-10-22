@@ -73,8 +73,8 @@ export function CalendarExport({ month: initialMonth }: { month: string }) {
           <input type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} />
           약속 메모도 파일에 포함
         </label>
-        <button className="primary-button" type="submit">
-          {pending ? "파일 준비 중…" : "캘린더 파일 다운로드"}
+        <button className="primary-button" type="submit" aria-busy={pending}>
+          {"캘린더 파일 다운로드"}
         </button>
       </fieldset>
       {error && (

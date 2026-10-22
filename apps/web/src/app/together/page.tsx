@@ -1,6 +1,6 @@
 import { ChevronRight, Dices, ListChecks, MessagesSquare, Target } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/progress-link";
 
 export const metadata: Metadata = { title: "함께" };
 

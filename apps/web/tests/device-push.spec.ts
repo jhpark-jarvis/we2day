@@ -9,6 +9,8 @@ test("device push explicit permission, retry, revoke and logout", async ({
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
+    // Both browser engines exercise the same synthetic Push API, without OS permission.
+    Object.defineProperty(window, "PushManager", { configurable: true, value: class {} });
     Object.defineProperty(navigator, "standalone", { configurable: true, value: true });
     let sub: object | null = null;
     let permissionRequests = 0;

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useTransition } from "react";
+import Link from "@/components/progress-link";
 
 export default function PageError({ retry }: { error: unknown; retry: () => void }) {
   const [pending, startTransition] = useTransition();
@@ -17,10 +17,11 @@ export default function PageError({ retry }: { error: unknown; retry: () => void
         <button
           type="button"
           className="primary-button"
+          aria-busy={pending}
           disabled={pending}
           onClick={() => startTransition(retry)}
         >
-          {pending ? "다시 불러오는 중…" : "다시 시도"}
+          다시 시도
         </button>
         <Link href="/" className="text-button">
           일정

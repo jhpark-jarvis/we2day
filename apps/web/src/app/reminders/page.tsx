@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { NotificationPreview } from "@/components/notification-preview";
+import Link from "@/components/progress-link";
 import { ServerRefresh } from "@/components/workspace-controls";
 import { countdown } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";

@@ -1,12 +1,10 @@
 "use client";
-import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { saveRoute } from "@/app/actions/routes";
+import { LoadingRegion } from "@/components/loading-region";
+import { RouteMap } from "@/components/route-map";
 import type { MeetingRoute, RouteContent } from "@/lib/routes";
 
-const RouteMap = dynamic(() => import("./route-map").then((module) => module.RouteMap), {
-  ssr: false,
-});
 type Fields = Record<keyof RouteContent, string>;
 const empty: Fields = {
   start_name: "",
@@ -63,13 +61,13 @@ function RouteEditor({ date, apiKey }: { date: string; apiKey: string }) {
     void revision;
     const controller = new AbortController();
     setLoading(true);
-    setError("");
     fetch(`/api/routes?date=${date}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error);
         if (controller.signal.aborted) return;
         const row: MeetingRoute | null = data[0] || null;
+        setError("");
         setRecord(row);
         setFields(
           row
@@ -100,146 +98,143 @@ function RouteEditor({ date, apiKey }: { date: string; apiKey: string }) {
       .filter(([key, value]) => !key.endsWith("name") && value.trim() !== "")
       .map(([key, value]) => [key, Number(value)]),
   );
-  if (loading)
-    return (
-      <p role="status" className="settings-hint">
-        동선을 불러오는 중…
-      </p>
-    );
   return (
-    <form
-      className="route-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError("");
-        setNotice("");
-        if (Object.values(fields).some((value) => !value.trim())) {
-          setError("두 장소의 이름과 좌표를 모두 지정해 주세요.");
-          return;
-        }
-        const content = {
-          ...fields,
-          start_lat: Number(fields.start_lat),
-          start_lng: Number(fields.start_lng),
-          end_lat: Number(fields.end_lat),
-          end_lng: Number(fields.end_lng),
-        };
-        startTransition(async () => {
-          const result = await saveRoute(
-            date,
-            content,
-            record?.version || 0,
-            request.current || crypto.randomUUID(),
-          );
-          if (result.error) {
-            setConflict(result.status === 409);
-            setError(
-              result.status === 409
-                ? "동선이 바뀌었어요. 작성 내용을 확인하고 최신 동선을 다시 불러와 주세요."
-                : result.error,
-            );
-          } else if (result.data) {
-            setRecord(result.data);
-            request.current = crypto.randomUUID();
-            setConflict(false);
-            setNotice("동선을 저장했어요. 두 사람이 함께 볼 수 있어요.");
+    <LoadingRegion busy={loading} label="동선을 불러오는 중">
+      <form
+        className="route-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setError("");
+          setNotice("");
+          if (Object.values(fields).some((value) => !value.trim())) {
+            setError("두 장소의 이름과 좌표를 모두 지정해 주세요.");
+            return;
           }
-        });
-      }}
-    >
-      <fieldset
-        className="meeting-fields"
-        disabled={pending || Boolean(error && !record && !request.current)}
+          const content = {
+            ...fields,
+            start_lat: Number(fields.start_lat),
+            start_lng: Number(fields.start_lng),
+            end_lat: Number(fields.end_lat),
+            end_lng: Number(fields.end_lng),
+          };
+          startTransition(async () => {
+            const result = await saveRoute(
+              date,
+              content,
+              record?.version || 0,
+              request.current || crypto.randomUUID(),
+            );
+            if (result.error) {
+              setConflict(result.status === 409);
+              setError(
+                result.status === 409
+                  ? "동선이 바뀌었어요. 작성 내용을 확인하고 최신 동선을 다시 불러와 주세요."
+                  : result.error,
+              );
+            } else if (result.data) {
+              setRecord(result.data);
+              request.current = crypto.randomUUID();
+              setConflict(false);
+              setNotice("동선을 저장했어요. 두 사람이 함께 볼 수 있어요.");
+            }
+          });
+        }}
       >
-        {apiKey ? (
-          <>
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => setMapOpened(!mapOpened)}
-              aria-expanded={mapOpened}
-            >
-              {mapOpened ? "지도 닫기" : "지도에서 두 점 지정하기"}
-            </button>
-            {mapOpened && (
-              <RouteMap
-                apiKey={apiKey}
-                points={points}
-                onPoint={(role, lat, lng) =>
-                  change({ [`${role}_lat`]: lat.toFixed(7), [`${role}_lng`]: lng.toFixed(7) })
-                }
-              />
-            )}
-          </>
-        ) : (
+        <fieldset
+          className="meeting-fields"
+          disabled={loading || pending || Boolean(error && !record && !request.current)}
+        >
+          {apiKey ? (
+            <>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setMapOpened(!mapOpened)}
+                aria-expanded={mapOpened}
+              >
+                {mapOpened ? "지도 닫기" : "지도에서 두 점 지정하기"}
+              </button>
+              {mapOpened && (
+                <RouteMap
+                  apiKey={apiKey}
+                  points={points}
+                  onPoint={(role, lat, lng) =>
+                    change({ [`${role}_lat`]: lat.toFixed(7), [`${role}_lng`]: lng.toFixed(7) })
+                  }
+                />
+              )}
+            </>
+          ) : (
+            <p className="settings-hint">
+              지도 설정 후 지도에서 두 점을 찍을 수 있어요. 지금은 직접 알고 있는 좌표를 입력할 수
+              있어요.
+            </p>
+          )}
+          {(["start", "end"] as const).map((side) => (
+            <fieldset key={side} className="route-point">
+              <legend>{side === "start" ? "출발점" : "도착점"}</legend>
+              <div className="auth-field">
+                <label htmlFor={`${side}-name`}>
+                  직접 정한 {side === "start" ? "출발" : "도착"} 장소 이름
+                </label>
+                <input
+                  id={`${side}-name`}
+                  value={fields[`${side}_name`]}
+                  maxLength={100}
+                  required
+                  onChange={(event) => change({ [`${side}_name`]: event.target.value })}
+                />
+              </div>
+              <div className="coordinate-fields">
+                {(["lat", "lng"] as const).map((axis) => (
+                  <div className="auth-field" key={axis}>
+                    <label htmlFor={`${side}-${axis}`}>
+                      {side === "start" ? "출발" : "도착"} {axis === "lat" ? "위도" : "경도"}
+                    </label>
+                    <input
+                      id={`${side}-${axis}`}
+                      type="number"
+                      min={axis === "lat" ? -90 : -180}
+                      max={axis === "lat" ? 90 : 180}
+                      step="any"
+                      value={fields[`${side}_${axis}`]}
+                      required
+                      onChange={(event) => change({ [`${side}_${axis}`]: event.target.value })}
+                    />
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+          ))}
           <p className="settings-hint">
-            지도 설정 후 지도에서 두 점을 찍을 수 있어요. 지금은 직접 알고 있는 좌표를 입력할 수
-            있어요.
+            저장한 두 점은 둘의 공간에 남아요. 플랜·지도 열람만으로 실제 방문 기록이 생기지는
+            않아요.
+          </p>
+          <button type="submit" className="primary-button" disabled={conflict} aria-busy={pending}>
+            {"동선 저장"}
+          </button>
+        </fieldset>
+        {error && (
+          <p role="alert" className="error-message">
+            {error}
           </p>
         )}
-        {(["start", "end"] as const).map((side) => (
-          <fieldset key={side} className="route-point">
-            <legend>{side === "start" ? "출발점" : "도착점"}</legend>
-            <div className="auth-field">
-              <label htmlFor={`${side}-name`}>
-                직접 정한 {side === "start" ? "출발" : "도착"} 장소 이름
-              </label>
-              <input
-                id={`${side}-name`}
-                value={fields[`${side}_name`]}
-                maxLength={100}
-                required
-                onChange={(event) => change({ [`${side}_name`]: event.target.value })}
-              />
-            </div>
-            <div className="coordinate-fields">
-              {(["lat", "lng"] as const).map((axis) => (
-                <div className="auth-field" key={axis}>
-                  <label htmlFor={`${side}-${axis}`}>
-                    {side === "start" ? "출발" : "도착"} {axis === "lat" ? "위도" : "경도"}
-                  </label>
-                  <input
-                    id={`${side}-${axis}`}
-                    type="number"
-                    min={axis === "lat" ? -90 : -180}
-                    max={axis === "lat" ? 90 : 180}
-                    step="any"
-                    value={fields[`${side}_${axis}`]}
-                    required
-                    onChange={(event) => change({ [`${side}_${axis}`]: event.target.value })}
-                  />
-                </div>
-              ))}
-            </div>
-          </fieldset>
-        ))}
-        <p className="settings-hint">
-          저장한 두 점은 둘의 공간에 남아요. 플랜·지도 열람만으로 실제 방문 기록이 생기지는 않아요.
-        </p>
-        <button type="submit" className="primary-button" disabled={conflict}>
-          {pending ? "저장 중…" : "동선 저장"}
-        </button>
-      </fieldset>
-      {error && (
-        <p role="alert" className="error-message">
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p role="status" className="settings-hint">
-          {notice}
-        </p>
-      )}
-      {(error || conflict) && (
-        <button
-          type="button"
-          className="text-button"
-          disabled={pending}
-          onClick={() => setRevision((value) => value + 1)}
-        >
-          작성 내용을 버리고 최신 동선 불러오기
-        </button>
-      )}
-    </form>
+        {notice && (
+          <p role="status" className="settings-hint">
+            {notice}
+          </p>
+        )}
+        {(error || conflict) && (
+          <button
+            type="button"
+            className="text-button"
+            disabled={pending}
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            작성 내용을 버리고 최신 동선 불러오기
+          </button>
+        )}
+      </form>
+    </LoadingRegion>
   );
 }

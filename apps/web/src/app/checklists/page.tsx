@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { ChecklistWorkspace } from "@/components/checklist-workspace";
+import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import type { Checklist } from "@/lib/checklists";
 import type { Couple } from "@/lib/shared-calendar";
