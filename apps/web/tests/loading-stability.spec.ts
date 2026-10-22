@@ -39,6 +39,40 @@ async function pause(page: Page, pattern: string, reply?: Parameters<Route["fulf
   return { started, release, remove: () => page.unroute(pattern, handler) };
 }
 
+test("calendar month changes show a spinner without a top bar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, "/login");
+  await page.getByLabel("아이디", { exact: true }).fill("member");
+  await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await open(page, "/couple");
+  await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
+  await open(page, "/");
+  const appointments = await pause(page, "**/api/appointments?*");
+  const meetings = await pause(page, "**/api/meetings?*");
+  try {
+    await page.getByRole("button", { name: "다음 달", exact: true }).click();
+    await Promise.all([appointments.started, meetings.started]);
+    const veil = page.locator(".loading-veil:visible").first();
+    await expect(veil.locator(".loading-spinner")).toBeVisible();
+    expect(await veil.evaluate((node) => getComputedStyle(node, "::before").content)).toMatch(
+      /^(none|normal)$/,
+    );
+    const during = await geometry(page.locator(".calendar-workspace"));
+    appointments.release();
+    meetings.release();
+    await expect(page.locator(".loading-veil:visible")).toHaveCount(0);
+    unchanged(await geometry(page.locator(".calendar-workspace")), during);
+  } finally {
+    appointments.release();
+    meetings.release();
+    await appointments.remove();
+    await meetings.remove();
+  }
+});
+
 test("slow reads preserve content geometry, block stale edits and recover in both themes", async ({
   page,
 }, info) => {
