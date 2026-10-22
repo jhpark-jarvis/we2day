@@ -140,7 +140,7 @@ export function PhotoPreparation({
             min="2000-01-01"
             max="2100-12-31"
             required
-            disabled={saving || locked}
+            disabled={!ready || saving || locked}
             value={date}
             onChange={(event) => {
               setDate(event.target.value);
@@ -226,11 +226,13 @@ export function PhotoPreparation({
               <dt>크기</dt>
               <dd>
                 {size(photo.originalBytes)} → {size(photo.blob.size)} · {photo.width} ×{" "}
-                {photo.height} · WebP
+                {photo.height} · {photo.blob.type === "image/jpeg" ? "JPEG" : "WebP"}
               </dd>
             </div>
           </dl>
           <p className="settings-hint">
+            {photo.blob.type === "image/jpeg" &&
+              (canSave ? "JPEG로 압축했어요. 저장할 때 WebP로 변환해요. " : "JPEG로 압축했어요. ")}
             파일 수정 시각은 촬영 시각과 다를 수 있어요. 위치 정보는 압축본에 넣지 않아요.
             {canSave
               ? "올린 사람과 저장 시각은 저장할 때 자동으로 기록해요."
@@ -286,7 +288,7 @@ export function PhotoPreparation({
             <a
               className="auth-button photo-download"
               href={photo.url}
-              download={`we2day-${date || "photo"}.webp`}
+              download={`we2day-${date || "photo"}.${photo.blob.type === "image/jpeg" ? "jpg" : "webp"}`}
             >
               압축본 내려받기
             </a>

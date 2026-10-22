@@ -109,17 +109,34 @@ export async function preparePhoto(file: File, signal: AbortSignal): Promise<Pre
     const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
     const context = canvas.getContext("2d");
     if (!context) throw new Error("이 브라우저에서 사진을 처리하지 못했어요.");
+    let format = "image/webp";
     for (let attempt = 0; attempt < 5; attempt++) {
       const shrink = 0.8 ** attempt;
       canvas.width = Math.max(1, Math.round(bitmap.width * scale * shrink));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale * shrink));
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/webp", 0.82 - attempt * 0.07),
-      );
+      const draw = () => {
+        if (format === "image/jpeg") {
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      };
+      const encode = () =>
+        new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, format, 0.82 - attempt * 0.07),
+        );
+      draw();
+      let blob = await encode();
       signal.throwIfAborted();
-      if (blob?.type !== "image/webp")
-        throw new Error("WebP 압축을 지원하는 브라우저에서 다시 시도해 주세요.");
+      // Unsupported canvas encoders can silently return PNG. Use a bounded JPEG instead.
+      if (format === "image/webp" && blob?.type !== "image/webp") {
+        format = "image/jpeg";
+        draw();
+        blob = await encode();
+        signal.throwIfAborted();
+      }
+      if (!blob || blob.type !== format)
+        throw new Error("사진을 압축하지 못했어요. 다른 사진을 선택해 주세요.");
       if (blob.size <= MAX_OUTPUT) {
         const capture = clean(tags.DateTimeOriginal);
         return {

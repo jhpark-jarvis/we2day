@@ -8,7 +8,13 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:3101", trace: "off" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile", use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" } },
+    {
+      name: "mobile",
+      use: {
+        ...devices["iPhone 13"],
+        defaultBrowserType: process.env.WE2DAY_TEST_BROWSER === "webkit" ? "webkit" : "chromium",
+      },
+    },
   ],
   webServer: {
     command: "npm run dev -- --port 3101",

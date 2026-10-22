@@ -50,7 +50,7 @@ const errors: Record<string, string> = {
   appointment_not_found: "약속을 찾지 못했어요. 최신 일정을 확인해 주세요.",
   photo_not_found: "사진을 찾지 못했어요. 날짜의 사진 목록을 새로고침해 주세요.",
   invalid_photo:
-    "사진 파일이나 사진 정보를 확인해 주세요. 1MB·1600px 이하의 WebP만 저장할 수 있어요.",
+    "사진 파일이나 사진 정보를 확인해 주세요. 1MB·1600px 이하의 JPEG·WebP 압축본을 선택해 주세요.",
   photo_upload_incomplete: "사진 저장이 아직 완료되지 않았어요. 같은 사진으로 다시 시도해 주세요.",
   invalid_meeting_day: "오늘 또는 지난 날짜를 선택하고 메모 길이를 확인해 주세요.",
   invalid_photo_action: "사진과 요청 내용을 확인해 주세요.",

@@ -9,7 +9,6 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
 from test_calendar_api import CONFIG, SPACE, USER
-
 from we2day_api import auth
 from we2day_api.main import create_app
 from we2day_api.photos import normalized_image
@@ -222,3 +221,39 @@ def test_lifecycle_http_contract_confirmation_and_storage_failure():
         files.failing = False
         assert client.post(f"/photos/{photo_id}/purge", json=body).status_code == 204
         assert calls[-1][0] == "finish_photo_purge"
+
+
+def jpeg_bytes(size=(32, 24)):
+    output = io.BytesIO()
+    exif = Image.Exif()
+    exif[0x010F] = "private-device"
+    exif[0x9286] = "private-comment"
+    Image.new("RGB", size, "#a15038").save(output, "JPEG", exif=exif)
+    return output.getvalue()
+
+
+def test_jpeg_upload_normalizes_to_webp_without_metadata():
+    source = jpeg_bytes()
+    with pytest.raises(HTTPException):
+        normalized_image(source)  # Stored-object reads remain WebP-only.
+    clean, width, height = normalized_image(source, allow_jpeg=True)
+    assert (width, height) == (32, 24)
+    assert clean[:4] == b"RIFF" and clean[8:12] == b"WEBP"
+    assert b"private" not in clean and b"EXIF" not in clean and b"XMP " not in clean
+    assert normalized_image(source, allow_jpeg=True)[0] == clean
+    invalid_png = io.BytesIO()
+    Image.new("RGB", (1, 1)).save(invalid_png, "PNG")
+    for invalid in (jpeg_bytes((1601, 1)), source[:10], invalid_png.getvalue()):
+        with pytest.raises(HTTPException):
+            normalized_image(invalid, allow_jpeg=True)
+
+
+def test_jpeg_upload_and_retry_keep_canonical_storage(upstream):
+    client, calls, state, body, photo_id = upstream
+    body["image"] = base64.b64encode(jpeg_bytes()).decode()
+    assert client.post("/photos", json=body).status_code == 201
+    assert state["content"][:4] == b"RIFF" and state["content"][8:12] == b"WEBP"
+    count = len(calls)
+    assert client.post("/photos", json=body).status_code == 201
+    assert len(calls) == count + 1
+    assert client.get(f"/photos/{photo_id}/image").headers["content-type"] == "image/webp"

@@ -8,5 +8,13 @@ export default defineConfig({
   workers: 1,
   expect: { timeout: 15_000 },
   use: { ...auth.use, actionTimeout: 15_000, navigationTimeout: 20_000 },
-  projects: [{ name: "photo-sharing", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "photo-sharing",
+      use: {
+        ...devices["Desktop Chrome"],
+        defaultBrowserType: process.env.WE2DAY_TEST_BROWSER === "webkit" ? "webkit" : "chromium",
+      },
+    },
+  ],
 });

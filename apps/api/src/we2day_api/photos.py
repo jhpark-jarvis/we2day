@@ -100,14 +100,20 @@ class PhotoPage(BaseModel):
     next_after: UUID | None
 
 
-def normalized_image(content: bytes) -> tuple[bytes, int, int]:
+def normalized_image(content: bytes, *, allow_jpeg: bool = False) -> tuple[bytes, int, int]:
     """Bound decoding before loading pixels; never retain uploaded EXIF/ICC/XMP."""
     if not content or len(content) > MAX_BYTES:
         raise HTTPException(422, "invalid_photo")
     try:
-        with Image.open(io.BytesIO(content), formats=["WEBP"]) as image:
+        with Image.open(
+            io.BytesIO(content), formats=["WEBP", "JPEG"] if allow_jpeg else ["WEBP"]
+        ) as image:
             width, height = image.size
-            if not 1 <= width <= 1600 or not 1 <= height <= 1600 or image.n_frames != 1:
+            if (
+                not 1 <= width <= 1600
+                or not 1 <= height <= 1600
+                or getattr(image, "n_frames", 1) != 1
+            ):
                 raise HTTPException(422, "invalid_photo")
             image.load()
             # A fresh image strips metadata, including decoded image.info inherited by convert().
@@ -209,7 +215,7 @@ def save_photo(body: PhotoInput, store: DataAPI, files: PhotoStorage) -> dict:
         raw = base64.b64decode(body.image, validate=True)
     except (ValueError, binascii.Error) as error:
         raise HTTPException(422, "invalid_photo") from error
-    content, width, height = normalized_image(raw)
+    content, width, height = normalized_image(raw, allow_jpeg=True)
     digest = hashlib.sha256(content).hexdigest()
     fields = {
         f"p_{key}": value for key, value in body.model_dump(mode="json").items() if key != "image"

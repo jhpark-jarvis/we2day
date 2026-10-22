@@ -58,7 +58,7 @@ test("photo preparation preserves allowed references locally and strips original
   if (testInfo.project.name === "mobile") {
     await page.goto("/settings");
     await page.getByRole("button", { name: /화이트/ }).click();
-    await expect(page.getByRole("status")).toContainText("1년");
+    await expect(page.getByRole("status").filter({ hasText: "1년" })).toBeVisible();
   }
   await page.goto("/memories");
   await expect(page.getByLabel("\uc0ac\uc9c4 \uc120\ud0dd")).toBeEnabled();
@@ -188,4 +188,41 @@ test("clearing during decode cannot restore an obsolete photo", async ({ page })
     }),
   ).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveCount(0);
+});
+
+test("unsupported WebP encoder falls back to a metadata-free bounded JPEG", async ({ page }) => {
+  await page.addInitScript(() => {
+    const encode = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+      return encode.call(this, callback, type === "image/webp" ? "image/png" : type, quality);
+    };
+  });
+  await page.goto("/memories");
+  await expect(page.getByLabel("사진 선택")).toBeEnabled();
+  const source = withExif(await image(page));
+  const writes: string[] = [];
+  page.on("request", (r) => {
+    if (["POST", "PUT", "PATCH"].includes(r.method())) writes.push(r.url());
+  });
+  await page.getByLabel("만난 날짜").fill("2026-10-10");
+  await page
+    .getByLabel("사진 선택")
+    .setInputFiles({ name: "camera.jpg", mimeType: "image/jpeg", buffer: source });
+  await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
+  await expect(page.getByText("Example · Test Phone 01", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("link", { name: "압축본 내려받기", exact: true }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe("we2day-2026-10-10.jpg");
+  const output = await readFile((await download.path()) as string);
+  expect(output[0]).toBe(255);
+  expect(output[1]).toBe(216);
+  expect(output.length).toBeLessThanOrEqual(1024 * 1024);
+  expect(output.includes(Buffer.from("PRIVATE_SENTINEL"))).toBe(false);
+  const tags = await parse(output, { reviveValues: false, userComment: true });
+  expect(tags?.GPSLatitudeRef).toBeUndefined();
+  expect(tags?.DateTimeOriginal).toBeUndefined();
+  expect(tags?.UserComment).toBeUndefined();
+  expect(writes).toEqual([]);
 });

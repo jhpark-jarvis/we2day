@@ -6,7 +6,18 @@ test("compressed photo survives retry and is shared through API, SQL and private
   request,
 }, testInfo) => {
   test.setTimeout(180_000);
-  const first = await browser.newContext({ baseURL: "http://127.0.0.1:3100" });
+  const first = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+    viewport: { width: 390, height: 844 },
+  });
+  if (process.env.WE2DAY_TEST_WEBP_FALLBACK === "1") {
+    await first.addInitScript(() => {
+      const encode = HTMLCanvasElement.prototype.toBlob;
+      HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+        return encode.call(this, callback, type === "image/webp" ? "image/png" : type, quality);
+      };
+    });
+  }
   const second = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
     viewport: { width: 390, height: 844 },
@@ -87,6 +98,11 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await expect(card.getByText("상대방", { exact: true })).toBeVisible();
     await expect(card.getByText("camera-day.jpg", { exact: true })).toBeVisible();
     const imageUrl = await card.getByRole("img").getAttribute("src");
+    const canonical = await second.request.get(imageUrl || "");
+    expect(canonical.headers()["content-type"]).toContain("image/webp");
+    const canonicalBytes = await canonical.body();
+    expect(canonicalBytes.toString("ascii", 0, 4)).toBe("RIFF");
+    expect(canonicalBytes.toString("ascii", 8, 12)).toBe("WEBP");
     const hidden = await third.request.get("/api/photos?date=2026-10-24");
     expect((await hidden.json()).items).toEqual([]);
     expect((await third.request.get(imageUrl as string)).status()).toBe(404);
