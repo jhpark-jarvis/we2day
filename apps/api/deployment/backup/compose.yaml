@@ -1,0 +1,41 @@
+name: we2day-backup
+services:
+  backup:
+    image: '${WE2DAY_BACKUP_IMAGE:?Set a reviewed backup image}'
+    pull_policy: never
+    entrypoint: [python, -m, we2day_api.backup_worker]
+    command: [run, --config, /run/config/runtime.env, --key, /run/keys/archive.key, --gate, /run/config/review.json, --directory, /copies]
+    user: '${WE2DAY_BACKUP_UID:?Set the private file owner UID}:${WE2DAY_BACKUP_GID:?Set the private file owner GID}'
+    restart: "no"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 192m
+    memswap_limit: 256m
+    cpus: 0.25
+    pids_limit: 64
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    volumes:
+      - type: bind
+        source: '${WE2DAY_BACKUP_CONFIG_DIR:?Set a private config directory}'
+        target: /run/config
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: '${WE2DAY_BACKUP_KEYS_DIR:?Set a separate keys directory}'
+        target: /run/keys
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: '${WE2DAY_BACKUP_CA_FILE:?Set the official CA file}'
+        target: /run/source/supabase-ca.crt
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: '${WE2DAY_BACKUP_COPIES_DIR:?Set a protected backup directory}'
+        target: /copies
+        bind: {create_host_path: false}
+    logging:
+      driver: json-file
+      options: {max-size: 1m, max-file: "2"}

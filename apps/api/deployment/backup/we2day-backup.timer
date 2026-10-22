@@ -1,0 +1,11 @@
+[Unit]
+Description=WE2DAY daily backup at Seoul 04:00
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Seoul
+AccuracySec=1min
+Persistent=true
+Unit=we2day-backup.service
+
+[Install]
+WantedBy=timers.target

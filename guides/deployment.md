@@ -239,7 +239,7 @@ uv run --project apps/api python -m we2day_api.local_archive decrypt --key /priv
 
 키와 암호화 사본은 서로 다른 디렉터리에 보관해야 하며, 같은 PC 고장에 대비한 별도 키 보관이 필요합니다. 입력/키/대조 원본은 작업 중 수정하지 않는 일반 파일, 출력은 아직 존재하지 않는 파일이어야 합니다. 원본과 키가 같은 파일을 가리키면 하드 링크 별칭도 거부합니다. 입력·대조 원본의 크기/수정 정보가 읽는 중 달라져도 실패하며, 검사 동안 파일을 닫아 두어야 합니다. 기존 파일·원본·키를 덮어쓰지 않고 잘못된 키/손상 시 최종 복호화 파일을 남기지 않습니다. 복호화 중 출력 디렉터리에 임시 평문이 생길 수 있으므로 접근 제한·디스크 암호화를 적용한 로컬 경로를 사용합니다. 강제 종료 시 남은 `.we2day-partial-*`는 자동 재사용하지 않으며 운영자가 확인/정리해야 합니다. 도구는 Windows ACL·BitLocker·오프라인 키 보관을 자동 설정하지 않습니다.
 
-백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 아래 도구로 수집과 보관 개수 계산은 가능하지만, 예약 생성과 사본 삭제는 아직 제공하지 않습니다. DB와 사진 전체 수집, 암호화 키의 별도 보관, 분리된 환경에서의 복원까지 확인한 뒤 연결해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
+백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 수집·일별 실행과 보관 개수 계산을 제공하며, 사본 자동 삭제는 제공하지 않습니다. 예약은 운영자가 복구 검증과 별도 키 보관을 확인한 뒤 직접 활성화해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
 
 <a id="backup-collection"></a>
 ## 서버에서 DB·사진 수집
@@ -276,6 +276,66 @@ docker run --rm --read-only --user "$(id -u):$(id -g)" \
 DB 스키마·데이터 덤프는 같은 exported snapshot을 사용합니다. 사진은 그 스냅샷의 전체 객체 목록과 크기로 내려받고 수집 뒤 최신 목록·메타데이터를 다시 대조합니다. 변경·누락·다운로드 실패가 발견되면 백업 생성을 중단합니다. DB와 Storage 간 원자적 백업을 보장하지는 않으므로 첫 수집은 사진 수정·삭제를 멈춘 상태에서 실행하세요. 다른 버킷을 운영한다면 이 도구의 사진 수집 범위 밖이므로 별도 백업이 필요합니다.
 
 작업 중 사본 디렉터리에 임시 SQL·사진·ZIP이 생깁니다. 보호된 충분한 공간에서 실행하고 강제 종료 시 잔여 파일을 확인해야 합니다. 정상 종료와 일반 실패에서는 작업 임시 디렉터리를 정리하며, 기존 사본·원본·키는 덮어쓰지 않습니다. 생성 성공은 수집·암호화 검증 결과이며 **전체 서비스 복원 완료가 아닙니다.** 관리형 확장, Auth/Storage 서비스, OAuth 설정과 역할 비밀번호는 복원 대상 환경에서 따로 검증해야 합니다.
+
+<a id="daily-backup"></a>
+## 매일 백업 실행과 상태 확인
+
+`backup_worker`는 한국 날짜별로 `we2day-auto-YYYY-MM-DD.enc` 하나를 생성합니다. 이미 그 날짜의 사본이 있으면 다시 수집하지 않고 무결성을 확인합니다. 손상본은 덮어쓰지 않으며, 수집·검사 실패 시 기존 사본과 마지막 성공 시각을 보존합니다. 같은 보관 디렉터리를 사용하는 동시 실행은 OS 파일 잠금으로 거부합니다.
+
+### 검토 파일 준비
+
+수동 수집·격리 복구·별도 키 복구를 먼저 확인하세요. 운영자가 검토한 프로젝트와 키에만 예약 실행을 허용하도록 `review.json`을 준비합니다. 파일에는 프로젝트 연결 정보와 키의 해시만 들어가며 키 자체는 들어가지 않습니다. 아래 명령의 설정 디렉터리는 이 준비 단계에서만 쓰기 가능하게 마운트합니다.
+
+```sh
+docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --mount type=bind,src=/private/config,dst=/run/config \
+  --mount type=bind,src=/private/keys,dst=/run/keys,readonly \
+  --mount type=bind,src=/private/config/supabase-ca.crt,dst=/run/source/supabase-ca.crt,readonly \
+  --entrypoint python we2day-backup:local -m we2day_api.backup_worker prepare \
+  --config /run/config/runtime.env --key /run/keys/archive.key --gate /run/config/review.json
+```
+
+처음 생성한 파일의 `enabled`, `restore_reviewed`, `key_recovery_reviewed`는 모두 `false`입니다. 이 상태에서는 수집하지 않습니다. 운영자가 복구 범위와 남은 한계를 검토하고 키 사본을 별도로 읽을 수 있는지 확인한 뒤에만 세 값을 `true`로 바꾸고, `approval_reference`에 본인의 검토 기록 식별자를 적습니다. 원래 생성된 `source_id`·`key_id`는 수정하지 마세요. 파일은 본인만 읽고 쓸 수 있게 유지합니다.
+
+검토 파일은 운영자의 확인 기록이며, 도구가 오프라인 매체의 존재나 전체 서비스 복구 성공을 자동 증명하는 방식은 아닙니다. 키·프로젝트가 달라지면 다시 검토해야 하며, 다른 프로젝트를 같은 보관 디렉터리에 섞지 않습니다. 검토 파일과 상태 파일도 Git에 넣지 않습니다.
+
+### 예약 파일 설치
+
+[예약용 Compose](../apps/api/deployment/backup/compose.yaml)와 [Compose 설정 예시](../apps/api/deployment/backup/scheduler/.env.example)를 서버의 별도 보호된 디렉터리에 각각 `compose.yaml`·`.env`로 복사합니다. 실제 UID/GID, 이미지와 경로를 채우고 `WE2DAY_BACKUP_COPIES_DIR`에는 수동 사본과 구분한 전용 디렉터리를 지정합니다. 자격이 든 `runtime.env`는 앞 절의 별도 설정 디렉터리에 둡니다.
+
+```sh
+docker compose config --quiet
+docker compose run --rm --no-deps -T backup check --config /run/config/runtime.env --key /run/keys/archive.key --gate /run/config/review.json
+```
+
+`check`는 로컬 설정·검토 파일을 읽어 `enabled` 상태만 보고하며 DB에 접속하지 않습니다. 종료 코드가 0이어도 `enabled: false`라면 실행 승인 전입니다. 실제 `run`은 승인 전 `pending_review`와 종료 코드 2를 반환합니다. 검토 파일은 자동으로 승인 상태로 바뀌지 않습니다.
+
+[서비스](../apps/api/deployment/backup/we2day-backup.service)의 `User`와 `WorkingDirectory`를 서버 계정·위 디렉터리에 맞춥니다. [타이머](../apps/api/deployment/backup/we2day-backup.timer)는 매일 **한국 시간 04:00**에 실행하며, 서버가 꺼져 놓친 실행은 다음 활성화 때 한 번 보충합니다. 서비스 제한 시간은 30분입니다. 설치만으로 활성화되지는 않습니다.
+
+```sh
+sudo install -m 0644 we2day-backup.service we2day-backup.timer /etc/systemd/system/
+sudo systemd-analyze verify /etc/systemd/system/we2day-backup.service /etc/systemd/system/we2day-backup.timer
+sudo systemctl daemon-reload
+```
+
+검토가 끝난 뒤 한 번 실행해 결과를 확인하고 예약을 켭니다. 예약 활성화는 운영자의 선택이며, 이 단계에서 백업 파일을 자동 삭제하지 않습니다.
+
+```sh
+sudo systemctl start we2day-backup.service
+sudo systemctl enable --now we2day-backup.timer
+systemctl list-timers we2day-backup.timer
+```
+
+### 최근 결과 확인
+
+```sh
+docker compose run --rm --no-deps -T backup status --directory /copies
+```
+
+마지막 실행 상태와 성공 시각, 마지막 성공이 36시간을 넘었는지 표시합니다. 36시간은 확인을 돕는 기준이며 알림을 외부로 보내지는 않습니다. `last_success: null`이면 이 실행부에서 성공한 기록이 없는 상태이며, 다른 디렉터리의 수동 백업 유무와는 별개입니다. 실패 후에도 이전 성공 시각이 유지되므로 `state`와 함께 확인해야 합니다.
+
+상태·프로필·잠금 파일은 보관 디렉터리 안의 `.we2day-backup-*` 이름으로 관리합니다. 실행 중 잠금 파일을 지우지 마세요. 보관 결과의 `review_candidates`는 일별 7개·주별 4개 기준의 검토 대상 수이며 **삭제 승인이 아닙니다.** 이 실행부는 암호화 사본을 자동 삭제하지 않습니다.
 
 <a id="backup-bundles"></a>
 ## DB·사진 백업 묶음과 파일 복구

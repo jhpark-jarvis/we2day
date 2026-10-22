@@ -1,0 +1,13 @@
+[Unit]
+Description=WE2DAY reviewed daily encrypted backup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/we2day-backup
+ExecStart=/usr/bin/docker compose run --rm --no-deps -T backup
+TimeoutStartSec=1800
+NoNewPrivileges=true

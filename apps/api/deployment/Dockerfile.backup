@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
     && rm -rf /var/lib/apt/lists/*
 COPY apps/api/src/we2day_api/local_archive.py \
      apps/api/src/we2day_api/backup_bundle.py apps/api/src/we2day_api/backup_retention.py \
-     apps/api/src/we2day_api/backup_collect.py /app/src/we2day_api/
+     apps/api/src/we2day_api/backup_collect.py apps/api/src/we2day_api/backup_worker.py \
+     /app/src/we2day_api/
 USER 10001
 ENTRYPOINT ["python", "-m", "we2day_api.backup_collect"]
