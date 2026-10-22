@@ -70,6 +70,8 @@ flowchart LR
 
 ## 4. 사진 저장과 삭제
 
+브라우저는 사진을 최대 1600px·1MiB로 줄입니다. WebP 인코딩이 지원되지 않으면 JPEG로 압축하고, FastAPI가 파일 형식과 크기를 검사한 뒤 메타데이터 없는 WebP로 변환합니다. 원본 파일은 전송하지 않으며 Storage 경로·이미지 조회·ZIP 내보내기 형식은 WebP로 유지합니다. 로컬 압축본 다운로드는 실제 형식에 따라 `.jpg` 또는 `.webp`를 사용합니다.
+
 ```mermaid
 flowchart LR
   File["사용자가 고른 사진"] --> Prepare["브라우저 검증·압축·미리보기"]
