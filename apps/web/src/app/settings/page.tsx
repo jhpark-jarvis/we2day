@@ -4,8 +4,9 @@ import Link from "next/link";
 import { PushSettings } from "@/components/push-settings";
 import { PwaSettings } from "@/components/pwa-settings";
 import { ThemePicker } from "@/components/theme-picker";
+import { callApi } from "@/lib/api";
 import { createAuthClient } from "@/lib/auth/server";
-import { usernameFromAddress } from "@/lib/auth/username";
+import type { ProfileView } from "@/lib/profiles";
 import { resolveTheme, THEME_COOKIE } from "@/lib/theme";
 
 export const metadata: Metadata = { title: "설정" };
@@ -24,10 +25,10 @@ async function accountView() {
       };
     }
     if (!data.user) return { status: "guest" as const };
-    const name = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
+    const profiles = await callApi<ProfileView>("/profiles");
     return {
       status: "ready" as const,
-      identity: usernameFromAddress(data.user.email) || (typeof name === "string" ? name : null),
+      identity: profiles.data?.mine?.display_name || null,
     };
   } catch {
     return { status: "unavailable" as const };
@@ -65,9 +66,7 @@ export default async function SettingsPage() {
         {account.status === "ready" ? (
           <>
             <p className="muted">
-              {account.identity
-                ? `${account.identity} 계정으로 로그인했어요.`
-                : "로그인한 상태예요."}
+              {account.identity ? `${account.identity}님으로 로그인했어요.` : "로그인한 상태예요."}
             </p>
             <Link className="text-button" href="/account">
               계정 관리

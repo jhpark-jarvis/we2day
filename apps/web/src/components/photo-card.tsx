@@ -77,6 +77,7 @@ export function PhotoCard({
   selected = false,
   selectingDisabled = false,
   onSelect,
+  authorName,
 }: {
   photo: SharedPhoto;
   userId: string | null;
@@ -85,6 +86,7 @@ export function PhotoCard({
   selected?: boolean;
   selectingDisabled?: boolean;
   onSelect?: () => void;
+  authorName?: string;
 }) {
   const [now, setNow] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -121,7 +123,10 @@ export function PhotoCard({
           />
           <figcaption>
             <small>
-              {photo.date} · {photo.created_by === userId ? "내가" : "상대가"} 남긴 사진
+              {photo.date} ·{" "}
+              {authorName
+                ? `${authorName}님의 사진`
+                : `${photo.created_by === userId ? "내가" : "상대가"} 남긴 사진`}
             </small>
             <strong>{photo.caption || "함께한 하루의 한 장면"}</strong>
           </figcaption>
@@ -142,7 +147,7 @@ export function PhotoCard({
         <dl className="detail-list photo-details">
           <div>
             <dt>올린 사람</dt>
-            <dd>{photo.created_by === userId ? "나" : "상대방"}</dd>
+            <dd>{authorName || (photo.created_by === userId ? "나" : "상대방")}</dd>
           </div>
           <div>
             <dt>올린 시각</dt>

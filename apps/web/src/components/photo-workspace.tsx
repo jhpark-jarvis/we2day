@@ -12,10 +12,12 @@ export function PhotoWorkspace({
   today,
   userId,
   canSave,
+  names = {},
 }: {
   today: string;
   userId: string | null;
   canSave: boolean;
+  names?: Record<string, string>;
 }) {
   const [date, setDate] = useState(today);
   const [items, setItems] = useState<SharedPhoto[]>([]);
@@ -236,6 +238,7 @@ export function PhotoWorkspace({
           <div className="shared-photo-grid">
             {items.map((photo) => (
               <PhotoCard
+                authorName={names[photo.created_by]}
                 key={`${photo.id}:${photo.lifecycle_version}`}
                 photo={photo}
                 userId={userId}

@@ -3,8 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { AuthSubmit } from "@/components/auth-submit";
+import { ProfileSettings } from "@/components/profile-settings";
+import { callApi } from "@/lib/api";
 import { createAuthClient } from "@/lib/auth/server";
-import { usernameFromAddress } from "@/lib/auth/username";
+import type { ProfileView } from "@/lib/profiles";
 
 export const metadata: Metadata = { title: "내 계정" };
 
@@ -30,36 +32,24 @@ export default async function AccountPage({
       </section>
     );
   }
-  // getSession supplies the token only; getUser above and FastAPI both validate identity.
-  const { data: sessionData } = await client.auth.getSession();
-  let apiReady = false;
-  if (sessionData.session) {
-    try {
-      const response = await fetch(
-        `${process.env.WE2DAY_API_URL || "http://127.0.0.1:8000"}/auth/me`,
-        {
-          headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
-          cache: "no-store",
-          signal: AbortSignal.timeout(8_000),
-        },
-      );
-      if (response.ok) apiReady = (await response.json()).id === data.user.id;
-    } catch {
-      // Keep the confirmed web session usable while the API is unavailable.
-    }
-  }
+  const [identity, profiles] = await Promise.all([
+    callApi<{ id: string }>("/auth/me"),
+    callApi<ProfileView>("/profiles"),
+  ]);
+  const apiReady = identity.data?.id === data.user.id;
   const params = await searchParams;
-  const username = usernameFromAddress(data.user.email);
-  const name = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
+  const name = profiles.data?.mine?.display_name;
   return (
     <section className="auth-panel">
       <p className="eyebrow">YOUR ACCOUNT</p>
       <h1>내 계정</h1>
-      <p className="muted">{typeof name === "string" ? `${name}님, 반가워요.` : "반가워요."}</p>
+      <p className="muted">
+        {name ? `${name}님, 반가워요.` : "반가워요. 사용할 이름을 등록해 주세요."}
+      </p>
       <dl className="detail-list">
         <div>
-          <dt>{username ? "아이디" : "이메일"}</dt>
-          <dd>{username || data.user.email || "이메일 제공 안 함"}</dd>
+          <dt>이름</dt>
+          <dd>{name || "이름 미설정"}</dd>
         </div>
         <div>
           <dt>로그인</dt>
@@ -70,6 +60,11 @@ export default async function AccountPage({
           <dd>{apiReady ? "계정 확인 완료" : "확인하지 못했어요. 잠시 후 다시 확인해 주세요."}</dd>
         </div>
       </dl>
+      <ProfileSettings
+        key={`${profiles.data?.mine?.version || 0}-${!!profiles.error}`}
+        initial={profiles.data?.mine || null}
+        loadError={profiles.error}
+      />
       <Link className="text-button" href="/couple">
         둘의 공간 연결 · 초대
       </Link>

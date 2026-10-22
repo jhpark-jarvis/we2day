@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PhotoWorkspace } from "@/components/photo-workspace";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, previousYearDate, seoulToday } from "@/lib/calendar";
+import { type ProfileView, profileNames } from "@/lib/profiles";
 import type { Couple } from "@/lib/shared-calendar";
 
 export const metadata: Metadata = { title: "기록" };
@@ -16,9 +17,10 @@ export default async function MemoriesPage({
   const today = seoulToday();
   const selectedDate = typeof date === "string" && isSupportedDate(date) ? date : today;
   const lastYear = previousYearDate(today);
-  const [couple, user] = await Promise.all([
+  const [couple, user, profiles] = await Promise.all([
     callApi<Couple | null>("/couple"),
     callApi<{ id: string }>("/auth/me"),
+    callApi<ProfileView>("/profiles"),
   ]);
   return (
     <>
@@ -77,6 +79,7 @@ export default async function MemoriesPage({
         today={selectedDate}
         userId={user.data?.id || null}
         canSave={!!couple.data && !!user.data}
+        names={profileNames(profiles.data)}
       />
     </>
   );

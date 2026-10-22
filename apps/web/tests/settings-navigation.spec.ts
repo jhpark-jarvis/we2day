@@ -47,7 +47,7 @@ test("settings separates feature links and reflects the confirmed account", asyn
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/account$/);
   await page.goto("/settings");
-  await expect(account).toContainText("member 계정으로 로그인했어요.");
+  await expect(account).toContainText("로그인한 상태예요.");
   await expect(account.getByRole("link", { name: "로그인", exact: true })).toHaveCount(0);
   await expect(account.getByRole("link", { name: "계정 관리", exact: true })).toHaveAttribute(
     "href",
@@ -58,7 +58,7 @@ test("settings separates feature links and reflects the confirmed account", asyn
     "/timezones",
   );
   await page.reload();
-  await expect(account).toContainText("member 계정으로 로그인했어요.");
+  await expect(account).toContainText("로그인한 상태예요.");
   await page.screenshot({
     path: testInfo.outputPath("settings-account-mobile.png"),
     fullPage: true,

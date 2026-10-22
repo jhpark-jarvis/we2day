@@ -41,7 +41,8 @@ test("username login validates the API, hides internal addresses and persists", 
   await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/account$/);
-  await expect(page.getByText("member", { exact: true })).toBeVisible();
+  await expect(page.getByText("이름 미설정", { exact: true })).toBeVisible();
+  await expect(page.getByText("member", { exact: true })).toHaveCount(0);
   await expect(page.getByText("계정 확인 완료", { exact: true })).toBeVisible();
   expect(await page.content()).not.toContain("login.we2day.invalid");
   await page.reload();
