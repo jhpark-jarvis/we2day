@@ -82,7 +82,7 @@ docker compose up --build --detach
 4. 지정 계정 두 개를 만들거나 선택 소셜 공급자를 설정합니다.
 5. 앱을 재생성하고 로그인한 뒤 공간을 만들고 상대를 초대합니다.
 
-계정 생성·전체 SQL 순서·오류 해결·Google/Kakao·NAVER 설정은 **[설치 가이드](guides/setup.md)**에 모았습니다. 처음 Supabase를 사용하는 경우 이 순서대로 진행하세요.
+계정 생성·전체 SQL 순서·오류 해결·Google/Kakao·NAVER 설정은 [설치 가이드](guides/setup.md)에 모았습니다. 처음 Supabase를 사용하는 경우 이 순서대로 진행하세요.
 
 ### 로그인은 설치자가 선택
 
@@ -147,7 +147,7 @@ flowchart TB
 
 서버 액션과 API는 현재 사용자 JWT로 요청하고 SQL/RLS가 같은 공간의 접근을 검사합니다. 업무용 관리자 키를 브라우저나 일반 업무 API에 넣지 않습니다. 사진은 압축본을 비공개 Storage에 저장하며 개인 회고/답변은 명시적 공유 전까지 작성자만 접근합니다.
 
-현재 실행 단위·로그인 시퀀스·데이터 연결·사진 수명주기·예약 알림·성능/PWA 범위는 **[아키텍처 가이드](guides/architecture.md)**에서 설명합니다. 정확한 의존성은 `package-lock.json`과 `apps/api/uv.lock`에 고정합니다.
+현재 실행 단위·로그인 시퀀스·데이터 연결·사진 수명주기·예약 알림·성능/PWA 범위는 [아키텍처 가이드](guides/architecture.md)에서 설명합니다. 정확한 의존성은 `package-lock.json`과 `apps/api/uv.lock`에 고정합니다.
 
 ## 자신의 서버에 배포
 
@@ -163,7 +163,7 @@ flowchart TB
 | 6 | Supabase redirect·NAVER 허용 origin을 운영 주소에 맞춤 |
 | 7 | 두 계정 로그인·사진·설치·기기 알림과 복구 절차 확인 |
 
-개발용 `compose.yaml`과 운영용 [`compose.vm.yaml`](apps/api/deployment/compose.vm.yaml)은 별도로 사용합니다. 운영 Compose는 웹만 loopback `3200`에 바인딩하고 API는 내부망에 둡니다. 공개 접속은 HTTPS 프록시를 거칩니다. 빌드·전송·환경 변수·TLS·갱신·예약 알림·백업·실패 복구의 실제 절차는 **[배포 가이드](guides/deployment.md)**를 따르세요.
+개발용 `compose.yaml`과 운영용 [`compose.vm.yaml`](apps/api/deployment/compose.vm.yaml)은 별도로 사용합니다. 운영 Compose는 웹만 loopback `3200`에 바인딩하고 API는 내부망에 둡니다. 공개 접속은 HTTPS 프록시를 거칩니다. 빌드·전송·환경 변수·TLS·갱신·예약 알림·백업·실패 복구의 실제 절차는 [배포 가이드](guides/deployment.md)를 따르세요.
 
 ### 휴대폰에서 사용
 
@@ -185,7 +185,7 @@ flowchart LR
 
 첫 단계는 날짜·예산·교통·희망 활동을 기존 플랜 템플릿으로 정리하는 기능입니다. 이후 부분 수정 제안, 이용 조건을 확인한 제한 도구, 선택한 메모의 회고 보조, 명시적으로 선택한 과거 기록 활용을 검토합니다.
 
-공급자는 미정이며 AI가 DB를 직접 쓰거나 일정 확정·공유·삭제를 자동 실행하도록 만들지 않습니다. 입력 최소화·사용 상한·실패 시 수동 편집·권한/구조 검증과 단계별 완료 기준은 **[AI 구현 로드맵](guides/ai-roadmap.md)**에 상세히 설명했습니다. 영상 타임랩스·전체 백업/복원·추가 연결 기능도 각각의 저장/복구·기기 검증을 거쳐 확장할 범위입니다.
+공급자는 미정이며 AI가 DB를 직접 쓰거나 일정 확정·공유·삭제를 자동 실행하도록 만들지 않습니다. 입력 최소화·사용 상한·실패 시 수동 편집·권한/구조 검증과 단계별 완료 기준은 [AI 구현 로드맵](guides/ai-roadmap.md)에 상세히 설명했습니다. 영상 타임랩스·전체 백업/복원·추가 연결 기능도 각각의 저장/복구·기기 검증을 거쳐 확장할 범위입니다.
 
 ## 개발과 검증
 
