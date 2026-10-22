@@ -18,7 +18,7 @@ from database_fixture import temporary_database  # noqa: E402
 
 def main():
     screenshots = "--screenshots" in sys.argv
-    photos = "--photos" in sys.argv or screenshots
+    photos = "--photos" in sys.argv or screenshots or "--organizer" in sys.argv
     places = "--places" in sys.argv
     plans = "--plans" in sys.argv
     journey = "--journey" in sys.argv
@@ -62,6 +62,7 @@ def main():
                 "33333333-3333-4333-8333-333333333333",
                 "44444444-4444-4444-8444-444444444444",
                 "55555555-5555-4555-8555-555555555555",
+                "66666666-6666-4666-8666-666666666666",
             ]:
                 connection.execute("insert into auth.users(id) values (%s)", (value,))
         name = f"{database_name}-rest"

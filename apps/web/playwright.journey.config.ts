@@ -8,7 +8,13 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   projects: [
-    { name: "journey-mobile", use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" } },
+    {
+      name: "journey-mobile",
+      use: {
+        ...devices["iPhone 13"],
+        defaultBrowserType: process.env.WE2DAY_TEST_BROWSER === "webkit" ? "webkit" : "chromium",
+      },
+    },
   ],
   webServer: servers.map((server) => ({
     ...server,

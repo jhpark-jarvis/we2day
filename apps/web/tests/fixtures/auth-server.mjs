@@ -211,7 +211,11 @@ createServer(async (request, response) => {
       }
       const calendarUser =
         process.env.WE2DAY_TEST_REST_URL &&
-        ["partner@login.we2day.invalid", "outsider@login.we2day.invalid"].includes(input.email);
+        [
+          "partner@login.we2day.invalid",
+          "outsider@login.we2day.invalid",
+          "audit@login.we2day.invalid",
+        ].includes(input.email);
       const accepted =
         (calendarUser && input.password === "fixture-password") ||
         (input.email === "member@login.we2day.invalid" && input.password === "fixture-password") ||
@@ -223,11 +227,13 @@ createServer(async (request, response) => {
         200,
         issue({
           id:
-            input.email === "partner@login.we2day.invalid"
-              ? "44444444-4444-4444-8444-444444444444"
-              : input.email === "outsider@login.we2day.invalid"
-                ? "55555555-5555-4555-8555-555555555555"
-                : "33333333-3333-4333-8333-333333333333",
+            input.email === "audit@login.we2day.invalid"
+              ? "66666666-6666-4666-8666-666666666666"
+              : input.email === "partner@login.we2day.invalid"
+                ? "44444444-4444-4444-8444-444444444444"
+                : input.email === "outsider@login.we2day.invalid"
+                  ? "55555555-5555-4555-8555-555555555555"
+                  : "33333333-3333-4333-8333-333333333333",
           aud: "authenticated",
           role: "authenticated",
           created_at: "2026-10-19T00:00:00Z",

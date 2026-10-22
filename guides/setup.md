@@ -336,6 +336,35 @@ npm run test:pwa
 
 `test:photo-sharing`은 공동 일정 검사와 같은 일회용 PostgreSQL/PostgREST·테스트용 인증·웹/API 포트를 재사용합니다. 파일은 메모리에 보관하는 사진 저장소를 대신하는 HTTP 테스트 서버이며 실제 PostgreSQL RLS를 호출합니다. 실제 Supabase Storage 서버·클라우드 적용 확인을 대신하지 않습니다. 수정한 기능에 맞는 검사를 선택해 실행하세요. 인증이나 공통 기반을 바꾸거나 배포를 준비할 때는 관련 전체 흐름도 함께 검사합니다.
 
+### 전체 화면과 모바일 레이아웃 검사
+
+`test:organizer`에는 모든 페이지를 자동으로 찾아 검사하는 화면 감사가 포함됩니다. 긴 제목·사진·편집 폼을 넣은 상태에서 좁은 모바일, 태블릿, 데스크톱과 두 테마의 가로 넘침, 입력칸 크기, 터치 영역, 키보드 포커스를 확인합니다. 화면 캡처는 `apps/web/test-results`에 생성되며 공개 커밋에는 포함하지 않습니다.
+
+전체 화면 감사만 실행하려면 다음 명령을 사용하세요.
+
+```bash
+uv run --project apps/api python apps/web/tests/run_calendar_tests.py --organizer --grep "all page controls"
+```
+
+Safari 계열 렌더링에는 WebKit을 사용합니다. 개발 서버의 화면 갱신과 자동 이동이 겹치는 영향을 줄이려면 운영용 빌드로 검사하세요. 먼저 저장소 루트에서 다음을 실행합니다.
+
+```bash
+npx playwright install webkit
+npm run build
+node -e "const fs=require('node:fs');fs.cpSync('apps/web/.next/static','apps/web/.next/standalone/apps/web/.next/static',{recursive:true});fs.cpSync('apps/web/public','apps/web/.next/standalone/apps/web/public',{recursive:true})"
+```
+
+PowerShell에서는 아래 환경 변수를 지정한 뒤 같은 화면 감사 명령을 실행합니다.
+
+```powershell
+$env:WE2DAY_TEST_BROWSER='webkit'
+$env:WE2DAY_TEST_WEB_ENGINE='standalone'
+uv run --project apps/api python apps/web/tests/run_calendar_tests.py --organizer --grep "all page controls"
+Remove-Item Env:WE2DAY_TEST_BROWSER, Env:WE2DAY_TEST_WEB_ENGINE
+```
+
+기본 브라우저 엔진은 Chromium입니다. 운영 빌드 검사도 실제 서비스 대신 테스트 계정·임시 DB를 사용합니다. 이 검사는 iPhone 실기기의 키보드·홈 화면 앱·알림 동작 확인을 대신하지 않습니다.
+
 ## Docker
 
 Docker Engine과 Docker Compose가 실행 중인 환경에서 다음 명령을 사용합니다. 로컬 개발 서버와 포트가 겹치면 먼저 종료하세요. 의존성 설치에는 BuildKit의 npm 캐시와 제한된 네트워크 재시도를 사용하며 잠금 파일의 버전을 유지합니다.
