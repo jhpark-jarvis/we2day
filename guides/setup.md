@@ -238,36 +238,25 @@ select to_regclass('public.anniversaries') as anniversary_table;
 
 결과가 `NULL`이면 테이블이 없는 상태입니다. 002 파일 전체를 실행하고 `Success`를 확인하세요. 테이블이 이미 있다면 파일을 다시 실행하기 전에 기존 실행 오류와 Data API 설정을 확인합니다. API 로그에는 오류 분류와 HTTP 상태만 남기며 SQL 원문·응답 본문·키는 기록하지 않습니다.
 
-## NAVER 장소 검색 설정 (선택)
+## NAVER 지도 검색
 
-설정하지 않아도 로그인·일정·기념일·사진 기능을 사용할 수 있습니다. 검색은 **NAVER API HUB → NAVER 검색 → 지역**을 사용합니다. Maps 지도 표시용 키·Google OAuth ID와 별개이며, Client Secret은 `apps/api/.env`에만 둡니다.
+장소 검색은 네이버 지도 앱으로 연결합니다. **별도 검색 API 신청·키·Client Secret은 필요하지 않습니다.**
 
-1. [네이버 클라우드 콘솔](https://console.ncloud.com/)에서 한국 리전의 **Application Services → NAVER API HUB → Subscription**을 엽니다. 현재 요금과 적용 약관을 확인하고 동의하는 경우 직접 이용 신청합니다.
-2. **Application → Application 등록 → NAVER 검색의 지역**을 선택합니다. 이름은 `WE2DAY-Local`처럼 영문·숫자·하이픈으로 작성합니다.
-3. **한도 및 알림**에서 일별/월별 한도를 설정합니다. 두 사람의 초기 사용이라면 하루 100회·한 달 1,000회를 시작값으로 검토할 수 있습니다. 같은 계정에 등록한 다른 Application의 사용량과 현재 무료 조건도 확인합니다.
-4. Application의 **인증 정보**에서 Client ID와 Client Secret을 확인하고, 기존 Supabase 설정을 유지한 채 `apps/api/.env`에 다음을 추가합니다. 값은 채팅·README·Git에 남기지 않습니다.
+1. 휴대폰에 네이버 지도 앱을 설치합니다.
+2. 약속 입력·약속 상세에서 **네이버 지도 검색**을 열고 장소명이나 주소를 입력합니다. 기존 장소가 있으면 검색어로 표시됩니다.
+3. **지도 검색**을 누르면 네이버 지도 앱에서 검색합니다. 검색창의 입력은 약속에 저장한 장소를 덮어쓰지 않습니다.
+4. 데이트 플랜에는 방문할 장소명·주소와 순서를 미리 적고 저장·확정합니다. 날짜별 **데이트 코스 → 네이버 지도**에서 저장한 장소를 다시 검색할 수 있습니다. 운전 길찾기는 지도 앱에서 선택합니다.
 
-```dotenv
-WE2DAY_NAVER_SEARCH_ENABLED=true
-WE2DAY_NAVER_SEARCH_CLIENT_ID=YOUR_API_HUB_CLIENT_ID
-WE2DAY_NAVER_SEARCH_CLIENT_SECRET=YOUR_API_HUB_CLIENT_SECRET
-```
-
-5. Docker 사용 시 `docker compose up --detach --wait`로 변경한 환경 변수를 반영합니다. `uvicorn --reload`로 실행 중이라도 `.env` 변경 후에는 API 프로세스를 재시작합니다. 웹에는 NAVER 키를 추가하지 않습니다.
-6. 로그인 후 **약속 추가하기 → 네이버 장소 검색 열기**에서 개인정보가 없는 장소 이름로 확인합니다. 검색 결과는 열람용이며, 약속이나 동선 기록에 자동 저장되지 않습니다. 새 SQL 마이그레이션은 필요하지 않습니다.
-
-검색 API와 Data Lab API의 무료 구간·기간·일/월 호출 제한은 상품별로 확인합니다. 이 앱은 지역 검색을 사용하며 검색어 트렌드·쇼핑 인사이트는 호출하지 않습니다. 키 설정 전에는 `WE2DAY_NAVER_SEARCH_ENABLED=false`를 유지합니다. [상품·요금 안내](https://www.ncloud.com/product/applicationService/NAVERAPIHUB), [콘솔 설정 안내](https://guide.ncloud-docs.com/docs/apihub-application).
-
-검색 결과는 화면에 표시하는 용도로만 사용하며 서버 DB나 파일, 브라우저의 영구 저장소에 저장하거나 AI에 전달하지 않습니다. 장소 정보를 보관하거나 다른 용도로 활용하려면 NAVER의 저장·가공·AI 입력 관련 이용 조건과 데이터 출처를 먼저 확인해야 합니다. [NAVER API 약관](https://developers.naver.com/products/terms/), [지역 검색 명세](https://api.ncloud-docs.com/docs/naver-api-hub-search-local).
+이전 버전의 `WE2DAY_NAVER_SEARCH_*` 설정은 더 이상 사용하지 않으므로 삭제할 수 있습니다. 이전 검색 API 경로는 종료 응답(HTTP410)만 반환합니다. 동선에 지도를 표시하려면 아래 Dynamic Map 설정을 별도로 진행하세요. 앱 실행·설치 여부와 외부 앱 복귀는 실제 휴대폰에서 확인해야 합니다. [공식 지도 앱 URL Scheme](https://guide-gov.ncloud-docs.com/docs/ko/naveropenapiv3-maps-url-scheme-url-scheme).
 
 ## NAVER 지도 표시 설정 (선택)
 
-장소 검색용 API HUB 키와 별도인 **NAVER Cloud Platform Maps → Dynamic Map**을 사용합니다. 지도 없이도 수동 플랜과 직접 좌표 기록은 사용할 수 있습니다.
+**NAVER Cloud Platform Maps → Dynamic Map**을 사용합니다. 장소 검색 링크와 달리 이 지도 표시에는 Client ID가 필요합니다. 지도 없이도 수동 플랜과 직접 좌표 기록은 사용할 수 있습니다.
 
 1. [네이버 클라우드 콘솔](https://console.ncloud.com/)의 **Application Services → Maps → Application**에서 이용 신청/애플리케이션 등록을 진행합니다. 해당 계정의 적용 약관·대표 계정 무료 혜택/호출량을 확인한 뒤 신청합니다.
 2. API는 **Dynamic Map**만 선택합니다. 이 구현에는 Directions 5·Geocoding·Reverse Geocoding이 필요하지 않습니다.
 3. **Web 서비스 URL**에 `http://127.0.0.1:3000`을 등록합니다. localhost도 사용한다면 `http://localhost:3000`을 별도로 등록하고, 운영 도메인이 생기면 HTTPS 주소를 추가합니다. 로그인 사이트 URL과 같은 주소로 접속하세요.
-4. 등록한 Maps 애플리케이션의 **Client ID**를 `apps/web/.env`에 추가합니다. API HUB의 검색 키를 재사용하지 않습니다.
+4. 등록한 Maps 애플리케이션의 **Client ID**를 `apps/web/.env`에 추가합니다. 지도 앱 검색 링크에는 이 키를 사용하지 않습니다.
 
 ```dotenv
 WE2DAY_NAVER_MAPS_CLIENT_ID=YOUR_MAPS_CLIENT_ID
@@ -279,7 +268,7 @@ WE2DAY_NAVER_MAPS_CLIENT_ID=YOUR_MAPS_CLIENT_ID
 
 SDK는 현재 `ncpKeyId` 매개변수를 사용합니다. `ncpClientId` 기반의 예전 예제와 혼동하지 마세요. 지도 인증 오류는 Dynamic Map 선택·Client ID·허용 Web 서비스 URL을 확인합니다. 지도 로드/인증에 실패해도 작성한 이름·좌표는 유지하며, 지도를 닫았다 열어 다시 시도할 수 있습니다. [SDK 시작 안내](https://navermaps.github.io/maps.js.ncp/docs/tutorial-2-Getting-Started.html), [Maps 신청 안내](https://guide.ncloud-docs.com/docs/application-maps-app-vpc), [공식 무료 혜택 FAQ](https://www.ncloud.com/support/faq/prod/2828).
 
-Maps와 API HUB 검색은 서로 다른 서비스이며 무료 제공·대표 계정 조건·호출 한도도 각각 확인해야 합니다. 사용 시점의 콘솔 조건을 확인하세요. 지도 SDK는 브라우저에서 NAVER 서비스로 직접 연결하며, 직접 지정한 두 점을 지도 위에 표시합니다. 검색·지도 결과를 저장하거나 다른 용도로 사용할 때는 해당 서비스의 이용 조건을 별도로 확인해야 합니다.
+Dynamic Map의 무료 제공·대표 계정 조건·호출 한도를 확인해야 합니다. 지도 앱 검색 링크는 서버 검색 API를 호출하지 않습니다. 사용 시점의 콘솔 조건을 확인하세요. 지도 SDK는 브라우저에서 NAVER 서비스로 직접 연결하며, 직접 지정한 두 점을 지도 위에 표시합니다. 검색·지도 결과를 저장하거나 다른 용도로 사용할 때는 해당 서비스의 이용 조건을 별도로 확인해야 합니다.
 
 <a id="checks"></a>
 
@@ -323,12 +312,12 @@ npm run test:pwa
 | `test:photos` | 테스트 이미지/EXIF로 압축·다운로드·메타데이터 제외·파일 거부/취소·모바일 검사 |
 | `test:photo-sharing` | 테스트 계정 두 개의 저장/공유·휴지통 이동·상대 계정에서 복구·30일/삭제 재시도·ZIP 다운로드·만남 메모/충돌. 실제 SQL + 사진 저장소를 대신하는 HTTP 테스트 서버 |
 | `test:map-loader` | 외부 호출 없이 SDK 준비 콜백/로드 이벤트·실패 후 재시도 검사. 브라우저·Docker 불필요 |
-| `test:plans` | 일회용 DB/테스트 계정 두 개의 동선 저장·공유, SDK 대역의 지연 로드/두 점·직선, 플랜 저장→확정→충돌→재확정→보관/복원. 실제 Maps/API HUB 호출 없음 |
+| `test:plans` | 일회용 DB/테스트 계정 두 개의 동선 저장·공유, SDK 대역의 지연 로드/두 점·직선, 플랜 저장→확정→충돌→재확정→보관/복원. 실제 Maps API 호출 없음 |
 | `test:journey` | 테스트 계정 두 개의 위시→플랜 확정→투데이·미확정 변경 제외→개인 회고 차단/공유/철회→복제 시 달력 보존 |
 | `test:organizer` | 테스트 계정의 다가오는 약속/기념일·날짜 직접 이동·ICS 실제 다운로드/메모 선택·월간 집계와 빈 월 |
 | `test:timeline` | 미정 비용(null)과 입력한 0원, 일부 비용의 합계 구분. Docker 불필요 |
 | `test:pwa` | 연결이 끊겼을 때 안내 화면 표시, API·인증·POST 응답 저장 제외, 사용자 선택에 따른 업데이트. Docker 불필요 |
-| `test:places` | 테스트 계정 로그인/공간·실제 웹/API의 미설정·Origin/본문 한도, 직접 작성한 가상 결과로 검색 표시/빈 결과/실패·안전 링크·약속 입력 보존. 실제 NAVER 호출 없음 |
+| `test:places` | 합성 약속 입력/상세의 지도 앱 검색 링크·기존 장소 기본값·특수문자 인코딩·초안 보존·과거 API410 종료. 외부 검색 API 호출 없음 |
 
 공동 일정·기념일 종단 검사는 웹/API/테스트용 인증의 위 포트와 임시 PostgREST의 54330 포트를 사용합니다. 날짜 계산은 첫날/100일·윤일/평년·한국 자정과 원본 보존을 검사하며, 브라우저에서는 사용자 두 명 기념일 공유·응답 유실 재시도·입력 오류/충돌·취소·두 테마를 확인합니다. 추적 파일은 남기지 않으며, 자동 검사와 별도로 실제 Supabase 프로젝트와 사용자 계정, 휴대폰에서도 동작을 확인해야 합니다.
 
