@@ -23,6 +23,7 @@ from we2day_api.photo_search import router as photo_search_router
 from we2day_api.photos import router as photos_router
 from we2day_api.places import router as places_router
 from we2day_api.plans import router as plans_router
+from we2day_api.profiles import router as profiles_router
 from we2day_api.push import router as push_router
 from we2day_api.questions import router as questions_router
 from we2day_api.record_search import router as record_search_router
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(monthly_router)
     application.include_router(places_router)
     application.include_router(plans_router)
+    application.include_router(profiles_router)
     application.include_router(visits_router)
     application.include_router(reports_router)
     application.include_router(route_history_router)

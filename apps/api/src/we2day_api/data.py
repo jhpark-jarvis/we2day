@@ -84,6 +84,7 @@ class DataAPI:
             "question_not_found",
             "invalid_answer",
             "invalid_timezone",
+            "invalid_profile",
             "invalid_roulette",
             "roulette_not_found",
             "roulette_archived",
