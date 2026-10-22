@@ -362,7 +362,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       });
     }
     await open(page, "/today");
-    await page.getByRole("button", { name: "네이버 지도 앱 이동 준비", exact: true }).click();
+    await page.getByRole("button", { name: "앱 연결 옵션", exact: true }).click();
     await page.getByText("목적지 좌표로 바로 길찾기", { exact: true }).click();
     await auditControls(page, "mobile-detail/naver-app-handoff");
     await page.screenshot({

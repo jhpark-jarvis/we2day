@@ -34,8 +34,8 @@ export default async function TodayPage({
       <header className="page-heading">
         <div>
           <p className="eyebrow">OUR DAY, STEP BY STEP</p>
-          <h1>투데이 타임라인</h1>
-          <p className="muted">함께 정한 하루를 순서대로 살펴봐요.</p>
+          <h1>데이트 코스</h1>
+          <p className="muted">방문할 장소를 순서대로 보고, 저장한 목적지로 바로 출발해요.</p>
         </div>
       </header>
       <form className="calendar-toolbar" action="/today">

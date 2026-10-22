@@ -1,28 +1,63 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { naverAppLinks, type RouteMode } from "@/lib/naver-app";
 
-export function NaverAppHandoff({ place, site }: { place: string; site: string }) {
+export function NaverAppHandoff({
+  place,
+  site,
+  compact = false,
+}: {
+  place: string;
+  site: string;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<"ios" | "android">("ios");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [mode, setMode] = useState<RouteMode>("car");
+  useEffect(() => {
+    if (/Android/i.test(navigator.userAgent)) setPlatform("android");
+  }, []);
   const search = naverAppLinks(site, place);
   const route = naverAppLinks(site, place, { lat, lng, mode });
+  if (compact)
+    return search ? (
+      <a
+        className="text-button"
+        href={search[platform]}
+        rel="noreferrer"
+        referrerPolicy="no-referrer"
+      >
+        지도 검색
+      </a>
+    ) : null;
   if (!place.trim())
     return (
       <p className="settings-hint">이 활동에는 장소가 없어요. 플랜에서 장소를 직접 적어 주세요.</p>
     );
   return (
     <section aria-label="네이버 지도 앱 이동">
+      {search && (
+        <a
+          className="primary-button"
+          href={search[platform]}
+          rel="noreferrer"
+          referrerPolicy="no-referrer"
+        >
+          네이버 지도
+        </a>
+      )}
+      <p className="settings-hint">
+        저장한 장소명·주소로 지도 앱을 열어요. 목적지를 확인하고 운전 길찾기를 선택해 주세요.
+      </p>
       <button
         type="button"
         className="text-button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        네이버 지도 앱 이동 준비
+        앱 연결 옵션
       </button>
       {open && (
         <div className="plan-review">
@@ -42,16 +77,7 @@ export function NaverAppHandoff({ place, site }: { place: string; site: string }
               <option value="android">Android · 네이버 지도 앱</option>
             </select>
           </div>
-          {search && (
-            <a
-              className="primary-button"
-              href={search[platform]}
-              rel="noreferrer"
-              referrerPolicy="no-referrer"
-            >
-              네이버 지도 앱에서 장소 검색
-            </a>
-          )}
+
           <details>
             <summary>목적지 좌표로 바로 길찾기</summary>
             <p className="settings-hint">

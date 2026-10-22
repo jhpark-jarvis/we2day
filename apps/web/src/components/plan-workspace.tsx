@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { changePlan } from "@/app/actions/plans";
-import { PlaceSearch } from "@/components/place-search";
+import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { PlanChecks } from "@/components/plan-checks";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
@@ -19,12 +19,14 @@ export function PlanWorkspace({
   today,
   initialContent = null,
   initialSelected = null,
+  site = "",
 }: {
   initialPlans: DatePlan[];
   initialError: string;
   today: string;
   initialContent?: PlanContent | null;
   initialSelected?: DatePlan | null;
+  site?: string;
 }) {
   const [items, setItems] = useState(initialPlans);
   const [error, setError] = useState(initialError);
@@ -67,6 +69,7 @@ export function PlanWorkspace({
         plan={selected}
         today={today}
         seed={seed}
+        site={site}
         onClone={(content) => {
           setSelected(null);
           setSeed({ ...content, title: `${content.title.slice(0, 94)} · 복사`, date: today });
@@ -137,8 +140,8 @@ export function PlanWorkspace({
       <Link className="text-button" href="/wishlist">
         위시리스트
       </Link>
-      <Link className="text-button" href="/today">
-        타임라인
+      <Link className="text-button" href={`/today?date=${today}`}>
+        데이트 코스
       </Link>
       <Link className="text-button" href="/checklists">
         목록
@@ -202,6 +205,7 @@ function PlanEditor({
   plan,
   today,
   seed,
+  site,
   onClone,
   onCancel,
   onSaved,
@@ -211,6 +215,7 @@ function PlanEditor({
   plan: DatePlan | null;
   today: string;
   seed: PlanContent | null;
+  site: string;
   onClone: (content: PlanContent) => void;
   onCancel: () => void;
   onSaved: (plan: DatePlan, action: PlanAction) => void;
@@ -315,7 +320,7 @@ function PlanEditor({
       {plan?.published_content && (
         <div className="calendar-toolbar">
           <Link className="text-button" href={`/today?date=${plan.published_content.date}`}>
-            확정한 날의 타임라인
+            데이트 코스
           </Link>
           <Link className="text-button" href={`/plans/${plan.id}/report`}>
             이 플랜의 리포트 작성·보기
@@ -413,7 +418,8 @@ function PlanEditor({
             </div>
             <h2>활동 순서</h2>
             <p className="settings-hint">
-              입력한 순서대로 진행해요. 첫 활동의 시간·장소가 달력 약속에 반영돼요.
+              방문할 장소명이나 주소를 순서대로 적어 주세요. 데이트 코스에서 네이버 지도 앱으로 바로
+              열 수 있어요. 첫 활동의 시간·장소가 달력 약속에 반영돼요.
             </p>
             {content.activities.map((item, index) => (
               <fieldset key={activityKeys.current[index]} className="plan-activity">
@@ -463,9 +469,11 @@ function PlanEditor({
                     id={`activity-${index}-place`}
                     value={item.place}
                     maxLength={200}
+                    placeholder="장소명 또는 주소"
                     onChange={(event) => activity(index, { place: event.target.value })}
                   />
                 </div>
+                <NaverAppHandoff place={item.place} site={site} compact />
                 <div className="auth-field">
                   <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>
                   <textarea
@@ -635,7 +643,6 @@ function PlanEditor({
           작성 내용을 버리고 최신 플랜 불러오기
         </button>
       )}
-      {!plan?.archived && <PlaceSearch />}
     </section>
   );
 }

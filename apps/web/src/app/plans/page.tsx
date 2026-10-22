@@ -1,14 +1,15 @@
 import { PlanWorkspace } from "@/components/plan-workspace";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
-import { seoulToday } from "@/lib/calendar";
+import { getAuthConfig } from "@/lib/auth/config";
+import { isSupportedDate, seoulToday } from "@/lib/calendar";
 import type { DatePlan, PlanContent } from "@/lib/plans";
 import type { Couple } from "@/lib/shared-calendar";
 import type { Wish } from "@/lib/wishlist";
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ wish?: string; item?: string }>;
+  searchParams: Promise<{ wish?: string; item?: string; date?: string; new?: string }>;
 }) {
   const [couple, plans] = await Promise.all([
     callApi<Couple | null>("/couple"),
@@ -25,7 +26,8 @@ export default async function PlansPage({
       </section>
     );
 
-  const { wish: id, item } = await searchParams;
+  const { wish: id, item, date, new: create } = await searchParams;
+  const selectedDate = typeof date === "string" && isSupportedDate(date) ? date : seoulToday();
   const selected =
     item && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(item)
       ? await callApi<DatePlan>(`/plans/${item}`)
@@ -56,8 +58,18 @@ export default async function PlansPage({
     } else
       seedError = wish?.error || "위시를 확인해 주세요. 보관한 위시는 복원한 뒤 사용할 수 있어요.";
   }
+  if (!seed && create === "1" && !item)
+    seed = {
+      title: "",
+      date: selectedDate,
+      budget: null,
+      transport: "자동차",
+      activities: [{ title: "", time: null, place: "", cost: null, note: "" }],
+      preparation: [],
+    };
   return (
     <PlanWorkspace
+      key={`${item || id || "list"}:${selectedDate}:${create || ""}`}
       initialPlans={plans.data || []}
       initialError={
         plans.error ||
@@ -66,7 +78,8 @@ export default async function PlansPage({
         (item && !selected ? "플랜 주소를 확인해 주세요." : "")
       }
       initialSelected={selected?.data}
-      today={seoulToday()}
+      today={selectedDate}
+      site={getAuthConfig()?.site || ""}
       initialContent={seed}
     />
   );

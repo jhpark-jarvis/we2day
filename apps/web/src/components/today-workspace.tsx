@@ -29,8 +29,8 @@ export function TodayWorkspace({
     return (
       <div className="empty-state">
         <p>이 날짜에 확정한 플랜이 없어요.</p>
-        <Link className="text-button" href="/plans">
-          데이트 플랜 만들기
+        <Link className="text-button" href={`/plans?date=${date}&new=1`}>
+          코스 등록
         </Link>
       </div>
     );
@@ -95,11 +95,7 @@ export function TodayWorkspace({
           <LocalAppointmentTime date={content.date} time={current.time} zones={zones} />
           <p className="preserve-lines">{current.place || "장소 없는 활동"}</p>
           {current.place && (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => copyPlace(current.place)}
-            >
+            <button type="button" className="text-button" onClick={() => copyPlace(current.place)}>
               이 장소 이름 복사
             </button>
           )}
@@ -187,8 +183,8 @@ export function TodayWorkspace({
         <Link className="text-button" href={`/memories?date=${date}`}>
           이 날짜의 사진
         </Link>
-        <Link className="text-button" href="/plans">
-          플랜 수정하기
+        <Link className="text-button" href={`/plans?item=${plan.id}`}>
+          코스 수정
         </Link>
       </div>
     </div>

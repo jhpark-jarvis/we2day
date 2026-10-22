@@ -54,6 +54,9 @@ export function NextAppointment({
           <p>{remainingAppointment(item.date, item.time, now)}</p>
           <p>{item.place || "장소 미정"}</p>
           <LocalAppointmentTime date={item.date} time={item.time} zones={zones} />
+          <Link className="text-button" href={`/today?date=${item.date}`}>
+            데이트 코스
+          </Link>
           <Link className="text-button" href={`/?date=${item.date}`}>
             달력에서 약속 보기
           </Link>
