@@ -93,7 +93,7 @@ def test_failure_preserves_prior_success_and_every_backup(setup, monkeypatch):
     success = worker.run(config, key, gate, copies)
     before = calls[0].read_bytes()
 
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise ValueError("simulated failure with private values")
 
     monkeypatch.setattr(worker, "collect", fail)
@@ -103,6 +103,26 @@ def test_failure_preserves_prior_success_and_every_backup(setup, monkeypatch):
     assert state["state"] == "failed" and state["last_success"] == success["last_success"]
     assert calls[0].read_bytes() == before
     assert "private values" not in json.dumps(state)
+
+
+def test_next_day_uses_latest_prior_archive_only(setup, monkeypatch):
+    config, key, gate, copies, calls = setup
+    enable(gate)
+    worker.run(config, key, gate, copies)
+    prior = calls[0]
+    tomorrow = datetime.now(UTC) + timedelta(days=1)
+    seen = []
+
+    def collect(config, destination, key, *, previous):
+        seen.append(previous)
+        raise ValueError("stop after selecting prior")
+
+    monkeypatch.setattr(worker, "collect", collect)
+    # Noncanonical names are not eligible for reuse, even if they sort last.
+    (copies / "we2day-auto-zzzz.enc").write_bytes(b"unrelated fixture")
+    with pytest.raises(ValueError, match="stop after selecting prior"):
+        worker.run(config, key, gate, copies, now=tomorrow)
+    assert seen == [prior] and prior.is_file()
 
 
 def test_corrupt_existing_copy_is_never_replaced(setup):

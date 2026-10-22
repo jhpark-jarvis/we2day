@@ -1,10 +1,13 @@
 """Read-only PostgreSQL/Storage collection. Credentials, SQL and photos never enter stdout."""
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
+from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import quote
@@ -13,10 +16,24 @@ import httpx
 import psycopg
 from dotenv import dotenv_values
 
-from we2day_api.backup_bundle import MAX_OBJECTS, MAX_TOTAL, encrypted, output_path, safe_name
-from we2day_api.local_archive import key_bytes
+from we2day_api.backup_bundle import (
+    MAX_OBJECTS,
+    MAX_TOTAL,
+    copy_hash,
+    encrypted,
+    json_value,
+    output_path,
+    safe_name,
+)
+from we2day_api.local_archive import fingerprint, key_bytes
 
 BUCKET = "we2day-photos"
+DISK_RESERVE = 512 * 1024**2
+
+
+def require_space(directory, additional=0):
+    if shutil.disk_usage(directory).free < DISK_RESERVE + additional:
+        raise ValueError("backup_disk_reserve")
 
 
 def configuration(path: Path) -> dict:
@@ -87,10 +104,37 @@ def objects(connection):
     return result
 
 
-def download(client, config, inventory, directory):
+def object_version(item):
+    if item["updated"] == "None":
+        return None
+    return hashlib.sha256(
+        json.dumps(item, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def download(client, config, inventory, directory, *, previous=None):
+    cached = {}
+    if previous is not None:
+        cached = {
+            item["name"]: item
+            for item in json_value((previous / "storage-inventory.json").read_bytes())["objects"]
+        }
+    reused = 0
     for name, item in inventory.items():
         target = directory / "storage" / name
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        version = object_version(item) if "updated" in item else None
+        old = cached.get(name, {})
+        if version and old.get("version") == version and old.get("size") == item["size"]:
+            with (previous / "storage" / name).open("rb") as source:
+                before = fingerprint(source)
+                descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(descriptor, "wb") as out:
+                    copy_hash(source, out, item["size"])
+                if fingerprint(source) != before:
+                    raise ValueError("cached_photo_changed")
+            reused += 1
+            continue
         size = 0
         with client.stream(
             "GET",
@@ -115,12 +159,13 @@ def download(client, config, inventory, directory):
                     output.write(chunk)
         if size != item["size"]:
             raise ValueError("storage_size")
+    return {"photos_reused": reused, "photos_downloaded": len(inventory) - reused}
 
 
-def limit_output():
+def limit_output(bound):
     import resource
 
-    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_TOTAL, MAX_TOTAL))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (bound, bound))
 
 
 def dump(config, snapshot, directory):
@@ -155,6 +200,8 @@ def dump(config, snapshot, directory):
         ],
     }
     for name, arguments in commands.items():
+        require_space(directory)
+        bound = min(MAX_TOTAL, shutil.disk_usage(directory).free - DISK_RESERVE)
         descriptor = os.open(directory / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, "wb") as output:
             result = subprocess.run(
@@ -164,7 +211,7 @@ def dump(config, snapshot, directory):
                 stderr=subprocess.PIPE,
                 timeout=300,
                 check=False,
-                preexec_fn=limit_output if os.name != "nt" else None,
+                preexec_fn=partial(limit_output, bound) if os.name != "nt" else None,
             )
         if result.returncode:
             raise ValueError("database_dump_failed")
@@ -172,14 +219,21 @@ def dump(config, snapshot, directory):
             raise ValueError("dump_size_limit")
 
 
-def collect(config, destination: Path, key: Path):
+def collect(config, destination: Path, key: Path, *, previous: Path | None = None):
     destination = output_path(destination)
     key_bytes(key)
     if key.parent.resolve() == destination.parent:
         raise ValueError("separate_key_required")
     parent = destination.parent
+    require_space(parent)
     with TemporaryDirectory(prefix=".we2day-collection-", dir=parent) as workspace:
-        export = Path(workspace)
+        export = Path(workspace) / "export"
+        export.mkdir(mode=0o700)
+        cached = None
+        if previous is not None:
+            require_space(parent, 2 * previous.stat().st_size)
+            cached = Path(workspace) / "previous"
+            encrypted("restore", previous, key, cached)
         with psycopg.connect(**connection_options(config), autocommit=True) as connection:
             with connection.transaction():
                 connection.execute("set transaction isolation level repeatable read, read only")
@@ -188,8 +242,12 @@ def collect(config, destination: Path, key: Path):
                 inventory = objects(connection)
                 snapshot = connection.execute("select pg_export_snapshot()").fetchone()[0]
                 dump(config, snapshot, export)
+                estimate = sum(item["size"] for item in inventory.values()) + sum(
+                    file.stat().st_size for file in export.glob("*.sql")
+                )
+                require_space(parent, 3 * estimate)
                 with httpx.Client(timeout=30, trust_env=False, follow_redirects=False) as client:
-                    download(client, config, inventory, export)
+                    statistics = download(client, config, inventory, export, previous=cached)
             # Read committed AFTER the shared dump snapshot, detecting additions/removals/updates.
             if objects(connection) != inventory:
                 raise ValueError("storage_changed_retry")
@@ -198,13 +256,18 @@ def collect(config, destination: Path, key: Path):
                 {
                     "bucket": BUCKET,
                     "objects": [
-                        {"name": name, "size": item["size"]} for name, item in inventory.items()
+                        {
+                            "name": name,
+                            "size": item["size"],
+                            **({"version": object_version(item)} if object_version(item) else {}),
+                        }
+                        for name, item in inventory.items()
                     ],
                 }
             ),
             encoding="utf-8",
         )
-        return encrypted("snapshot", export, key, destination)
+        return encrypted("snapshot", export, key, destination) | statistics
 
 
 def main():
@@ -212,9 +275,10 @@ def main():
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--key", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--previous", type=Path)
     args = parser.parse_args()
     try:
-        result = collect(configuration(args.config), args.output, args.key)
+        result = collect(configuration(args.config), args.output, args.key, previous=args.previous)
         print(json.dumps({"collection": "PASS", **result, "live_restore": False}))
         return 0
     except Exception:

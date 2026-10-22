@@ -127,6 +127,42 @@ def rewrite_bundle(source, destination, mutate):
             bundle.writestr(info, content)
 
 
+def test_new_format_writes_v2_and_legacy_v1_remains_readable(export, tmp_path):
+    current, legacy = tmp_path / "v2.zip", tmp_path / "v1.zip"
+    backup.pack(export, current)
+    with ZipFile(current) as archive:
+        assert json.loads(archive.read(backup.MANIFEST))["format"] == "WE2DAY-BACKUP-2"
+
+    def legacy_format(entries):
+        for index, (entry, content) in enumerate(entries):
+            if entry.filename == backup.MANIFEST:
+                manifest = json.loads(content)
+                manifest["format"] = backup.LEGACY_FORMAT
+                entries[index] = entry, json.dumps(manifest).encode()
+
+    rewrite_bundle(current, legacy, legacy_format)
+    assert backup.verify(current) == backup.verify(legacy)
+    backup.unpack(legacy, tmp_path / "recovered-v1")
+    assert files(tmp_path / "recovered-v1") == files(export)
+
+
+def test_inventory_version_is_optional_only_in_new_format():
+    data = json.dumps(
+        {
+            "bucket": "we2day-photos",
+            "objects": [{"name": "pair/photo.webp", "size": 4, "version": "a" * 64}],
+        }
+    ).encode()
+    assert backup.inventory_value(data) == {"storage/pair/photo.webp": 4}
+    with pytest.raises(ValueError):
+        backup.inventory_value(data, allow_version=False)
+    for version in (None, 123, "bad"):
+        bad = json.loads(data)
+        bad["objects"][0]["version"] = version
+        with pytest.raises(ValueError):
+            backup.inventory_value(json.dumps(bad).encode())
+
+
 @pytest.mark.parametrize(
     "problem",
     [

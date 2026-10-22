@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -161,11 +162,20 @@ def run(config, key, gate, directory, *, now=None):
             day = now.astimezone(KST).date().isoformat()
             destination = directory / f"we2day-auto-{day}.enc"
             existing = destination.exists() or linked(destination)
-            result = (
-                encrypted("verify-encrypted", destination, key, None)
-                if existing
-                else collect(config, destination, key)
-            )
+            if existing:
+                result = encrypted("verify-encrypted", destination, key, None)
+            else:
+                prior = sorted(
+                    path
+                    for path in directory.glob("we2day-auto-*.enc")
+                    if re.fullmatch(r"we2day-auto-\d{4}-\d{2}-\d{2}\.enc", path.name)
+                    and path.name < destination.name
+                )
+                result = (
+                    collect(config, destination, key, previous=prior[-1])
+                    if prior
+                    else collect(config, destination, key)
+                )
             created = datetime.fromisoformat(result["created_at"])
             if created.astimezone(KST).date().isoformat() != day:
                 raise ValueError("backup_date_mismatch")

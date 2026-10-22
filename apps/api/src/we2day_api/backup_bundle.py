@@ -15,7 +15,8 @@ from cryptography.exceptions import InvalidTag
 
 from we2day_api.local_archive import CHUNK, fingerprint, process, regular
 
-FORMAT = "WE2DAY-BACKUP-1"
+FORMAT = "WE2DAY-BACKUP-2"
+LEGACY_FORMAT = "WE2DAY-BACKUP-1"
 DATABASE = ("roles.sql", "schema.sql", "data.sql")
 INVENTORY = "storage-inventory.json"
 MANIFEST = "manifest.json"
@@ -70,7 +71,7 @@ def json_value(data: bytes):
     return json.loads(data, object_pairs_hook=unique_pairs)
 
 
-def inventory_value(data: bytes) -> dict[str, int]:
+def inventory_value(data: bytes, *, allow_version=True) -> dict[str, int]:
     value = json_value(data)
     if not isinstance(value, dict) or set(value) != {"bucket", "objects"}:
         raise ValueError("invalid_inventory")
@@ -82,8 +83,16 @@ def inventory_value(data: bytes) -> dict[str, int]:
     result = {}
     folded = set()
     for item in objects:
-        if not isinstance(item, dict) or set(item) != {"name", "size"}:
+        if not isinstance(item, dict) or set(item) not in (
+            {"name", "size"},
+            {"name", "size", "version"} if allow_version else {"name", "size"},
+        ):
             raise ValueError("invalid_inventory")
+        if "version" in item and (
+            not isinstance(item["version"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", item["version"])
+        ):
+            raise ValueError("invalid_inventory_version")
         name, size = safe_name(item["name"]), item["size"]
         if (
             type(size) is not int
@@ -225,7 +234,10 @@ def inspect_bundle(bundle: ZipFile) -> tuple[dict, dict[str, dict]]:
         "files",
     }:
         raise ValueError("invalid_manifest")
-    if manifest["format"] != FORMAT or manifest["source"] != "operator_supplied_export":
+    if (
+        manifest["format"] not in {FORMAT, LEGACY_FORMAT}
+        or manifest["source"] != "operator_supplied_export"
+    ):
         raise ValueError("invalid_manifest")
     if not isinstance(manifest["created_at"], str):
         raise ValueError("invalid_created_at")
@@ -252,7 +264,7 @@ def inspect_bundle(bundle: ZipFile) -> tuple[dict, dict[str, dict]]:
         raise ValueError("invalid_record_set")
     if bundle.getinfo(INVENTORY).file_size > MAX_JSON:
         raise ValueError("metadata_too_large")
-    objects = inventory_value(bundle.read(INVENTORY))
+    objects = inventory_value(bundle.read(INVENTORY), allow_version=manifest["format"] == FORMAT)
     if set(records) != set(DATABASE) | {INVENTORY} | objects.keys():
         raise ValueError("inventory_mismatch")
     for name, record in records.items():
