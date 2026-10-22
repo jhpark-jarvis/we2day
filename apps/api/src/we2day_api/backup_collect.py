@@ -185,7 +185,6 @@ def dump(config, snapshot, directory):
         "schema.sql": [
             "pg_dump",
             "--schema-only",
-            "--no-owner",
             "--no-password",
             "--lock-wait-timeout=5s",
             "--snapshot=" + snapshot,
@@ -193,7 +192,6 @@ def dump(config, snapshot, directory):
         "data.sql": [
             "pg_dump",
             "--data-only",
-            "--no-owner",
             "--no-password",
             "--lock-wait-timeout=5s",
             "--snapshot=" + snapshot,

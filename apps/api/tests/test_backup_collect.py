@@ -101,6 +101,8 @@ def test_dump_shares_snapshot_and_keeps_password_out_of_arguments(tmp_path, monk
         assert "default_transaction_read_only=on" in environment["PGOPTIONS"]
     assert "--no-role-passwords" in calls[0][0]
     assert all("--snapshot=0001-0002-1" in item[0] for item in calls[1:])
+    # Auth/Storage service principals need their original object ownership on recovery.
+    assert all("--no-owner" not in item[0] for item in calls[1:])
     assert {p.name for p in tmp_path.iterdir()} == {"roles.sql", "schema.sql", "data.sql"}
 
 

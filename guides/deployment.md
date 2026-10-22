@@ -246,6 +246,10 @@ uv run --project apps/api python -m we2day_api.local_archive decrypt --key /priv
 
 `backup_collect`는 PostgreSQL 17 클라이언트가 있는 별도 실행 환경에서 DB 덤프와 `we2day-photos`의 실제 파일을 수집해 암호화 묶음을 만듭니다. 원본에는 읽기 전용 DB 접속과 Storage GET 요청만 사용합니다. PostgreSQL 역할은 비밀번호를 제외하고 내보내므로 역할 로그인 비밀번호와 Supabase 공급자 설정은 별도로 복구해야 합니다.
 
+새 수집본의 SQL에는 원래 스키마·객체 소유자를 보존합니다. Auth·Storage의 서비스 역할이 자신의 테이블을 관리할 수 있어야 실제 서비스까지 복구할 수 있기 때문입니다. 복원 대상에는 필요한 역할이 먼저 준비되어 있어야 합니다. 기존 `--no-owner` 방식으로 생성한 사본도 파일 복구는 가능하지만, 서비스별 소유권을 별도로 맞추고 검증해야 합니다. 기존 사본을 자동으로 변환하거나 덮어쓰지는 않습니다.
+
+관리형 프로젝트의 역할·이벤트 트리거는 다른 PostgreSQL 환경에서 그대로 재생되지 않을 수 있습니다. `GRANTED BY`와 역할 속성, 서비스 객체 소유권을 대조하고 대상 환경에 맞는 복구 절차를 준비하세요. 시험 환경에서만 사용한 권한이나 역할 매핑을 운영 환경에 그대로 적용하지 마세요. 이 도구는 SQL을 실행하거나 권한을 자동 보정하지 않습니다. [Supabase의 복원 안내](https://supabase.com/docs/guides/self-hosting/restore-from-platform)도 함께 확인하세요.
+
 수집 도구의 `roles.sql`은 `pg_dumpall --roles-only --no-role-passwords` 결과이며 관리형 역할도 포함합니다. Supabase CLI가 가공한 역할 덤프와는 다릅니다. 새 환경에서는 관리형 역할·권한 부여 주체가 달라 그대로 실행하면 실패할 수 있습니다. 이 파일은 검토용 원본으로 보존하고, 복원 대상이 제공하는 기본 역할과 사용자 정의 역할을 구분해 적용해야 합니다. 테이블·사진 복구 검사만 통과한 것을 역할 권한이나 Auth/Storage 서비스 전체 복구 완료로 판단하지 마세요.
 
 먼저 [백업 설정 예시](../apps/api/deployment/backup/.env.example)를 저장소 밖의 보호된 파일로 복사하고 본인만 읽도록 권한을 제한합니다. `PGHOST`·`PGUSER`는 Supabase 상단 **Connect → Session pooler**의 값을 사용하고, `PGPORT=5432`로 설정합니다. `WE2DAY_BACKUP_DB_PASSWORD`에는 프로젝트 DB 비밀번호를 넣습니다. 이름 오타·빈 값은 연결 전에 거부하며 비밀번호를 자동 재설정하지 않습니다.

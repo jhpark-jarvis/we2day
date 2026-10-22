@@ -20,6 +20,10 @@ def test_encrypted_export_restores_sql_permissions_and_photo_bytes(request, tmp_
         pytest.skip("Use --database for isolated DB restoration")
     with temporary_database() as (dsn, container):
         with psycopg.connect(dsn) as connection:
+            connection.execute("create role we2day_fixture_auth_owner nologin")
+            connection.execute("alter schema auth owner to we2day_fixture_auth_owner")
+            connection.execute("alter table auth.users owner to we2day_fixture_auth_owner")
+        with psycopg.connect(dsn) as connection:
             for user in USERS:
                 connection.execute("insert into auth.users(id) values (%s)", (user,))
         connect_pair(dsn)
@@ -41,7 +45,6 @@ def test_encrypted_export_restores_sql_permissions_and_photo_bytes(request, tmp_
                     "-U",
                     "postgres",
                     option,
-                    "--no-owner",
                     "postgres",
                 ],
                 check=True,
@@ -98,6 +101,9 @@ def test_encrypted_export_restores_sql_permissions_and_photo_bytes(request, tmp_
             )
         restored_dsn = make_conninfo(dsn, dbname="rehearsal")
         with psycopg.connect(restored_dsn) as connection:
+            assert connection.execute(
+                "select pg_get_userbyid(relowner) from pg_class where oid='auth.users'::regclass"
+            ).fetchone() == ("we2day_fixture_auth_owner",)
             assert (
                 connection.execute(
                     "select schemaname, tablename, policyname from pg_policies order by 1,2,3"
