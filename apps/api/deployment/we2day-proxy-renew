@@ -1,0 +1,6 @@
+#!/bin/sh
+# Install after operator approval; lineage contains the exact reviewed cert path.
+set -eu
+[ "${RENEWED_LINEAGE:-}" = "$(cat /etc/we2day-proxy/lineage)" ] || exit 0
+/usr/sbin/nginx -t -c /etc/we2day-proxy/nginx.conf
+/bin/systemctl reload we2day-proxy.service

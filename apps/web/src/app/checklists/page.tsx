@@ -1,0 +1,24 @@
+import Link from "next/link";
+import { ChecklistWorkspace } from "@/components/checklist-workspace";
+import { callApi } from "@/lib/api";
+import type { Checklist } from "@/lib/checklists";
+import type { Couple } from "@/lib/shared-calendar";
+
+export default async function ChecklistsPage() {
+  const [couple, lists] = await Promise.all([
+    callApi<Couple | null>("/couple"),
+    callApi<Checklist[]>("/checklists"),
+  ]);
+  if (!couple.data)
+    return (
+      <section>
+        <h1>목록</h1>
+        <p className="muted">둘의 공간에 연결하면 함께 준비할 수 있어요.</p>
+        <Link className="text-button" href={couple.status === 401 ? "/login" : "/couple"}>
+          공간 연결 확인하기
+        </Link>
+      </section>
+    );
+
+  return <ChecklistWorkspace initialLists={lists.data || []} initialError={lists.error} />;
+}

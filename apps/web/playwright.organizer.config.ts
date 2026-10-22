@@ -1,0 +1,25 @@
+import { defineConfig } from "@playwright/test";
+import journey from "./playwright.journey.config";
+export default defineConfig({
+  ...journey,
+  testMatch: [
+    "organizer.spec.ts",
+    "checklists.spec.ts",
+    "goals.spec.ts",
+    "together.spec.ts",
+    "photo-search.spec.ts",
+    "question-search.spec.ts",
+    "visits.spec.ts",
+    "navigation.spec.ts",
+    "record-discovery.spec.ts",
+    "record-copies.spec.ts",
+    "device-push.spec.ts",
+    "notification-preview.spec.ts",
+    "plan-review.spec.ts",
+    "memory-return.spec.ts",
+    "settings-navigation.spec.ts",
+    "home-summary.spec.ts",
+    "calendar-controls.spec.ts",
+    "control-affordance.spec.ts",
+  ],
+});

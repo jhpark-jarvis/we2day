@@ -1,0 +1,14 @@
+# Optional same-host reverse-proxy deployment example; never applied by local compose up.
+# Review HTTPS, domain, backup and scheduler ownership before deployment.
+# From the repository root: docker compose -f compose.yaml -f apps/api/deployment/compose.production.example.yaml config --quiet
+services:
+  api:
+    ports: !reset []
+    environment:
+      WE2DAY_CORS_ORIGINS: '${WE2DAY_PRODUCTION_CORS_ORIGINS:?Set exact HTTPS origin JSON}'
+  web:
+    environment:
+      WE2DAY_SITE_URL: '${WE2DAY_PRODUCTION_SITE_URL:?Set HTTPS site origin}'
+      WE2DAY_API_URL: http://api:8000
+# Web remains bound to 127.0.0.1:3000 through the base file.
+# A separately configured TLS reverse proxy must preserve Host and use the chosen site origin.

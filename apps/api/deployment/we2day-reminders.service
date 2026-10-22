@@ -1,0 +1,13 @@
+[Unit]
+Description=WE2DAY bounded anniversary reminder batch
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/we2day
+ExecStart=/usr/bin/docker compose --profile reminders run --rm --no-deps -T reminder-worker
+TimeoutStartSec=120
+NoNewPrivileges=true

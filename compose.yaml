@@ -1,0 +1,31 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - path: ./apps/api/.env
+        required: false
+    environment:
+      WE2DAY_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - path: ./apps/web/.env
+        required: false
+    environment:
+      WE2DAY_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy

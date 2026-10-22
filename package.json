@@ -1,0 +1,33 @@
+{
+  "name": "we2day",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "engines": { "node": ">=24.15.0 <25" },
+  "packageManager": "npm@11.12.1",
+  "scripts": {
+    "dev": "npm run dev --workspace @we2day/web",
+    "dev:api": "uv run --directory apps/api uvicorn we2day_api.main:app --reload --host 127.0.0.1 --port 8000",
+    "build": "npm run build --workspace @we2day/web",
+    "start": "npm run start --workspace @we2day/web",
+    "lint": "npm run lint --workspace @we2day/web",
+    "typecheck": "npm run typecheck --workspace @we2day/web",
+    "test:web": "npm run test:e2e --workspace @we2day/web",
+    "screenshots": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py --screenshots",
+    "test:auth": "npm run test:auth --workspace @we2day/web",
+    "test:photos": "npm run test:photos --workspace @we2day/web",
+    "test:photo-sharing": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py --photos",
+    "test:map-loader": "node --experimental-strip-types --test apps/web/tests/naver-map.test.mjs",
+    "test:plans": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py --plans",
+    "test:journey": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py --journey",
+    "test:organizer": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py --organizer",
+    "test:timeline": "node --experimental-strip-types --test apps/web/tests/timeline.test.mjs",
+    "test:pwa": "node --test apps/web/tests/service-worker.test.mjs",
+    "test:places": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py --places",
+    "test:api": "uv run --project apps/api pytest apps/api/tests",
+    "test:database": "uv run --project apps/api pytest apps/api/tests --database",
+    "test:calendar": "uv run --project apps/api python apps/web/tests/run_calendar_tests.py",
+    "lint:api": "uv run --project apps/api ruff check apps/api",
+    "format:api": "uv run --project apps/api ruff format apps/api"
+  }
+}

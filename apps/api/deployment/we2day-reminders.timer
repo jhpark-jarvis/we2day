@@ -1,0 +1,11 @@
+[Unit]
+Description=WE2DAY anniversary reminders during Seoul morning window
+
+[Timer]
+OnCalendar=*-*-* 09:00..59:00 Asia/Seoul
+AccuracySec=10s
+Persistent=false
+Unit=we2day-reminders.service
+
+[Install]
+WantedBy=timers.target
