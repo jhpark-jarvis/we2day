@@ -110,11 +110,11 @@ button { appearance: none; color: var(--foreground); }
 .calendar-day[aria-current="date"] .day-number { border: 1px solid var(--line); }
 .calendar-day[aria-pressed="true"] .day-number { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .calendar-caption { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 12px; color: var(--muted); font-size: 12px; }
-.agenda-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 3px 0 13px; }
+.agenda-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; margin: 3px 0 13px; }
 .agenda-heading h2 { font-size: 20px; font-weight: 500; letter-spacing: -.7px; }
-.agenda-heading h2 small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
-.agenda-heading > .muted { font-size: 12px; }
-.appointment-row { display: grid; grid-template-columns: 43px minmax(0, 1fr) 16px; align-items: center; gap: 12px; width: 100%; padding: 16px 12px; margin-bottom: 10px; text-align: left; border: 1px solid var(--control-border); border-radius: 12px; background: var(--surface); }
+.agenda-heading h2 small { display: inline-block; white-space: nowrap; font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.agenda-heading > .muted { white-space: nowrap; font-size: 12px; }
+.appointment-row { display: grid; grid-template-columns: minmax(43px, max-content) minmax(0, 1fr) 16px; align-items: center; gap: 12px; width: 100%; padding: 16px 12px; margin-bottom: 10px; text-align: left; border: 1px solid var(--control-border); border-radius: 12px; background: var(--surface); }
 .appointment-row time { font-size: 12px; color: var(--accent); align-self: start; padding-top: 2px; font-variant-numeric: tabular-nums; word-break: keep-all; }
 .appointment-row strong { display: block; font-size: 15px; font-weight: 500; letter-spacing: -.4px; overflow-wrap: anywhere; }
 .appointment-row small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
@@ -167,8 +167,8 @@ button { appearance: none; color: var(--foreground); }
 .memory-empty { min-height: 250px; justify-content: center; }
 .settings-section { max-width: 620px; }
 .settings-section h2 { font-size: 17px; font-weight: 500; margin-bottom: 8px; }
-.theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; margin: 24px 0 0; padding: 0; border: 0; min-width: 0; }
-.theme-option { position: relative; display: block; width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--control-border); border-radius: 15px; text-align: left; background: var(--surface); }
+.theme-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9em), 1fr)); gap: 15px; margin: 24px 0 0; padding: 0; border: 0; min-width: 0; }
+.theme-option { position: relative; display: grid; align-content: start; grid-template-rows: minmax(112px, auto) auto; width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--control-border); border-radius: 15px; text-align: left; background: var(--surface); }
 .theme-option[aria-pressed="true"] { border-color: var(--accent); }
 .theme-swatch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; min-height: 112px; border: 1px solid #e7ded2; border-radius: 9px; padding: 16px 13px; }
 .swatch-warm { background: #fcf9f4; color: #46392f; }
@@ -179,9 +179,9 @@ button { appearance: none; color: var(--foreground); }
 .swatch-white i { background: #e8ebe4; }
 .swatch-white i:nth-child(2) { background: #87503e; }
 .theme-option-copy { display: block; padding: 15px 1px 3px; }
-.theme-option-copy strong { display: block; font-size: 14px; font-weight: 500; }
+.theme-option-copy strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 500; }
 .theme-option-copy small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; word-break: keep-all; }
-.theme-check { position: absolute; right: 15px; bottom: 45px; color: var(--accent); }
+.theme-check { flex-shrink: 0; color: var(--accent); }
 .settings-hint { color: var(--muted); font-size: 12px; margin-top: 18px; }
 .error-message { color: #a54135; font-size: 13px; margin-top: 12px; }
 .account-settings { margin-top: 40px; padding-top: 25px; border-top: 1px solid var(--line); }
@@ -261,7 +261,6 @@ button { appearance: none; color: var(--foreground); }
   .theme-option { padding: 9px; }
   .theme-swatch { padding: 14px 10px; gap: 6px; }
   .theme-option-copy small { min-height: 34px; }
-  .theme-check { bottom: 66px; right: 13px; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -312,10 +311,10 @@ button.plan-card { border-color: var(--control-border); }
 .plan-workspace > .text-button { margin-right: 18px; }
 .reminder-workspace { max-width: 720px; margin: 0 auto; }
 .upcoming-list { list-style: none; margin: 24px 0; padding: 0; }
-.upcoming-list > li { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 16px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.upcoming-list > li { display: grid; grid-template-columns: minmax(70px, max-content) minmax(0,1fr); gap: 16px; padding: 22px 0; border-bottom: 1px solid var(--line); }
 .upcoming-list h2 { font-size: 20px; font-weight: 500; margin-block: 8px; overflow-wrap: anywhere; }
 .upcoming-list p { overflow-wrap: anywhere; }
-.countdown-tag { align-self: start; color: var(--accent); font-size: 16px; padding-top: 5px; }
+.countdown-tag { white-space: nowrap; align-self: start; color: var(--accent); font-size: 16px; padding-top: 5px; }
 .timeline-choice[aria-current="page"] { color: var(--accent); border-color: var(--accent); }
 .export-form { display: grid; gap: 14px; margin: 24px 0; }
 .export-form .primary-button { justify-self: start; }

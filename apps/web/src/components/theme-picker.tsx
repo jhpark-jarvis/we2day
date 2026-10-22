@@ -55,12 +55,14 @@ export function ThemePicker({ initialTheme }: { initialTheme: Theme }) {
                 <i />
               </span>
               <span className="theme-option-copy">
-                <strong>{option.name}</strong>
+                <strong>
+                  <span>{option.name}</span>
+                  {selected === option.value && (
+                    <Check className="theme-check" size={18} aria-hidden="true" />
+                  )}
+                </strong>
                 <small>{option.description}</small>
               </span>
-              {selected === option.value && (
-                <Check className="theme-check" size={18} aria-hidden="true" />
-              )}
             </button>
           ))}
         </fieldset>

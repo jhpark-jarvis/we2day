@@ -2,6 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
+const mobileDeepAudit = process.env.WE2DAY_TEST_MOBILE_DEEP === "1";
+let textScale = 1;
+
 test.use({ actionTimeout: 15_000, serviceWorkers: "block" });
 
 async function open(page: Page, url: string) {
@@ -12,7 +15,18 @@ async function open(page: Page, url: string) {
 
 async function auditControls(page: Page, label: string) {
   await expect(page.locator(".page-loading")).toHaveCount(0, { timeout: 30_000 });
-  const issues = await page.locator("main").evaluate((main) => {
+  if (textScale > 1) {
+    await page.locator("body").evaluate((body, scale) => {
+      const sizes = [...body.querySelectorAll<HTMLElement>("*")]
+        .filter((node) => !node.dataset.auditTextScale)
+        .map((node) => [node, parseFloat(getComputedStyle(node).fontSize)] as const);
+      for (const [node, size] of sizes) {
+        node.style.setProperty("font-size", `${size * scale}px`, "important");
+        node.dataset.auditTextScale = String(scale);
+      }
+    }, textScale);
+  }
+  const issues = await page.locator("main").evaluate((main, deep) => {
     const problems: string[] = [];
     for (const control of main.querySelectorAll<HTMLElement>("button, a, summary")) {
       const bounds = control.getBoundingClientRect();
@@ -30,6 +44,8 @@ async function auditControls(page: Page, label: string) {
         problems.push(`plain text control: ${name}`);
       if (control.tagName !== "A" && !dateCell && bounds.height < 43.5)
         problems.push(`short target: ${name}`);
+      if (deep && control.scrollWidth > control.clientWidth + 2)
+        problems.push(`clipped control text: ${name}`);
       if (control.matches(".icon-button") && bounds.width < 43.5)
         problems.push(`narrow icon: ${name}`);
       if (bounds.right > document.documentElement.clientWidth + 1 || bounds.left < -1)
@@ -53,17 +69,180 @@ async function auditControls(page: Page, label: string) {
     }
     if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
       problems.push("horizontal page overflow");
+    if (deep) {
+      for (const label of main.querySelectorAll<HTMLElement>(
+        ".agenda-heading small, .agenda-heading > .muted",
+      )) {
+        if (
+          label.getClientRects().length > 1 ||
+          label.scrollHeight > parseFloat(getComputedStyle(label).lineHeight) * 1.1
+        )
+          problems.push(`split calendar header label: ${label.textContent}`);
+      }
+      for (const time of main.querySelectorAll<HTMLElement>(".appointment-row time")) {
+        if (time.scrollWidth > time.clientWidth + 1)
+          problems.push("appointment time spills into title");
+      }
+      const swatches = [...main.querySelectorAll<HTMLElement>(".theme-swatch")];
+      if (
+        swatches.length === 2 &&
+        Math.abs(
+          swatches[0].getBoundingClientRect().left - swatches[1].getBoundingClientRect().left,
+        ) > 1 &&
+        Math.abs(
+          swatches[0].getBoundingClientRect().top - swatches[1].getBoundingClientRect().top,
+        ) > 1
+      )
+        problems.push("theme previews are vertically misaligned");
+      const controls = [...main.querySelectorAll<HTMLElement>("button,a,summary")].filter((node) =>
+        node.checkVisibility(),
+      );
+      for (let i = 0; i < controls.length; i++) {
+        const a = controls[i],
+          ar = a.getBoundingClientRect();
+        for (const b of controls.slice(i + 1)) {
+          if (a.contains(b) || b.contains(a)) continue;
+          // An open popover intentionally covers the page behind it.
+          const menuA = a.closest(".schedule-tools nav"),
+            menuB = b.closest(".schedule-tools nav");
+          if (menuA !== menuB && (menuA || menuB)) continue;
+          const br = b.getBoundingClientRect();
+          if (
+            Math.min(ar.right, br.right) - Math.max(ar.left, br.left) > 2 &&
+            Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top) > 2
+          )
+            problems.push(
+              `overlapping controls: ${a.textContent?.trim().slice(0, 30)} / ${b.textContent?.trim().slice(0, 30)}`,
+            );
+        }
+      }
+    }
     return problems;
-  });
+  }, mobileDeepAudit);
+  if (mobileDeepAudit) {
+    const reachability = await page.locator("body").evaluate((body) => {
+      const problems: string[] = [];
+      for (const target of body.querySelectorAll<HTMLElement>(
+        'main button:not(.calendar-day),main a,main summary,main input:not([type="hidden"]),main select,main textarea,.app-navigation a',
+      )) {
+        const style = getComputedStyle(target);
+        if (!target.checkVisibility() || style.visibility === "hidden" || target.closest("[inert]"))
+          continue;
+        target.scrollIntoView({ block: "center", inline: "nearest" });
+        const reachable = [...target.getClientRects()].some((rect) => {
+          const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+          if (hit?.closest(".schedule-tools[open] nav") && !target.closest(".schedule-tools nav"))
+            return true;
+          return !!hit && (target === hit || target.contains(hit));
+        });
+        if (!reachable)
+          problems.push(
+            `unreachable control: ${target.getAttribute("aria-label") || target.id || target.textContent?.trim().slice(0, 40)}`,
+          );
+      }
+      for (const link of body.querySelectorAll<HTMLElement>(".app-navigation a")) {
+        const rect = link.getBoundingClientRect();
+        if (
+          link.scrollWidth > link.clientWidth + 2 ||
+          rect.right > innerWidth + 1 ||
+          rect.left < -1
+        )
+          problems.push(`navigation overflow: ${link.textContent?.trim()}`);
+      }
+      return problems;
+    });
+    issues.push(...reachability);
+  }
+  if (issues.length) console.log(`UI issues ${label}: ${JSON.stringify(issues)}`);
   expect.soft(issues, label).toEqual([]);
 }
+
+test("mobile offline notice remains readable at narrow widths", async ({ page }, info) => {
+  const worker = await fs.readFile(path.resolve("public/sw.js"), "utf8");
+  const html = worker.match(/const offlineDocument = `([\s\S]*?)`;/)?.[1];
+  if (!html) throw new Error("offline notice is missing");
+  try {
+    for (const width of [320, 393]) {
+      for (const scale of [1, 2]) {
+        textScale = scale;
+        await page.setViewportSize({ width, height: 852 });
+        // Render the worker's exact notice; this does not test SW delivery.
+        await page.setContent(html);
+        await expect(
+          page.getByRole("heading", { name: "인터넷 연결을 확인해 주세요" }),
+        ).toBeVisible();
+        await auditControls(page, `offline-notice/${width}/text${scale}`);
+        await page.screenshot({
+          path: info.outputPath(`offline-notice-${width}-text${scale}.png`),
+          fullPage: true,
+          scale: "css",
+        });
+      }
+    }
+  } finally {
+    textScale = 1;
+  }
+});
+
+test("mobile calendar labels remain whole when text grows", async ({ page }, info) => {
+  try {
+    for (const width of [320, 393]) {
+      for (const scale of [1, 2]) {
+        textScale = scale;
+        await page.setViewportSize({ width, height: 852 });
+        await open(page, "/preview");
+        await auditControls(page, `calendar-labels/${width}/text${scale}`);
+        const labels = page.locator(".agenda-heading small, .agenda-heading > .muted");
+        for (const label of await labels.all()) {
+          expect(await label.evaluate((node) => node.getClientRects().length)).toBe(1);
+          expect(
+            await label.evaluate(
+              (node) => node.scrollHeight <= parseFloat(getComputedStyle(node).lineHeight) * 1.1,
+            ),
+          ).toBe(true);
+        }
+        await page.screenshot({
+          path: info.outputPath(`calendar-labels-${width}-text${scale}.png`),
+          fullPage: true,
+          scale: "css",
+        });
+      }
+    }
+  } finally {
+    textScale = 1;
+  }
+});
+
+test("mobile theme cards remain readable with enlarged text", async ({ page }, info) => {
+  try {
+    textScale = 2;
+    for (const width of [320, 393]) {
+      await page.setViewportSize({ width, height: 852 });
+      await open(page, "/settings");
+      await auditControls(page, `theme-text200/${width}`);
+      await page.screenshot({
+        path: info.outputPath(`theme-text200-${width}.png`),
+        fullPage: true,
+        scale: "css",
+      });
+      for (const swatch of await page.locator(".theme-swatch").all()) {
+        const container = await swatch.boundingBox();
+        const word = await swatch.locator("span").boundingBox();
+        if (!container || !word) throw new Error("theme preview is missing");
+        expect(word.x + word.width).toBeLessThanOrEqual(container.x + container.width);
+      }
+    }
+  } finally {
+    textScale = 1;
+  }
+});
 
 test("all page controls remain identifiable in both themes and narrow layouts", async ({
   page,
   context,
   browser,
 }, testInfo) => {
-  test.setTimeout(900_000);
+  test.setTimeout(1_800_000);
   await open(page, "/login");
   await page.getByLabel("아이디", { exact: true }).fill("audit");
   await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
@@ -125,6 +304,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await page.getByLabel("플랜 이름").fill("LongUnbrokenPlanTitle".repeat(4));
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 1 이름").fill("공원 산책");
+  await page.getByLabel("활동 1 장소").fill("직접 적은 예시 공원");
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await expect(page.getByRole("button", { name: "확정 내용 확인", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
@@ -153,13 +333,72 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       {
         routes,
         engine: testInfo.project.use.defaultBrowserType || "chromium",
-        widths: [320, 390, 768, 1280],
+        widths: mobileDeepAudit ? [320, 375, 393, 430, 844] : [320, 390, 768, 1280],
+        textScales: mobileDeepAudit ? [1, 2] : [1],
         themes: ["warm", "white"],
       },
       null,
       2,
     ),
   );
+  if (mobileDeepAudit) {
+    await page.setViewportSize({ width: 393, height: 852 });
+    const detailedStates = [
+      ["/", /LongUnbrokenAppointmentTitle/, "appointment-detail"],
+      ["/plans", /LongUnbrokenPlanTitle/, "plan-edit"],
+      ["/checklists", /^목록 열기/, "checklist-edit"],
+      ["/goals", /^목표 열기/, "goal-edit"],
+      ["/wishlist", /^위시 추가$/, "wish-editor"],
+      ["/anniversaries", / 수정$/, "anniversary-edit"],
+    ] as const;
+    for (const [route, name, label] of detailedStates) {
+      await open(page, route);
+      await page.getByRole("button", { name }).first().click();
+      await auditControls(page, `mobile-detail/${label}`);
+      await page.screenshot({
+        path: testInfo.outputPath(`mobile-detail-${label}.png`),
+        fullPage: true,
+        scale: "css",
+      });
+    }
+    await open(page, "/today");
+    await page.getByRole("button", { name: "네이버 지도 앱 이동 준비", exact: true }).click();
+    await page.getByText("목적지 좌표로 바로 길찾기", { exact: true }).click();
+    await auditControls(page, "mobile-detail/naver-app-handoff");
+    await page.screenshot({
+      path: testInfo.outputPath("mobile-detail-handoff.png"),
+      fullPage: true,
+      scale: "css",
+    });
+    await open(page, "/memories");
+    await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
+    await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
+    await page
+      .getByLabel("이 사진의 한마디")
+      .fill("사진 미리보기와 긴 설명을 작성하는 상태".repeat(10));
+    await auditControls(page, "mobile-detail/photo-draft");
+    await page.screenshot({
+      path: testInfo.outputPath("mobile-detail-photo-draft.png"),
+      fullPage: true,
+      scale: "css",
+    });
+    for (const route of ["/account", "/questions", "/memories/search"]) {
+      await page.setViewportSize({ width: 393, height: 350 });
+      await open(page, route);
+      const field = page.locator('main input:not([type="hidden"]),main textarea').first();
+      await field.focus();
+      await field.scrollIntoViewIfNeeded();
+      await expect(field).toBeFocused();
+      await auditControls(page, `short-viewport/${route}`);
+      await field.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath(`short-viewport-${route.replaceAll("/", "_")}.png`),
+        scale: "css",
+      });
+    }
+    await page.setViewportSize({ width: 393, height: 852 });
+  }
+
   const desktop = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
     viewport: { width: 1280, height: 900 },
@@ -168,16 +407,33 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   });
   try {
     const desktopPage = await desktop.newPage();
-    for (const [theme, width, current, currentContext] of [
-      ["warm", 320, page, context],
-      ["white", 390, page, context],
-      ["warm", 768, desktopPage, desktop],
-      ["warm", 1280, desktopPage, desktop],
-      ["white", 1280, desktopPage, desktop],
-    ] as const) {
-      await current.setViewportSize({ width, height: 900 });
+    const layouts = mobileDeepAudit
+      ? ([
+          ["warm", 320, 740, 1],
+          ["white", 320, 740, 1],
+          ["warm", 375, 667, 1],
+          ["white", 393, 852, 1],
+          ["warm", 430, 932, 1],
+          ["white", 844, 390, 1],
+          ["warm", 320, 740, 2],
+          ["white", 393, 852, 2],
+        ] as const)
+      : ([
+          ["warm", 320, 900, 1],
+          ["white", 390, 900, 1],
+          ["warm", 768, 900, 1],
+          ["warm", 1280, 900, 1],
+          ["white", 1280, 900, 1],
+        ] as const);
+    for (const [baseTheme, width, height, scale] of layouts) {
+      textScale = scale;
+      console.log(`Mobile layout ${baseTheme}/${width}x${height}/text${scale}`);
+      const theme = `${baseTheme}${scale > 1 ? "-text200" : ""}`;
+      const current = width < 641 || mobileDeepAudit ? page : desktopPage;
+      const currentContext = width < 641 || mobileDeepAudit ? context : desktop;
+      await current.setViewportSize({ width, height });
       await currentContext.addCookies([
-        { name: "we2day-theme", value: theme, url: "http://127.0.0.1:3100" },
+        { name: "we2day-theme", value: baseTheme, url: "http://127.0.0.1:3100" },
       ]);
       for (const route of routes) {
         await open(current, route);
@@ -202,6 +458,26 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
           fullPage: true,
           scale: "css",
         });
+        if (mobileDeepAudit && width === 393 && scale === 1) {
+          const sections = current.locator("main details:not([open]) > summary");
+          let expanded = 0;
+          for (const summary of await sections.all()) {
+            if (await summary.isVisible()) {
+              await summary.click();
+              expanded++;
+            }
+          }
+          if (expanded) {
+            await auditControls(current, `${theme}/${width}/${route}/expanded`);
+            await current.screenshot({
+              path: testInfo.outputPath(
+                `${theme}-${width}-${route.replaceAll("/", "_") || "home"}-expanded.png`,
+              ),
+              fullPage: true,
+              scale: "css",
+            });
+          }
+        }
       }
       for (const [route, button] of [
         ["/plans", "플랜 만들기"],
@@ -289,6 +565,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
         scale: "css",
       });
     }
+    textScale = 1;
     await open(page, "/login");
     await page.getByLabel("아이디", { exact: true }).fill("missing");
     await page.getByLabel("비밀번호", { exact: true }).fill("wrong-password");
