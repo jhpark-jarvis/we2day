@@ -1,0 +1,11 @@
+# Build separately from the app; no credentials or live files belong in this image.
+ARG WE2DAY_API_BASE=we2day-api:local
+FROM ${WE2DAY_API_BASE}
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && rm -rf /var/lib/apt/lists/*
+COPY apps/api/src/we2day_api/local_archive.py \
+     apps/api/src/we2day_api/backup_bundle.py apps/api/src/we2day_api/backup_retention.py \
+     apps/api/src/we2day_api/backup_collect.py /app/src/we2day_api/
+USER 10001
+ENTRYPOINT ["python", "-m", "we2day_api.backup_collect"]
