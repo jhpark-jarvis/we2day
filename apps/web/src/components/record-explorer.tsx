@@ -55,7 +55,7 @@ export function RecordExplorer({
           ) : type === "records" ? (
             <RecordSearch today={today} />
           ) : type === "routes" ? (
-            <RouteHistory today={today} apiKey={mapsKey} />
+            <RouteHistory today={today} apiKey={mapsKey} active={kind === "routes"} />
           ) : (
             <MonthlyMemories initialMonth={initialMonth} />
           )}

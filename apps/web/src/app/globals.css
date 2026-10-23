@@ -212,6 +212,20 @@ button { appearance: none; color: var(--foreground); }
 .swatch-white i:nth-child(2) { background: #87503e; }
 .theme-swatch:has(.theme-character-preview) { display: flex; align-items: center; justify-content: center; padding: 8px; border-color: var(--line); background: var(--background); }
 .theme-character-preview { display: block; width: 96px; height: 96px; object-fit: contain; }
+.route-playback { margin-block: 16px; }
+.route-playback-diagram { display: block; width: 100%; max-height: 260px; border-radius: 10px; background: var(--panel); }
+.route-playback-grid { stroke: var(--line); fill: none; stroke-width: 1; }
+.route-playback-line { stroke: var(--accent); stroke-width: 3; }
+.route-playback-start { fill: var(--surface); stroke: var(--accent); stroke-width: 3; }
+.route-playback-end { fill: var(--accent); }
+.route-playback-caption { height: 144px; padding-block: 12px; overflow-wrap: anywhere; overflow-y: auto; }
+.route-playback-caption p { margin-block: 8px; }
+.route-playback-caption span { color: var(--muted); margin-right: 8px; }
+.route-playback-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border: 0; padding: 0; margin: 0; min-width: 0; }
+.route-playback-speed { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.route-playback-speed select { width: auto; min-height: 44px; }
+.route-playback-scrubber { display: flex; flex-direction: column; gap: 4px; margin-block: 10px; }
+.route-playback-scrubber input { width: 100%; min-width: 0; min-height: 44px; padding: 0; accent-color: var(--accent); }
 .theme-option-copy { display: block; padding: 15px 1px 3px; }
 .theme-option-copy strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 500; }
 .theme-option-copy small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; word-break: keep-all; }

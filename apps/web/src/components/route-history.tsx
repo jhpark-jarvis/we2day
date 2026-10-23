@@ -4,12 +4,21 @@ import { useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
 import Link from "@/components/progress-link";
 import { RouteMap } from "@/components/route-map";
+import { RoutePlayback } from "@/components/route-playback";
 import { downloadRecord } from "@/lib/file-download";
 import type { RouteContent } from "@/lib/routes";
 
 type Hit = RouteContent & { date: string; version: number; updated_at: string };
 type Page = { items: Hit[]; next_offset: number | null; signature: string };
-export function RouteHistory({ today, apiKey }: { today: string; apiKey: string }) {
+export function RouteHistory({
+  today,
+  apiKey,
+  active = true,
+}: {
+  today: string;
+  apiKey: string;
+  active?: boolean;
+}) {
   const [start, setStart] = useState(`${today.slice(0, 7)}-01`),
     [end, setEnd] = useState(today);
   const [result, setResult] = useState<Page | null>(null),
@@ -137,6 +146,12 @@ export function RouteHistory({ today, apiKey }: { today: string; apiKey: string 
               <p role="status">기간이 바뀌었어요. 동선 조회를 눌러 주세요.</p>
             )}
             {!result.items.length && <p>이 기간에 직접 남긴 동선이 없어요.</p>}
+            <RoutePlayback
+              key={`${result.signature}:${result.items.length}:${active}:${pending}:${signature}`}
+              items={result.items}
+              active={active && !pending && result.signature === signature}
+              hasMore={result.next_offset !== null}
+            />
             {result.items.map((item) => (
               <article className="plan-review" key={item.date}>
                 <h3>{item.date}</h3>
