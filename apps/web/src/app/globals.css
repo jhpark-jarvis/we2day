@@ -26,6 +26,23 @@ html[data-theme="white"] {
   --control-border: #8a9385;
 }
 
+html[data-theme="pongni"], .swatch-pongni {
+  --background: #f8f6fc; --surface: #fffeff; --foreground: #40364e; --muted: #70657d;
+  --line: #e3dcee; --accent: #705c91; --soft: #ede5f6; --panel: #f1ecf8; --control-border: #9b8dad;
+}
+html[data-theme="dumung"], .swatch-dumung {
+  --background: #fcf9f0; --surface: #fffefa; --foreground: #4a3b2e; --muted: #746554;
+  --line: #e8dfcc; --accent: #876039; --soft: #f5e8cf; --panel: #f8f1e0; --control-border: #a18c70;
+}
+html[data-theme="sopoo"], .swatch-sopoo {
+  --background: #fffbee; --surface: #fffef9; --foreground: #4d4024; --muted: #756747;
+  --line: #eae1c2; --accent: #88621d; --soft: #faedba; --panel: #fbf4d8; --control-border: #a18c59;
+}
+html[data-theme="kuku"], .swatch-kuku {
+  --background: #f8f3ee; --surface: #fffdfb; --foreground: #49372e; --muted: #776352;
+  --line: #e4d9cf; --accent: #79523d; --soft: #ebdacc; --panel: #f1e6dc; --control-border: #a38b77;
+}
+
 * { box-sizing: border-box; }
 /* Keep the page width unchanged when vertical scrolling starts or stops. */
 html { overflow-y: scroll; }
@@ -193,6 +210,8 @@ button { appearance: none; color: var(--foreground); }
 .theme-swatch i:nth-child(2) { background: #a2543e; }
 .swatch-white i { background: #e8ebe4; }
 .swatch-white i:nth-child(2) { background: #87503e; }
+.theme-swatch:has(.theme-character-preview) { display: flex; align-items: center; justify-content: center; padding: 8px; border-color: var(--line); background: var(--background); }
+.theme-character-preview { display: block; width: 96px; height: 96px; object-fit: contain; }
 .theme-option-copy { display: block; padding: 15px 1px 3px; }
 .theme-option-copy strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 500; }
 .theme-option-copy small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; word-break: keep-all; }
@@ -601,6 +620,11 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 
 .wordmark { font-family: "Arial Black", Arial, sans-serif; font-weight: 900; letter-spacing: -.07em; color: #422b21; }
 .wordmark-accent { color: #f0a57e; }
+.wordmark { display: inline-flex; align-items: center; gap: 4px; }
+.wordmark-character { display: none; width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+html[data-theme="pongni"] .character-pongni, html[data-theme="dumung"] .character-dumung,
+html[data-theme="sopoo"] .character-sopoo, html[data-theme="kuku"] .character-kuku { display: block; }
+@media (max-width: 380px) { .wordmark-character { width: 28px; height: 28px; } }
 
 @media (max-width: 840px) { .app-header { gap: 14px; } }
 

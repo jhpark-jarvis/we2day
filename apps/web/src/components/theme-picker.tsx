@@ -1,10 +1,11 @@
 "use client";
 
 import { Check } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { saveTheme } from "@/app/actions/theme";
 import { LoadingRegion } from "@/components/loading-region";
-import type { Theme } from "@/lib/theme";
+import { type Theme, themes } from "@/lib/theme";
 
 export function ThemePicker({ initialTheme }: { initialTheme: Theme }) {
   const [selected, setSelected] = useState(initialTheme);
@@ -34,12 +35,7 @@ export function ThemePicker({ initialTheme }: { initialTheme: Theme }) {
     <div>
       <LoadingRegion busy={pending} label="테마를 저장하는 중">
         <fieldset className="theme-options" aria-label="화면 테마">
-          {(
-            [
-              { value: "warm", name: "웜 클린", description: "차분한 크림과 따뜻한 테라코타" },
-              { value: "white", name: "화이트", description: "밝은 화이트와 간결한 여백" },
-            ] as const
-          ).map((option) => (
+          {themes.map((option) => (
             <button
               className="theme-option"
               type="button"
@@ -49,10 +45,23 @@ export function ThemePicker({ initialTheme }: { initialTheme: Theme }) {
               onClick={() => choose(option.value)}
             >
               <span className={`theme-swatch swatch-${option.value}`} aria-hidden="true">
-                <span>WE2DAY</span>
-                <i />
-                <i />
-                <i />
+                {option.character ? (
+                  <Image
+                    src={option.character}
+                    alt=""
+                    width={96}
+                    height={96}
+                    sizes="96px"
+                    className="theme-character-preview"
+                  />
+                ) : (
+                  <>
+                    <span>WE2DAY</span>
+                    <i />
+                    <i />
+                    <i />
+                  </>
+                )}
               </span>
               <span className="theme-option-copy">
                 <strong>

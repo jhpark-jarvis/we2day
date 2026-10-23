@@ -3,6 +3,7 @@ import journey from "./playwright.journey.config";
 export default defineConfig({
   ...journey,
   testMatch: [
+    "character-themes.spec.ts",
     "favorite-places.spec.ts",
     "organizer.spec.ts",
     "checklists.spec.ts",
