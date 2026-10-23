@@ -14,7 +14,8 @@ export async function saveDisplayName(name: string, version: number, requestId: 
     }),
   });
   if (result.data) {
-    for (const path of ["/account", "/settings", "/memories"]) revalidatePath(path);
+    for (const path of ["/", "/account", "/settings", "/memories", "/memories/search"])
+      revalidatePath(path);
   }
   return result;
 }

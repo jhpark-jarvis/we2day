@@ -10,10 +10,12 @@ export function NextAppointment({
   data,
   error,
   zones,
+  hideCalendarOnMobile = false,
 }: {
   data: Data | null;
   error: string;
   zones: TimezoneView | null;
+  hideCalendarOnMobile?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -57,7 +59,10 @@ export function NextAppointment({
           <Link className="text-button" href={`/today?date=${item.date}`}>
             데이트 코스
           </Link>
-          <Link className="text-button" href={`/?date=${item.date}`}>
+          <Link
+            className={`text-button${hideCalendarOnMobile ? " next-appointment-calendar" : ""}`}
+            href={`/?date=${item.date}`}
+          >
             달력에서 약속 보기
           </Link>
         </>

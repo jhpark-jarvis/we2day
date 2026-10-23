@@ -404,6 +404,7 @@ button.plan-card { border-color: var(--control-border); }
 .next-appointment-refresh { width: 44px; min-height: 44px; flex-shrink: 0; }
 .next-appointment-refresh:hover { background: var(--panel); color: var(--accent); }
 .next-appointment-refresh:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media(max-width:840px) { .next-appointment-calendar { display: none; } }
 
 .calendar-refresh { width: 44px; min-height: 44px; flex-shrink: 0; }
 .calendar-refresh:hover { background: var(--panel); color: var(--accent); }

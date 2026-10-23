@@ -7,7 +7,15 @@ import Link from "@/components/progress-link";
 import type { PhotoSearchPage, PhotoSearchQuery } from "@/lib/photo-search";
 import { zonedTimestamp } from "@/lib/timezones";
 
-export function PhotoSearch({ start, end }: { start: string; end: string }) {
+export function PhotoSearch({
+  start,
+  end,
+  names = { mine: "", partner: "" },
+}: {
+  start: string;
+  end: string;
+  names?: { mine: string; partner: string };
+}) {
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
   const [query, setQuery] = useState("");
@@ -156,7 +164,7 @@ export function PhotoSearch({ start, end }: { start: string; end: string }) {
                     <dt>원래 파일명</dt>
                     <dd>{photo.filename}</dd>
                     <dt>올린 사람</dt>
-                    <dd>{photo.uploaded_by_me ? "나" : "상대"}</dd>
+                    <dd>{(photo.uploaded_by_me ? names.mine : names.partner) || "이름 미설정"}</dd>
                     <dt>올린 시각 (한국)</dt>
                     <dd>{zonedTimestamp(photo.uploaded_at, "Asia/Seoul")}</dd>
                     <dt>기기 정보</dt>

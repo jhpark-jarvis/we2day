@@ -4,6 +4,7 @@ import { NextAppointment } from "@/components/next-appointment";
 import type { AnniversaryList } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
+import type { ProfileView } from "@/lib/profiles";
 import type { Appointment, Couple } from "@/lib/shared-calendar";
 import type { TimezoneView } from "@/lib/timezones";
 import type { NextAppointment as NextData } from "@/lib/upcoming";
@@ -24,21 +25,27 @@ export default async function HomePage({
     : couple.data
       ? "ready"
       : "unlinked";
-  const [appointments, next, zoneResult, anniversaries] =
+  const [appointments, next, zoneResult, anniversaries, profiles] =
     status === "ready"
       ? await Promise.all([
           callApi<Appointment[]>(`/appointments?month=${selectedDate.slice(0, 7)}`),
           callApi<NextData>("/appointments/next"),
           callApi<TimezoneView>("/timezones"),
           callApi<AnniversaryList>("/anniversaries"),
+          callApi<ProfileView>("/profiles"),
         ])
-      : [null, null, null, null];
+      : [null, null, null, null, null];
   const zones = zoneResult?.data || null;
   return (
     <>
       {status === "ready" && <AnniversarySummary data={anniversaries?.data || null} />}
       {status === "ready" && (
-        <NextAppointment data={next?.data || null} error={next?.error || ""} zones={zones} />
+        <NextAppointment
+          data={next?.data || null}
+          error={next?.error || ""}
+          zones={zones}
+          hideCalendarOnMobile
+        />
       )}
       <CalendarWorkspace
         key={selectedDate}
@@ -52,6 +59,16 @@ export default async function HomePage({
         }
         status={status}
         memberCount={couple.data?.member_count}
+        participantNames={
+          profiles?.data
+            ? [
+                profiles.data.mine?.display_name || "이름 미설정",
+                ...(couple.data?.member_count === 2
+                  ? [profiles.data.partner?.display_name || "이름 미설정"]
+                  : []),
+              ]
+            : []
+        }
         initialEvents={appointments?.data || []}
         initialError={appointments?.error || couple.error}
       />

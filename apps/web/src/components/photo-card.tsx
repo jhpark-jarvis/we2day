@@ -147,7 +147,7 @@ export function PhotoCard({
         <dl className="detail-list photo-details">
           <div>
             <dt>올린 사람</dt>
-            <dd>{authorName || (photo.created_by === userId ? "나" : "상대방")}</dd>
+            <dd>{authorName || "이름 미설정"}</dd>
           </div>
           <div>
             <dt>올린 시각</dt>

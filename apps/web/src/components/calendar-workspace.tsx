@@ -72,6 +72,7 @@ export function CalendarWorkspace({
   mapsKey = "",
   initialDate,
   zones = null,
+  participantNames = [],
 }: {
   today: string;
   preview?: boolean;
@@ -82,6 +83,7 @@ export function CalendarWorkspace({
   mapsKey?: string;
   initialDate?: string;
   zones?: TimezoneView | null;
+  participantNames?: string[];
 }) {
   const [selected, setSelected] = useState(preview ? "2026-10-24" : initialDate || today);
   const [detail, setDetail] = useState<CalendarEvent | null>(null);
@@ -268,7 +270,11 @@ export function CalendarWorkspace({
         <dl className="detail-list">
           <div>
             <dt>함께</dt>
-            <dd>나 · 너</dd>
+            <dd>
+              {preview
+                ? "가상 사용자 1 · 가상 사용자 2"
+                : participantNames.join(" · ") || "이름을 불러오지 못했어요"}
+            </dd>
           </div>
           <div>
             <dt>장소</dt>
@@ -286,7 +292,7 @@ export function CalendarWorkspace({
             <dl className="detail-list">
               <div>
                 <dt>올린 사람</dt>
-                <dd>나 (예시)</dd>
+                <dd>가상 사용자 1 (예시)</dd>
               </div>
               <div>
                 <dt>업로드</dt>
