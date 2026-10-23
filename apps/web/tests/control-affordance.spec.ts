@@ -15,6 +15,23 @@ async function open(page: Page, url: string) {
 
 async function auditControls(page: Page, label: string) {
   await expect(page.locator(".page-loading")).toHaveCount(0, { timeout: 30_000 });
+  if (mobileDeepAudit && textScale === 1) {
+    for (const field of await page
+      .locator(
+        'main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),main textarea,main select',
+      )
+      .all()) {
+      if (!(await field.isVisible()) || !(await field.isEnabled())) continue;
+      await field.focus();
+      await expect(field).toBeFocused();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+        ),
+        `${label}/focused field overflow`,
+      ).toBe(true);
+    }
+  }
   if (textScale > 1) {
     await page.locator("body").evaluate((body, scale) => {
       const sizes = [...body.querySelectorAll<HTMLElement>("*")]
@@ -41,7 +58,11 @@ async function auditControls(page: Page, label: string) {
       const underlined = style.textDecorationLine.includes("underline");
       const outline = parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== "none";
       const icon = control.matches(".icon-button") && !!control.querySelector("svg");
-      if (!dateCell && !grouped && !underlined && !outline && !icon)
+      const activityCard =
+        control.matches(".activity-card > .timeline-item") &&
+        !!control.parentElement &&
+        parseFloat(getComputedStyle(control.parentElement).borderTopWidth) > 0;
+      if (!dateCell && !grouped && !underlined && !outline && !icon && !activityCard)
         problems.push(`plain text control: ${name}`);
       if (icon && parseFloat(style.borderTopWidth) !== 0) problems.push(`outlined icon: ${name}`);
       if (control.tagName !== "A" && !dateCell && bounds.height < 43.5)
@@ -62,10 +83,17 @@ async function auditControls(page: Page, label: string) {
       if (box.height < 43.5) problems.push(`short field: ${field.id || field.tagName}`);
       if (!parseFloat(style.borderTopWidth))
         problems.push(`unmarked field: ${field.id || field.tagName}`);
-      if (document.documentElement.clientWidth <= 640 && parseFloat(style.fontSize) < 16)
+      if (
+        (document.documentElement.clientWidth <= 840 ||
+          matchMedia("(hover: none) and (pointer: coarse)").matches) &&
+        parseFloat(style.fontSize) < 16
+      )
         problems.push(
           `iOS focus zoom: ${field.getAttribute("id") || field.getAttribute("name") || field.tagName}`,
         );
+      const parent = field.parentElement?.getBoundingClientRect();
+      if (parent && (box.right > parent.right + 1 || box.left < parent.left - 1))
+        problems.push(`field escapes parent: ${field.id || field.tagName}`);
       if (box.right > document.documentElement.clientWidth + 1 || box.left < -1)
         problems.push(`field overflow: ${field.getAttribute("id") || field.tagName}`);
     }
@@ -648,4 +676,59 @@ test("mobile navigation keeps pending feedback separate from menu labels", async
     release();
   }
   await expect(page).toHaveURL(/\/together$/);
+});
+
+test("mobile inputs keep portrait and landscape size without disabling user zoom", async ({
+  page,
+}) => {
+  for (const width of [320, 393, 768, 844]) {
+    await page.setViewportSize({ width, height: width > 640 ? 390 : 852 });
+    await open(page, "/login");
+    const field = page.getByLabel("아이디", { exact: true });
+    await field.fill("long_unbroken_account_name_for_mobile");
+    await field.focus();
+    await expect(field).toBeFocused();
+    expect(
+      await field.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)),
+      `input font at ${width}`,
+    ).toBeGreaterThanOrEqual(16);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true);
+    const viewport = await page.locator('meta[name="viewport"]').getAttribute("content");
+    expect(viewport).not.toMatch(/user-scalable=no|maximum-scale=1(?:,|$)/);
+  }
+});
+
+test("mobile preview badge stays within the heading at enlarged text", async ({
+  page,
+  context,
+}, info) => {
+  try {
+    for (const theme of ["warm", "white"]) {
+      await context.addCookies([
+        { name: "we2day-theme", value: theme, url: "http://127.0.0.1:3100" },
+      ]);
+      for (const width of [320, 393]) {
+        await page.setViewportSize({ width, height: 852 });
+        textScale = 2;
+        await open(page, "/preview");
+        await auditControls(page, `preview-badge/${theme}/${width}/text200`);
+        const badge = page.locator(".preview-badge");
+        expect(
+          await badge.evaluate(
+            (e) => e.getBoundingClientRect().right <= document.documentElement.clientWidth,
+          ),
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath(`preview-badge-${theme}-${width}.png`),
+          fullPage: true,
+        });
+      }
+    }
+  } finally {
+    textScale = 1;
+  }
 });

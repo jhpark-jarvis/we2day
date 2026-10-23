@@ -231,4 +231,17 @@ test("in-app place lists preserve appointment and activity drafts, loading geome
   await page.reload();
   await page.getByRole("button", { name: /선택한 장소 저장 확인/ }).click();
   await expect(page.locator(".detail-list")).toContainText("가상 카페 & 정원 (예시 거리)");
+  const card = page.getByRole("region", { name: "약속 정보", exact: true });
+  const edit = card.getByRole("button", { name: "약속 수정하기", exact: true });
+  await expect(edit).toHaveClass("icon-button");
+  await expect(edit).toHaveCSS("border-top-width", "0px");
+  const inline = card.getByRole("region", { name: "네이버 장소 검색", exact: true });
+  await expect(inline).toContainText("가상 카페 & 정원 (예시 거리)");
+  await inline.getByRole("button", { name: "장소 검색", exact: true }).click();
+  await expect(inline.getByLabel("장소 검색어")).toHaveValue("가상 카페 & 정원 (예시 거리)");
+  await inline.getByRole("button", { name: "검색 닫기", exact: true }).click();
+  await expect(inline.getByLabel("장소 검색어")).toHaveCount(0);
+  await edit.click();
+  await expect(page.getByLabel("약속 이름")).toHaveValue("선택한 장소 저장 확인");
+  await expect(page.getByLabel("만날 장소 (선택)")).toHaveValue("가상 카페 & 정원 (예시 거리)");
 });
