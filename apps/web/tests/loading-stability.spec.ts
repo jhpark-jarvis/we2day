@@ -206,6 +206,7 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
     const albumBox = await geometry(album);
     const photos = await pause(page, "**/api/photos?*");
     try {
+      await album.getByLabel("사진 도구", { exact: true }).click();
       await album.getByRole("button", { name: "사진 새로고침", exact: true }).click();
       await photos.started;
       await expect(album.locator(".loading-results > .loading-veil")).toBeVisible();
@@ -257,6 +258,7 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
     await expect(album.locator(".shared-photo-carousel")).toBeHidden();
     await failure.remove();
     await page.unroute("**/api/photos?month=2025-01");
+    await album.getByLabel("사진 도구", { exact: true }).click();
     await album.getByRole("button", { name: "사진 새로고침", exact: true }).click();
     await expect(
       album.getByText("아직 이 날의 사진이 없어요. 첫 장면을 남겨보세요."),

@@ -1,5 +1,15 @@
 "use client";
-import { CalendarDays, ChevronLeft, ChevronRight, Download, ImageUp, X } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Ellipsis,
+  ImageUp,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import {
   Children,
   type KeyboardEvent,
@@ -24,12 +34,14 @@ export function PhotoWorkspace({
   canSave,
   names = {},
   trash = false,
+  browseHref,
 }: {
   today: string;
   userId: string | null;
   canSave: boolean;
   names?: Record<string, string>;
   trash?: boolean;
+  browseHref?: string;
 }) {
   const [date, setDate] = useState(trash ? "" : today);
   const [selecting, setSelecting] = useState(false);
@@ -155,6 +167,16 @@ export function PhotoWorkspace({
     <>
       {!canSave && (
         <p className="photo-local-notice">
+          {browseHref && (
+            <Link
+              className="icon-button"
+              href={browseHref}
+              aria-label="기록 검색"
+              title="기록 검색"
+            >
+              <Search size={20} aria-hidden="true" />
+            </Link>
+          )}
           {trash ? "사진 휴지통을 보려면 " : "사진 준비는 바로 할 수 있어요. 함께 저장하려면 "}
           <Link className="inline-link" href={userId ? "/couple" : "/login"}>
             {userId ? "둘의 공간을 연결해 주세요" : "로그인해 주세요"}
@@ -190,13 +212,23 @@ export function PhotoWorkspace({
               </h2>
             </div>
             <div className="photo-album-actions">
-              <RefreshButton
-                label="사진 새로고침"
-                pending={loading}
-                onClick={() => {
-                  setRefresh((value) => value + 1);
-                }}
-              />
+              {trash && (
+                <RefreshButton
+                  label="사진 새로고침"
+                  pending={loading}
+                  onClick={() => setRefresh((value) => value + 1)}
+                />
+              )}
+              {!trash && browseHref && (
+                <Link
+                  className="icon-button"
+                  href={browseHref}
+                  aria-label="기록 검색"
+                  title="기록 검색"
+                >
+                  <Search size={20} aria-hidden="true" />
+                </Link>
+              )}
               {!trash && (
                 <PhotoUploadDialog
                   today={date || today}
@@ -208,23 +240,19 @@ export function PhotoWorkspace({
                 />
               )}
               {!trash && (
-                <button
-                  className="icon-button"
-                  type="button"
-                  aria-label={selecting ? "사진 선택 닫기" : "사진 내보내기"}
-                  title={selecting ? "사진 선택 닫기" : "사진 내보내기"}
-                  aria-pressed={selecting}
-                  disabled={
+                <AlbumTools
+                  pending={loading}
+                  selecting={selecting}
+                  exportDisabled={
                     loading || exporting || loadedAlbum !== album || items.length === 0 || !!error
                   }
-                  onClick={() => {
+                  onRefresh={() => setRefresh((value) => value + 1)}
+                  onExport={() => {
                     setSelecting(!selecting);
                     setSelected([]);
                     setExportError("");
                   }}
-                >
-                  <Download size={20} aria-hidden="true" />
-                </button>
+                />
               )}
             </div>
           </div>
@@ -700,5 +728,81 @@ function AlbumDatePicker({
         )}
       </dialog>
     </div>
+  );
+}
+
+function AlbumTools({
+  pending,
+  selecting,
+  exportDisabled,
+  onRefresh,
+  onExport,
+}: {
+  pending: boolean;
+  selecting: boolean;
+  exportDisabled: boolean;
+  onRefresh: () => void;
+  onExport: () => void;
+}) {
+  const details = useRef<HTMLDetailsElement>(null);
+  const menuId = useId();
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (
+        details.current &&
+        event.target instanceof Node &&
+        !details.current.contains(event.target)
+      )
+        details.current.open = false;
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, []);
+  const choose = (action: () => void) => {
+    if (details.current) {
+      details.current.open = false;
+      details.current.querySelector("summary")?.focus();
+    }
+    action();
+  };
+  return (
+    <details
+      className="album-tools"
+      ref={details}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && details.current?.open) {
+          event.preventDefault();
+          details.current.open = false;
+          details.current.querySelector("summary")?.focus();
+        }
+      }}
+    >
+      <summary
+        className="icon-button"
+        aria-label="사진 도구"
+        title="사진 도구"
+        aria-controls={menuId}
+      >
+        <Ellipsis size={20} aria-hidden="true" />
+      </summary>
+      <fieldset className="album-tools-menu" id={menuId} aria-label="사진 도구 목록">
+        <button
+          type="button"
+          disabled={pending}
+          aria-busy={pending}
+          onClick={() => choose(onRefresh)}
+        >
+          <RefreshCw size={18} aria-hidden="true" /> 사진 새로고침
+        </button>
+        <button
+          type="button"
+          disabled={exportDisabled}
+          aria-pressed={selecting}
+          onClick={() => choose(onExport)}
+        >
+          <Download size={18} aria-hidden="true" /> {selecting ? "사진 선택 닫기" : "사진 내보내기"}
+        </button>
+      </fieldset>
+    </details>
   );
 }

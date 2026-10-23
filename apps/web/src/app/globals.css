@@ -692,7 +692,13 @@ body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidd
 
 .shared-photo-section:has(.album-heading) { margin-top: 20px; padding-top: 16px; }
 
-.record-browse-toolbar { justify-content: flex-end; margin-bottom: 0; }
+.album-tools { position: relative; }
+.album-tools > summary { list-style: none; }
+.album-tools > summary::-webkit-details-marker { display: none; }
+.album-tools-menu { margin: 0; min-width: 0; position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; width: 190px; max-width: calc(100vw - 32px); padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.album-tools-menu > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--foreground); text-align: left; font: inherit; font-size: 14px; }
+.album-tools-menu > button:hover:not(:disabled) { background: var(--soft); }
+.album-tools-menu > button:disabled { opacity: .45; cursor: default; }
 
 .favorite-places { min-width: 0; margin-top: 12px; }
 .favorite-places-toolbar, .favorite-places-actions { display: flex; align-items: center; gap: 6px; }

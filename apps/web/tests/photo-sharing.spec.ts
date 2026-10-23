@@ -151,6 +151,7 @@ test("compressed photo survives retry and is shared through API, SQL and private
       a.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
     ).toBeVisible();
     await a.getByRole("button", { name: "사진 업로드 닫기", exact: true }).click();
+    await b.getByLabel("사진 도구", { exact: true }).click();
     await b.getByRole("button", { name: "사진 새로고침" }).click();
     const monthResponse = await b.request.get("/api/photos?month=2026-10");
     expect(monthResponse.headers()["cache-control"]).toContain("no-store");
@@ -187,7 +188,37 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await picker.getByRole("button", { name: "다음 앨범 월", exact: true }).click();
     await picker.getByRole("button", { name: "2026-10-24 · 사진 1장", exact: true }).click();
     await expect(picker).not.toBeVisible();
+    const albumActions = b.locator(".photo-album-actions");
+    await expect(
+      albumActions.getByRole("link", { name: "기록 검색", exact: true }),
+    ).toHaveAttribute("href", "/memories/search");
+    await expect(b.locator(".record-browse-toolbar")).toHaveCount(0);
+    const more = albumActions.getByLabel("사진 도구", { exact: true });
+    await more.click();
+    await expect(b.getByRole("group", { name: "사진 도구 목록" })).toBeVisible();
+    await b.keyboard.press("Escape");
+    await expect(b.getByRole("group", { name: "사진 도구 목록" })).not.toBeVisible();
+    await expect(more).toBeFocused();
+    await more.click();
+    await b.getByRole("heading", { name: "함께한 날들", exact: true }).click();
+    await expect(b.getByRole("group", { name: "사진 도구 목록" })).not.toBeVisible();
+    for (const width of [320, 393, 1280]) {
+      await b.setViewportSize({ width, height: 844 });
+      await more.click();
+      const menu = await b.getByRole("group", { name: "사진 도구 목록" }).boundingBox();
+      if (!menu) throw new Error("Album tools missing");
+      expect(menu.x).toBeGreaterThanOrEqual(0);
+      expect(menu.x + menu.width).toBeLessThanOrEqual(width);
+      expect(
+        await b.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      await b.screenshot({ path: testInfo.outputPath(`album-tools-${width}.png`) });
+      await b.keyboard.press("Escape");
+    }
+    await b.setViewportSize({ width: 390, height: 844 });
+    await more.click();
     await b.getByRole("button", { name: "사진 내보내기", exact: true }).click();
+    await expect(b.getByRole("group", { name: "사진 도구 목록" })).not.toBeVisible();
     const card = b.locator(".shared-photo-card");
     await expect(card).toHaveCount(1);
     await expect(card.getByText("가을날의 작은 산책", { exact: true })).toBeVisible();
@@ -224,6 +255,8 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await b.route(`**/api/photos/${secondId}/image*`, (route) =>
       route.fulfill({ body: canonicalBytes, contentType: "image/webp" }),
     );
+    if (await b.getByLabel("사진 도구", { exact: true }).count())
+      await b.getByLabel("사진 도구", { exact: true }).click();
     await b.getByRole("button", { name: "사진 새로고침", exact: true }).click();
     await expect(b.locator(".shared-photo-card")).toHaveCount(2);
     await expect(b.getByRole("button", { name: "앨범", exact: true })).toHaveCount(0);
@@ -280,6 +313,8 @@ test("compressed photo survives retry and is shared through API, SQL and private
       .screenshot({ path: testInfo.outputPath("photo-icons.png") });
     await b.unroute("**/api/photos?date=2026-10-24");
     await b.unroute(`**/api/photos/${secondId}/image*`);
+    if (await b.getByLabel("사진 도구", { exact: true }).count())
+      await b.getByLabel("사진 도구", { exact: true }).click();
     await b.getByRole("button", { name: "사진 새로고침", exact: true }).click();
     await expect(b.locator(".shared-photo-card")).toHaveCount(1);
     const hidden = await third.request.get("/api/photos?date=2026-10-24");
@@ -302,6 +337,7 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await a.getByRole("button", { name: "사진 업로드 닫기", exact: true }).click();
     await a.setViewportSize({ width: 1100, height: 900 });
     await a.screenshot({ path: testInfo.outputPath("photo-sharing-desktop.png"), fullPage: true });
+    await a.getByLabel("사진 도구", { exact: true }).click();
     await a.getByRole("button", { name: "사진 내보내기", exact: true }).click();
     await a.getByLabel("이 사진 내보내기 선택", { exact: true }).check();
     const exporting = a.waitForEvent("download");
@@ -316,6 +352,7 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await expect(a.getByText("사진을 휴지통으로 옮겼어요.", { exact: true })).toBeVisible();
     await expect(a.locator(".shared-photo-card")).toHaveCount(0);
     expect((await first.request.get(imageUrl as string)).status()).toBe(404);
+    await b.getByLabel("사진 도구", { exact: true }).click();
     await b.getByRole("button", { name: "사진 새로고침" }).click();
     await expect(b.locator(".shared-photo-card")).toHaveCount(0);
     await b.goto("/settings/trash");
@@ -346,6 +383,8 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await expect(b.locator(".shared-photo-card")).toHaveCount(0);
     await b.goto("/memories?date=2026-10-24");
     await expect(b.locator(".shared-photo-card")).toHaveCount(1);
+    if (await a.getByLabel("사진 도구", { exact: true }).count())
+      await a.getByLabel("사진 도구", { exact: true }).click();
     await a.getByRole("button", { name: "사진 새로고침" }).click();
     await expect(a.locator(".shared-photo-card")).toHaveCount(1);
     await a.getByRole("button", { name: "사진 휴지통으로 이동", exact: true }).click();
@@ -353,6 +392,8 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await expect(a.locator(".shared-photo-card")).toHaveCount(0);
     await a.goto("/settings/trash");
     expect((await request.post("http://127.0.0.1:54329/__age-photo-trash")).ok()).toBe(true);
+    if (await a.getByLabel("사진 도구", { exact: true }).count())
+      await a.getByLabel("사진 도구", { exact: true }).click();
     await a.getByRole("button", { name: "사진 새로고침" }).click();
     await a.getByText("영구 삭제 확인 열기", { exact: true }).click();
     await a.getByLabel("확인 문구 ‘영구 삭제’ 입력").fill("영구 삭제");
