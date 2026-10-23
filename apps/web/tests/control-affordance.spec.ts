@@ -351,7 +351,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await expect(page).toHaveURL(/\/questions\/[a-f0-9-]+$/, { timeout: 30_000 });
   const question = new URL(page.url()).pathname;
   await open(page, "/roulette");
-  await page.getByText("룰렛 만들기", { exact: true }).click();
+  await page.getByRole("button", { name: "룰렛 만들기", exact: true }).click();
   await page.getByLabel("룰렛 이름").fill("화면 확인용 선택");
   await page.getByLabel("후보 (한 줄에 하나, 2~20개)").fill("산책\n카페");
   await page.getByRole("button", { name: "룰렛 저장", exact: true }).click();

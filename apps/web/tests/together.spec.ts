@@ -119,8 +119,46 @@ test("direct questions, chosen timezones and durable roulette results", async ({
       caret: "initial",
       style: "nextjs-portal{display:none}",
     });
-    await open(a, "/roulette");
-    await a.getByText("룰렛 만들기", { exact: true }).click();
+    for (const route of ["/checklists", "/goals", "/questions", "/roulette"]) {
+      await open(a, route);
+      await expect(a.locator('main a[href="/together"]')).toHaveCount(0);
+    }
+    const create = a.getByRole("button", { name: "룰렛 만들기", exact: true });
+    const dialog = a.getByRole("dialog", { name: "룰렛 만들기", exact: true });
+    await create.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator("summary")).toHaveCount(0);
+    await a.getByLabel("룰렛 이름", { exact: true }).fill("닫아도 보존할 작성 내용");
+    await a.getByRole("button", { name: "룰렛 작성 닫기", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(create).toBeFocused();
+    await create.click();
+    await expect(a.getByLabel("룰렛 이름", { exact: true })).toHaveValue("닫아도 보존할 작성 내용");
+    for (const [width, height] of [
+      [320, 568],
+      [393, 852],
+      [1280, 800],
+    ]) {
+      await a.setViewportSize({ width, height });
+      expect(
+        await dialog.evaluate((el) => {
+          const rect = el.getBoundingClientRect();
+          return (
+            rect.left >= 0 &&
+            rect.right <= innerWidth &&
+            rect.top >= 0 &&
+            rect.bottom <= innerHeight &&
+            el.scrollWidth <= el.clientWidth
+          );
+        }),
+      ).toBe(true);
+      await a.screenshot({ path: testInfo.outputPath(`roulette-create-${width}.png`) });
+    }
+    await a.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(create).toBeFocused();
+    await a.setViewportSize({ width: 390, height: 844 });
+    await create.click();
     await a.getByLabel("룰렛 이름", { exact: true }).fill("둘이 고르는 시간 · 합성 룰렛");
     await a.getByLabel("후보 (한 줄에 하나, 2~20개)", { exact: true }).fill("산책\n집에서 영화");
     await a.getByRole("button", { name: "룰렛 저장", exact: true }).click();

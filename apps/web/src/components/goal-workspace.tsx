@@ -4,7 +4,6 @@ import { Pencil } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { saveGoal } from "@/app/actions/goals";
 import { PageHeading } from "@/components/page-heading";
-import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { Goal, GoalContent, GoalStep } from "@/lib/goals";
 import { goalProgress } from "@/lib/goals";
@@ -72,9 +71,6 @@ export function GoalWorkspace({
     );
   return (
     <section>
-      <Link className="text-button" href="/together">
-        ← 함께
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">LITTLE STEPS, TOGETHER</p>

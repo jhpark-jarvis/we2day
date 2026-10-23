@@ -4,7 +4,6 @@ import { Pencil, RefreshCw } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { saveChecklist } from "@/app/actions/checklists";
 import { PageHeading } from "@/components/page-heading";
-import Link from "@/components/progress-link";
 import type { Checklist, ChecklistContent, ChecklistItem } from "@/lib/checklists";
 
 export function ChecklistWorkspace({
@@ -70,9 +69,6 @@ export function ChecklistWorkspace({
     );
   return (
     <section>
-      <Link className="text-button" href="/together">
-        ← 함께
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">TOGETHER, READY</p>

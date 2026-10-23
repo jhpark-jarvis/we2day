@@ -609,3 +609,14 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 .next-appointment > h3, .next-appointment > p { grid-column: 1 / -1; }
 
 .next-appointment > a { grid-column: 2; }
+
+/* Keep creation beside the list controls; the dialog retains an unfinished draft. */
+.roulette-page-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.roulette-create-trigger { flex-shrink: 0; }
+.roulette-create-dialog { box-sizing: border-box; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--foreground); overflow-y: auto; overscroll-behavior: contain; }
+.roulette-create-dialog::backdrop { background: rgb(30 22 18 / 45%); }
+.roulette-create-heading { margin-bottom: 12px; }
+.roulette-create-heading h2 { margin: 0; }
+.roulette-create-dialog .plan-editor { max-width: 100%; }
+.roulette-create-dialog .meeting-fields { min-width: 0; }
+body:has(.roulette-create-dialog[open]) { overflow: hidden; }
