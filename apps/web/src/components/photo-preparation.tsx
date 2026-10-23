@@ -24,7 +24,7 @@ export function PhotoPreparation({
 }) {
   const [date, setDate] = useState(today);
   useEffect(() => {
-    if (selectedDate) setDate(selectedDate);
+    if (selectedDate !== undefined) setDate(selectedDate);
   }, [selectedDate]);
   const validDate = !!date && date >= "2000-01-01" && date <= "2100-12-31";
   const [photo, setPhoto] = useState<(PreparedPhoto & { url: string }) | null>(null);
