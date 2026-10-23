@@ -32,6 +32,7 @@ export function PhotoWorkspace({
   trash?: boolean;
 }) {
   const [date, setDate] = useState(trash ? "" : today);
+  const [selecting, setSelecting] = useState(false);
   const [recordId, setRecordId] = useState("");
   const [items, setItems] = useState<SharedPhoto[]>([]);
   const [loadedAlbum, setLoadedAlbum] = useState("");
@@ -161,19 +162,6 @@ export function PhotoWorkspace({
           .
         </p>
       )}
-      {!trash && (
-        <div>
-          <PhotoPreparation
-            today={today}
-            canSave={canSave}
-            onDateChange={(day) => {
-              setLoading(canSave);
-              setDate(day);
-            }}
-            onSaved={() => setRefresh((value) => value + 1)}
-          />
-        </div>
-      )}
       {canSave && (
         <section
           className="shared-photo-section"
@@ -196,6 +184,23 @@ export function PhotoWorkspace({
               }}
             />
           </div>
+          {!trash && (
+            <div className="auth-field album-date">
+              <label htmlFor="album-date">앨범 날짜</label>
+              <input
+                id="album-date"
+                type="date"
+                min="2000-01-01"
+                max="2100-12-31"
+                value={date}
+                onChange={(e) => {
+                  active.current?.abort();
+                  setLoading(true);
+                  setDate(e.target.value);
+                }}
+              />
+            </div>
+          )}
           {trash && (
             <div className="trash-filters">
               <div className="auth-field">
@@ -265,6 +270,19 @@ export function PhotoWorkspace({
               style={{ visibility: loadedAlbum && loadedAlbum !== album ? "hidden" : undefined }}
             >
               {!trash && items.length > 0 && (
+                <button
+                  type="button"
+                  className="text-button"
+                  aria-pressed={selecting}
+                  onClick={() => {
+                    setSelecting(!selecting);
+                    setSelected([]);
+                  }}
+                >
+                  {selecting ? "사진 선택 닫기" : "사진 내보내기"}
+                </button>
+              )}
+              {!trash && selecting && items.length > 0 && (
                 <div className="photo-export-toolbar">
                   <button
                     aria-busy={exporting}
@@ -306,18 +324,22 @@ export function PhotoWorkspace({
                       onChanged={changed}
                       selected={selected.includes(photo.id)}
                       selectingDisabled={exporting}
-                      onSelect={() => {
-                        if (!selected.includes(photo.id) && selected.length >= 20) {
-                          setExportError("한 번에 최대20장까지 선택해 주세요.");
-                          return;
-                        }
-                        setExportError("");
-                        setSelected((current) =>
-                          current.includes(photo.id)
-                            ? current.filter((id) => id !== photo.id)
-                            : [...current, photo.id],
-                        );
-                      }}
+                      onSelect={
+                        selecting
+                          ? () => {
+                              if (!selected.includes(photo.id) && selected.length >= 20) {
+                                setExportError("한 번에 최대20장까지 선택해 주세요.");
+                                return;
+                              }
+                              setExportError("");
+                              setSelected((current) =>
+                                current.includes(photo.id)
+                                  ? current.filter((id) => id !== photo.id)
+                                  : [...current, photo.id],
+                              );
+                            }
+                          : undefined
+                      }
                     />
                   ))}
               </PhotoCollection>
@@ -334,6 +356,21 @@ export function PhotoWorkspace({
             </div>
           </LoadingRegion>
         </section>
+      )}{" "}
+      {!trash && (
+        <details className="editor-disclosure" open={!canSave}>
+          <summary>사진 추가</summary>
+          <PhotoPreparation
+            today={today}
+            selectedDate={date}
+            canSave={canSave}
+            onDateChange={(day) => {
+              setLoading(canSave);
+              setDate(day);
+            }}
+            onSaved={() => setRefresh((value) => value + 1)}
+          />
+        </details>
       )}
     </>
   );

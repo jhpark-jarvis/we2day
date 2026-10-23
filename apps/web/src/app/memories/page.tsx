@@ -49,6 +49,14 @@ export default async function MemoriesPage({
           내보내기
         </Link>
       </nav>
+
+      <PhotoWorkspace
+        key={selectedDate}
+        today={selectedDate}
+        userId={user.data?.id || null}
+        canSave={!!couple.data && !!user.data}
+        names={profileNames(profiles.data)}
+      />
       <section className="settings-section" aria-label="작년 오늘 돌아보기">
         <h2>작년 오늘은 어땠을까요?</h2>
         {lastYear ? (
@@ -75,13 +83,6 @@ export default async function MemoriesPage({
           </Link>
         )}
       </section>
-      <PhotoWorkspace
-        key={selectedDate}
-        today={selectedDate}
-        userId={user.data?.id || null}
-        canSave={!!couple.data && !!user.data}
-        names={profileNames(profiles.data)}
-      />
     </>
   );
 }

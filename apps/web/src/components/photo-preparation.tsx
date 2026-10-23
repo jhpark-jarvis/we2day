@@ -11,16 +11,21 @@ function size(bytes: number) {
 
 export function PhotoPreparation({
   today,
+  selectedDate,
   canSave = false,
   onDateChange,
   onSaved,
 }: {
   today: string;
+  selectedDate?: string;
   canSave?: boolean;
   onDateChange?: (date: string) => void;
   onSaved?: () => void;
 }) {
   const [date, setDate] = useState(today);
+  useEffect(() => {
+    if (selectedDate) setDate(selectedDate);
+  }, [selectedDate]);
   const validDate = !!date && date >= "2000-01-01" && date <= "2100-12-31";
   const [photo, setPhoto] = useState<(PreparedPhoto & { url: string }) | null>(null);
   const [busy, setBusy] = useState(false);
