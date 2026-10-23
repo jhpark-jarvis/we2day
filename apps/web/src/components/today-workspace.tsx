@@ -109,6 +109,7 @@ export function TodayWorkspace({
               <NaverAppHandoff
                 key={`${plan.id}:${plan.published_revision}:${step}`}
                 place={current.place}
+                mapUrl={current.map_url}
                 site={site}
                 extraAction={
                   current.place && (

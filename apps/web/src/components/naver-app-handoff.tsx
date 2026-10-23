@@ -1,15 +1,17 @@
 "use client";
 import { Settings2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
-import { naverAppLinks, type RouteMode } from "@/lib/naver-app";
+import { naverAppLinks, naverShareLink, type RouteMode } from "@/lib/naver-app";
 
 export function NaverAppHandoff({
   place,
   site,
   compact = false,
   extraAction,
+  mapUrl = "",
 }: {
   place: string;
+  mapUrl?: string;
   site: string;
   compact?: boolean;
   extraAction?: ReactNode;
@@ -23,30 +25,31 @@ export function NaverAppHandoff({
   useEffect(() => {
     if (/Android/i.test(navigator.userAgent)) setPlatform("android");
   }, []);
+  const shared = naverShareLink(mapUrl);
   const search = naverAppLinks(site, place);
   const route = naverAppLinks(site, place, { lat, lng, mode });
   if (compact)
     return search ? (
       <a
         className="text-button"
-        href={search[platform]}
+        href={shared || search?.[platform]}
         rel="noreferrer"
         referrerPolicy="no-referrer"
       >
         지도 검색
       </a>
     ) : null;
-  if (!place.trim())
+  if (!place.trim() && !shared)
     return (
       <p className="settings-hint">이 활동에는 장소가 없어요. 플랜에서 장소를 직접 적어 주세요.</p>
     );
   return (
     <section className="naver-handoff" aria-label="네이버 지도 앱 이동">
       <div className="handoff-actions">
-        {search && (
+        {(shared || search) && (
           <a
             className="primary-button"
-            href={search[platform]}
+            href={shared || search?.[platform]}
             rel="noreferrer"
             referrerPolicy="no-referrer"
           >
@@ -67,7 +70,9 @@ export function NaverAppHandoff({
         </button>
       </div>
       <p className="settings-hint">
-        저장한 장소명·주소로 지도 앱을 열어요. 목적지를 확인하고 운전 길찾기를 선택해 주세요.
+        {shared
+          ? "저장한 공유 링크를 열어요. 네이버 지도에서 목적지나 경로를 확인해 주세요."
+          : "저장한 장소명·주소로 지도 앱을 열어요. 목적지를 확인하고 운전 길찾기를 선택해 주세요."}
       </p>
       {open && (
         <div className="plan-review" id={optionsId}>

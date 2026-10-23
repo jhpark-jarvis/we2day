@@ -724,3 +724,7 @@ body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 .favorite-place-destination-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .favorite-place-destination-heading label { margin: 0; }
 .favorite-place-fields > div:empty { display: none; }
+
+.map-share-input { display: flex; align-items: end; gap: 12px; min-width: 0; }
+.map-share-input > .auth-field { flex: 1; min-width: 0; margin: 0; }
+.map-share-input input { width: 100%; min-width: 0; }

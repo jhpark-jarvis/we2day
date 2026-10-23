@@ -69,3 +69,8 @@ export function naverAppLinks(site: string, name: string, destination?: Destinat
     android: `intent://${path}?${query}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`,
   };
 }
+
+// User-pasted NAVER share links only; never fetch or expand them on the server.
+export function naverShareLink(value: string) {
+  return /^https:\/\/naver\.me\/[A-Za-z0-9_-]{1,80}$/.test(value) ? value : null;
+}

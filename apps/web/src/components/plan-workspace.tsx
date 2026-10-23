@@ -523,7 +523,24 @@ function PlanEditor({
                       document.getElementById(`activity-${index}-place`)?.focus();
                     }}
                   />
-                  <NaverAppHandoff place={item.place} site={site} compact />
+                  <div className="map-share-input">
+                    <NaverAppHandoff place={item.place} site={site} compact />
+                    <div className="auth-field">
+                      <label htmlFor={`activity-${index}-map-url`}>네이버 지도 공유 링크</label>
+                      <input
+                        id={`activity-${index}-map-url`}
+                        type="url"
+                        inputMode="url"
+                        value={item.map_url || ""}
+                        maxLength={97}
+                        pattern="https://naver\.me/[A-Za-z0-9_-]{1,80}"
+                        placeholder="https://naver.me/…"
+                        onChange={(event) =>
+                          activity(index, { map_url: event.target.value.trim() })
+                        }
+                      />
+                    </div>
+                  </div>
                   <div className="auth-field">
                     <div className="activity-note-heading">
                       <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>

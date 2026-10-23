@@ -100,6 +100,7 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     await a.getByLabel("활동 1 이름").fill("산책");
     await a.getByLabel("활동 1 시간").fill("14:00");
     await a.getByLabel("활동 1 장소", { exact: true }).fill("직접 정한 공원");
+    await a.locator("#activity-0-map-url").fill("https://naver.me/Example12");
     await a.getByRole("button", { name: "활동 추가", exact: true }).click();
     await a.getByLabel("활동 2 이름").fill("카페");
     await a.getByRole("button", { name: "활동 2 위로", exact: true }).click();
@@ -121,6 +122,18 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     const events = await after.json();
     expect(events).toHaveLength(1);
     expect(events[0].time).toBe("14:00:00");
+    const course = await first.newPage();
+    await course.goto(`/today?date=${date}`);
+    await expect(course.getByRole("link", { name: "네이버 지도", exact: true })).toHaveAttribute(
+      "href",
+      "https://naver.me/Example12",
+    );
+    await course.screenshot({
+      path: testInfo.outputPath("shared-map-course-mobile.png"),
+      fullPage: true,
+    });
+    await course.close();
+    await expect(a.locator("#activity-0-map-url")).toHaveValue("https://naver.me/Example12");
     await b.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
     await b.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
     await expect(

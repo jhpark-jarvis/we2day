@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { naverAppLinks } from "../src/lib/naver-app.ts";
+import { naverAppLinks, naverShareLink } from "../src/lib/naver-app.ts";
 
 test("fixed app identity and literal destination encoding never accept injected actions", () => {
   const name = "강남역 #Intent;scheme=evil;end & café";
@@ -79,4 +79,17 @@ test("selected place display address is excluded only from the search keyword", 
     );
     assert.equal(query, title.endsWith("예시로 1)") ? "예시 카페 (본점)" : title);
   }
+});
+
+test("share links accept only the exact NAVER HTTPS short-link host", () => {
+  assert.equal(naverShareLink("https://naver.me/Example12"), "https://naver.me/Example12");
+  for (const value of [
+    "javascript:alert(1)",
+    "https://naver.me.evil.test/x",
+    "https://user@naver.me/x",
+    "http://naver.me/x",
+    "https://naver.me/x?redirect=evil",
+    "https://naver.me/x#evil",
+  ])
+    assert.equal(naverShareLink(value), null);
 });

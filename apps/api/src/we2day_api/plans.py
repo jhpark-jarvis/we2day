@@ -17,6 +17,7 @@ class Activity(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     place: str = Field(default="", max_length=200)
+    map_url: str = Field(default="", pattern=r"^(?:https://naver\.me/[A-Za-z0-9_-]{1,80})?$")
     cost: Money = Field(default=None, ge=0, le=1_000_000_000)
     note: str = Field(default="", max_length=1000)
 

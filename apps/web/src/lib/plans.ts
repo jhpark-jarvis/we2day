@@ -3,6 +3,7 @@ export type Activity = {
   title: string;
   time: string | null;
   place: string;
+  map_url?: string;
   cost: number | null;
   note: string;
 };
