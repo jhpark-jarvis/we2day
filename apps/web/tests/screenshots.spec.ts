@@ -4,6 +4,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const output = path.resolve("../../assets/screenshots");
 const date = "2026-10-24";
+test.use({ actionTimeout: 15_000 });
 
 async function capture(page: Page, name: string, region?: Locator) {
   await expect(page.locator(".page-loading")).toHaveCount(0, { timeout: 30_000 });
@@ -104,6 +105,7 @@ test("generate public screenshots using disposable synthetic records only", asyn
     ]);
 
     await page.setViewportSize({ width: 1280, height: 980 });
+    console.log("Public capture: plan editor");
     await page.goto("/plans");
     await page.getByRole("button", { name: "플랜 만들기", exact: true }).click();
     await page.getByLabel("플랜 이름").fill("가을, 느긋한 하루");
@@ -116,15 +118,18 @@ test("generate public screenshots using disposable synthetic records only", asyn
       await page.getByRole("button", { name: "활동 추가", exact: true }).click();
       await page.getByLabel(`활동 ${index} 이름`).fill(title);
       await page.getByLabel(`활동 ${index} 시간`).fill(time);
-      await page.getByLabel(`활동 ${index} 장소`).fill(place);
+      await page.getByLabel(`활동 ${index} 장소`, { exact: true }).fill(place);
     }
+    await page.getByText("준비물 (선택)", { exact: true }).click();
     await page.getByLabel("준비물 (한 줄에 하나, 최대 30개)").fill("물 한 병\n가벼운 겉옷");
     await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
+    console.log("Public capture: saved plan review");
     await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }),
     ).toBeVisible();
     await capture(page, "plan-desktop.png", page.getByRole("region", { name: "플랜 확정 내용" }));
+    console.log("Public capture: photo upload");
 
     await page.goto("/memories?date=2026-10-10");
     await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
@@ -139,9 +144,9 @@ test("generate public screenshots using disposable synthetic records only", asyn
       page.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
     ).toBeVisible();
     await page.setViewportSize({ width: 390, height: 1100 });
-    await page.goto("/memories/month?month=2026-10");
-    await expect(page.getByRole("heading", { name: "월간 추억", exact: true })).toBeVisible();
-    await expect(page.locator(".monthly-photo")).toHaveCount(1);
+    await page.goto("/memories?date=2026-10-10");
+    await expect(page.getByRole("button", { name: "사진 업로드", exact: true })).toBeVisible();
+    await expect(page.locator(".shared-photo-carousel img")).toHaveCount(1);
     await capture(page, "memories-mobile.png");
   } finally {
     await context.close();
