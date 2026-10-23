@@ -533,7 +533,7 @@ function PlanEditor({
                         inputMode="url"
                         value={item.map_url || ""}
                         maxLength={97}
-                        pattern="https://naver\.me/[A-Za-z0-9_-]{1,80}"
+                        pattern={"https://naver[.]me/[A-Za-z0-9_\\-]{1,80}"}
                         placeholder="https://naver.me/…"
                         onChange={(event) =>
                           activity(index, { map_url: event.target.value.trim() })
