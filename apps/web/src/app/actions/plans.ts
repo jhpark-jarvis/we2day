@@ -25,6 +25,7 @@ export async function changePlan(
   if (!result.error) {
     revalidatePath("/");
     revalidatePath("/plans");
+    revalidatePath("/today");
   }
   return result;
 }

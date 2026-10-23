@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, X } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { changePlan } from "@/app/actions/plans";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { PageHeading } from "@/components/page-heading";
@@ -41,6 +41,7 @@ export function PlanWorkspace({
   const [seed, setSeed] = useState(initialContent);
   const [notice, setNotice] = useState("");
   const [editorEpoch, setEditorEpoch] = useState(0);
+  const [savedReview, setSavedReview] = useState("");
   const [pending, startTransition] = useTransition();
   function load(includeArchived: boolean, offset = 0) {
     startTransition(async () => {
@@ -71,6 +72,7 @@ export function PlanWorkspace({
         key={`${selected?.id || newId}:${selected?.version || 0}:${editorEpoch}`}
         id={selected?.id || newId}
         plan={selected}
+        showSavedReview={savedReview === `${selected?.id}:${selected?.version}`}
         today={today}
         seed={seed}
         site={site}
@@ -80,6 +82,7 @@ export function PlanWorkspace({
           setNewId(crypto.randomUUID());
         }}
         onSaved={(plan, action) => {
+          setSavedReview(action === "save" ? `${plan.id}:${plan.version}` : "");
           setNewId("");
           setItems((current) =>
             [plan, ...current.filter((item) => item.id !== plan.id)].filter(
@@ -202,6 +205,7 @@ export function PlanWorkspace({
 function PlanEditor({
   id,
   plan,
+  showSavedReview,
   today,
   seed,
   site,
@@ -211,6 +215,7 @@ function PlanEditor({
 }: {
   id: string;
   plan: DatePlan | null;
+  showSavedReview: boolean;
   today: string;
   seed: PlanContent | null;
   site: string;
@@ -235,7 +240,14 @@ function PlanEditor({
   const [preparation, setPreparation] = useState(
     (plan?.content.preparation || seed?.preparation || []).join("\n"),
   );
-  const [review, setReview] = useState(false);
+  const [review, setReview] = useState(
+    showSavedReview ||
+      Boolean(plan && (!plan.published_content || planStatus(plan) === "변경안 · 다시 확정 필요")),
+  );
+  const reviewPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (showSavedReview) reviewPanel.current?.scrollIntoView({ block: "start" });
+  }, [showSavedReview]);
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -563,7 +575,9 @@ function PlanEditor({
             <button type="submit" className="primary-button plan-save" aria-busy={pending}>
               {"플랜 저장"}
             </button>
-            <p className="settings-hint">저장만으로 달력 약속은 바뀌지 않아요.</p>
+            <p className="settings-hint">
+              저장 후 아래 내용을 확인하고 ‘이 내용으로 확정하기’를 눌러야 코스와 달력에 반영돼요.
+            </p>
             {plan && (
               <>
                 <div className="calendar-toolbar">
@@ -571,7 +585,12 @@ function PlanEditor({
                     type="button"
                     className="text-button"
                     disabled={dirty}
-                    onClick={() => setReview(!review)}
+                    onClick={() => {
+                      setReview(true);
+                      requestAnimationFrame(() =>
+                        reviewPanel.current?.scrollIntoView({ block: "start" }),
+                      );
+                    }}
                   >
                     {plan.published_content ? "변경 내용 확인·재확정" : "확정 내용 확인"}
                   </button>
@@ -590,8 +609,18 @@ function PlanEditor({
                   </p>
                 )}
                 {review && !dirty && (
-                  <section className="plan-review" aria-label="플랜 확정 내용">
-                    <h2>달력에 반영할 약속</h2>
+                  <section
+                    className="plan-review"
+                    aria-label="플랜 확정 내용"
+                    id="plan-publication"
+                    ref={reviewPanel}
+                  >
+                    <h2>코스와 달력에 반영할 내용</h2>
+                    <p className="settings-hint">
+                      {planStatus(plan) === "확정됨"
+                        ? "현재 코스와 달력에 반영된 내용이에요."
+                        : "아직 코스에 반영되지 않았어요. 아래 내용을 확인하고 확정해 주세요."}
+                    </p>
                     <PlanPreview content={content} />
                     {plan.published_content && (
                       <details>

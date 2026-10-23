@@ -65,7 +65,7 @@ export default async function TodayPage({
       )}
       {couple.data ? (
         <TodayWorkspace
-          key={`${date}:${offset}`}
+          key={`${date}:${offset}:${plans.data?.map((plan) => `${plan.id}:${plan.published_revision}`).join(",")}`}
           plans={plans.data || []}
           date={date}
           today={seoulToday()}

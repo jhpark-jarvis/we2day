@@ -82,9 +82,14 @@ export function TodayWorkspace({
           </p>
         )}
         {JSON.stringify(plan.content) !== JSON.stringify(content) && (
-          <p className="settings-hint">
-            수정 중인 변경안이 있어요. 여기에는 마지막 확정 내용을 표시해요.
-          </p>
+          <div className="note-panel">
+            <p>
+              저장한 변경사항이 아직 코스에 반영되지 않았어요. 현재는 마지막 확정 내용을 보여줘요.
+            </p>
+            <Link className="text-button" href={`/plans?item=${plan.id}#plan-publication`}>
+              변경안 확인·반영
+            </Link>
+          </div>
         )}
       </header>
       {current && (
