@@ -2,6 +2,7 @@
 
 import {
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Images,
@@ -368,7 +369,10 @@ export function CalendarWorkspace({
                 약속 추가하기
               </button>
               <details className="schedule-tools">
-                <summary>일정 도구</summary>
+                <summary>
+                  일정 도구
+                  <ChevronDown className="schedule-tools-chevron" size={16} aria-hidden="true" />
+                </summary>
                 <nav aria-label="일정 도구">
                   <Link href={`/plans?date=${selected}`}>플랜</Link>
                   <Link href={`/today?date=${selected}`}>데이트 코스</Link>

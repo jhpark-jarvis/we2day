@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/page-heading";
 import { PhotoWorkspace } from "@/components/photo-workspace";
@@ -32,9 +33,9 @@ export default async function MemoriesPage({
           <p className="muted">약속으로 시작해, 기억으로 남는 날들.</p>
         </div>
       </PageHeading>
-      <nav className="calendar-toolbar" aria-label="기록 둘러보기">
-        <Link className="text-button" href="/memories/search">
-          검색
+      <nav className="calendar-toolbar record-browse-toolbar" aria-label="기록 둘러보기">
+        <Link className="icon-button" href="/memories/search" aria-label="검색" title="기록 검색">
+          <Search size={20} aria-hidden="true" />
         </Link>
       </nav>
 

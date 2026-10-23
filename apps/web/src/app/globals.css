@@ -449,8 +449,8 @@ button.plan-card { border-color: var(--control-border); }
 .together-card:hover { border-color: var(--accent); }
 .schedule-tools { position: relative; }
 .schedule-tools summary { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; color: var(--muted); cursor: pointer; }
-.schedule-tools summary::after { content: "⌄"; margin-left: 8px; }
-.schedule-tools[open] summary::after { content: "⌃"; }
+.schedule-tools-chevron { margin-inline-start: 8px; flex-shrink: 0; }
+.schedule-tools[open] .schedule-tools-chevron { transform: rotate(180deg); }
 .schedule-tools summary::-webkit-details-marker { display: none; }
 .schedule-tools nav { position: absolute; top: 100%; right: 0; z-index: 6; width: 200px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--background); }
 .schedule-tools a { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: 8px; }
@@ -653,3 +653,5 @@ body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidd
 .record-explorer .today-workspace { margin-top: 0; }
 
 .shared-photo-section:has(.album-heading) { margin-top: 20px; padding-top: 16px; }
+
+.record-browse-toolbar { justify-content: flex-end; margin-bottom: 0; }

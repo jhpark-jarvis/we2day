@@ -69,12 +69,6 @@ export function NextAppointment({
       ) : (
         <p>앞으로 예정된 약속이 없어요. 달력에서 다음 약속을 정해 보세요.</p>
       )}
-      <details className="compact-help">
-        <summary>표시 기준</summary>
-        <p className="settings-hint">
-          오늘부터 날짜순으로 표시해요. 시간 없는 약속도 포함하며 만남 완료는 직접 기록해요.
-        </p>
-      </details>
     </aside>
   );
 }
