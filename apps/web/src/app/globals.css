@@ -691,6 +691,7 @@ body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidd
 .record-explorer .today-workspace { margin-top: 0; }
 
 .shared-photo-section:has(.album-heading) { margin-top: 20px; padding-top: 16px; }
+@media (max-width: 840px) { .shared-photo-section[aria-label="날짜별 사진 앨범"] { border-top: 0; } }
 
 .album-tools { position: relative; }
 .album-tools > summary { list-style: none; }
