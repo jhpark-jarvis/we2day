@@ -79,11 +79,13 @@ h1 { word-break: keep-all; font-size: 28px; font-weight: 500; line-height: 1.3; 
 h2 { font-size: 20px; font-weight: 500; line-height: 1.4; }
 h3 { font-size: 17px; font-weight: 500; line-height: 1.5; }
 button { appearance: none; color: var(--foreground); }
-.app-shell { max-width: 1100px; min-height: 100svh; margin: 0 auto; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr; }
-.app-header { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 18px; min-width: 0; min-height: 104px; padding: 16px 30px; border-bottom: 1px solid var(--line); }
+.app-shell { max-width: 1100px; min-height: 100svh; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: auto 1fr; }
+.app-header { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid; align-items: center; min-width: 0; min-height: 104px; padding: 16px 30px; border-bottom: 1px solid var(--line); }
+.app-header > .wordmark { grid-column: 1; justify-self: start; }
+.app-header > .page-title-slot { grid-column: 3; }
 .wordmark { display: inline-block; flex-shrink: 0; font-family: Arial, sans-serif; font-size: 25px; font-weight: 600; letter-spacing: -.065em; line-height: 1.2; }
 .app-main { grid-column: 1 / -1; grid-row: 2; min-width: 0; padding: 24px 30px 55px; }
-.app-navigation { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 7px; padding: 19px 25px; border-bottom: 1px solid var(--line); }
+.app-navigation { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 7px; padding: 19px 14px; }
 .app-navigation a { min-height: 44px; display: flex; align-items: center; gap: 7px; padding: 8px 15px; border-radius: 12px; color: var(--muted); }
 .app-navigation a[aria-current="page"] { color: var(--accent); background: var(--soft); }
 .skip-link { position: absolute; left: 12px; top: -100px; background: var(--surface); padding: 10px 16px; z-index: 3; }
@@ -311,7 +313,7 @@ button.plan-card { border-color: var(--control-border); }
 }
 @media(max-width:840px) {
   .app-shell { display: flex; flex-direction: column; }
-  .app-header { padding: 16px 21px; border-bottom: 1px solid var(--line); }
+  .app-header { display: flex; padding: 16px 21px; border-bottom: 1px solid var(--line); }
   .app-main { flex: 1; }
   .app-navigation { position: sticky; bottom: 0; display: flex; justify-content: space-around; gap: 4px; padding: 10px 12px max(10px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); border-bottom: 0; background: var(--background); margin-top: auto; z-index: 5; }
   .app-navigation a { flex: 1; flex-direction: column; min-width: 0; padding: 7px 8px; font-size: 11px; gap: 5px; }
@@ -328,8 +330,17 @@ button.plan-card { border-color: var(--control-border); }
 .report-workspace h3 { font-size: 17px; font-weight: 500; white-space: pre-wrap; overflow-wrap: anywhere; }
 .report-workspace > h2 { margin-top: 35px; }
 .today-workspace { max-width: 720px; margin: 0 auto; }
-.timeline-focus { padding: 22px 0; border-block: 1px solid var(--line); }
+.timeline-focus { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .timeline-focus p { margin-block: 12px; line-height: 1.8; }
+.timeline-step-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 16px; }
+.naver-handoff { padding-top: 12px; border-top: 1px solid var(--line); margin-top: 16px; }
+.handoff-actions, .section-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.handoff-actions .primary-button, .handoff-actions .icon-button { margin: 0; flex-shrink: 0; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.section-heading h2 { min-width: 0; }
+.section-actions { flex-shrink: 0; flex-wrap: nowrap; gap: 2px; }
+.visit-progress > .settings-hint { margin-top: 6px; }
+.date-filter { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: end; gap: 10px; margin-block: 16px 22px; }
 .timeline-choice { min-height: 44px; padding: 10px 14px; border: 1px solid var(--control-border); border-radius: 10px; background: var(--surface); color: var(--foreground); }
 .timeline-choice[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .day-timeline { list-style: none; padding: 0; margin: 24px 0; }

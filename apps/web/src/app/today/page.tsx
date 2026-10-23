@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { TodayWorkspace } from "@/components/today-workspace";
@@ -39,7 +40,7 @@ export default async function TodayPage({
           <p className="muted">방문할 장소를 순서대로 보고, 저장한 목적지로 바로 출발해요.</p>
         </div>
       </PageHeading>
-      <form className="calendar-toolbar" action="/today">
+      <form className="date-filter" action="/today">
         <div className="auth-field">
           <label htmlFor="timeline-date">살펴볼 날짜</label>
           <input
@@ -53,8 +54,8 @@ export default async function TodayPage({
             required
           />
         </div>
-        <button className="text-button" type="submit">
-          이 날짜 보기
+        <button className="icon-button" type="submit" aria-label="이 날짜 보기" title="날짜 조회">
+          <Search size={19} aria-hidden="true" />
         </button>
       </form>
       {plans.error && (

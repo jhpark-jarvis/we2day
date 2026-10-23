@@ -1,4 +1,5 @@
 "use client";
+import { ListRestart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { LoadingRegion } from "@/components/loading-region";
@@ -102,27 +103,35 @@ export function VisitProgressPanel({ plan, today }: { plan: DatePlan; today: str
   }
   return (
     <LoadingRegion busy={pending || (!loaded && !error)} label="방문 진행을 불러오는 중">
-      <section className="plan-review" aria-label="공동 방문 진행" aria-busy={pending}>
-        <h2>둘의 방문 진행</h2>
+      <section
+        className="plan-review visit-progress"
+        aria-label="공동 방문 진행"
+        aria-busy={pending}
+      >
+        <div className="section-heading">
+          <h2>둘의 방문 진행</h2>
+          <div className="section-actions">
+            <button
+              className="icon-button"
+              aria-label="최신 방문 진행 불러오기"
+              title="방문 진행 새로고침"
+              type="button"
+              disabled={pending || (!loaded && !error)}
+              onClick={() => load()}
+            >
+              <ListRestart size={19} aria-hidden="true" />
+            </button>
+            <RefreshButton
+              label="확정 플랜 새로고침"
+              pending={pending}
+              onClick={() => refreshPlan(() => router.refresh())}
+            />
+          </div>
+        </div>
         <p className="settings-hint">
           확정안 {plan.published_revision} · 직접 표시한 상태를 둘이 함께 봐요. 방문 완료도 다시
           예정으로 되돌릴 수 있어요.
         </p>
-        <div className="calendar-toolbar">
-          <button
-            className="text-button"
-            type="button"
-            disabled={pending || (!loaded && !error)}
-            onClick={() => load()}
-          >
-            최신 방문 진행 불러오기
-          </button>
-          <RefreshButton
-            label="확정 플랜 새로고침"
-            pending={pending}
-            onClick={() => refreshPlan(() => router.refresh())}
-          />
-        </div>
         {content && content.date > today && (
           <p className="settings-hint">방문 진행은 플랜 당일이나 지난 날짜에 표시할 수 있어요.</p>
         )}

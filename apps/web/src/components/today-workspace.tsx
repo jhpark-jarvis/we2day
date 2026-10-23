@@ -1,4 +1,5 @@
 "use client";
+import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
@@ -69,17 +70,17 @@ export function TodayWorkspace({
         <p className="eyebrow">확정한 하루 · {content.date}</p>
         <h2>{content.title}</h2>
         <p>
-          {content.transport || "교통수단 미정"} · 예산{" "}
-          {content.budget === null ? "미정" : `${content.budget.toLocaleString()}원`}
+          {content.transport || "교통수단 미정"}
+          {!!content.budget && ` · 예산 ${content.budget.toLocaleString()}원`}
         </p>
-        <p className="settings-hint">
-          {content.activities.length
-            ? `입력한 활동 비용 ${budget.known.toLocaleString()}원${budget.unknown ? ` + 비용 미정 ${budget.unknown}개` : ""}`
-            : "아직 활동이 없어요."}
-          {budget.total !== null && content.budget !== null && budget.total > content.budget
-            ? " · 계획 예산을 초과해요."
-            : ""}
-        </p>
+        {budget.known > 0 && (
+          <p className="settings-hint">
+            입력한 활동 비용 {budget.known.toLocaleString()}원
+            {budget.total !== null && content.budget && budget.total > content.budget
+              ? " · 계획 예산을 초과해요."
+              : ""}
+          </p>
+        )}
         {JSON.stringify(plan.content) !== JSON.stringify(content) && (
           <p className="settings-hint">
             수정 중인 변경안이 있어요. 여기에는 마지막 확정 내용을 표시해요.
@@ -94,47 +95,62 @@ export function TodayWorkspace({
           <h2>{current.title}</h2>
           <LocalAppointmentTime date={content.date} time={current.time} zones={zones} />
           <p className="preserve-lines">{current.place || "장소 없는 활동"}</p>
-          {current.place && (
-            <button type="button" className="text-button" onClick={() => copyPlace(current.place)}>
-              이 장소 이름 복사
-            </button>
-          )}
-          <p className="preserve-lines">{current.note || "추가 메모가 없어요."}</p>
+          {current.note && <p className="preserve-lines">{current.note}</p>}
           <NaverAppHandoff
             key={`${plan.id}:${plan.published_revision}:${step}`}
             place={current.place}
             site={site}
+            extraAction={
+              current.place && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="이 장소 이름 복사"
+                  title="장소 복사"
+                  onClick={() => copyPlace(current.place)}
+                >
+                  <Copy size={18} aria-hidden="true" />
+                </button>
+              )
+            }
           />
-          <div className="calendar-toolbar">
+          {notice && (
+            <p role="status" className="settings-hint">
+              {notice}
+            </p>
+          )}
+          <nav className="timeline-step-navigation" aria-label="활동 이동">
             <button
               type="button"
-              className="text-button"
+              className="icon-button"
+              aria-label="이전 활동 보기"
+              title="이전 활동"
               disabled={step === 0}
               onClick={() => {
                 setStep(step - 1);
                 setNotice("");
               }}
             >
-              이전 활동 보기
+              <ChevronLeft size={21} aria-hidden="true" />
             </button>
+            <span className="muted" aria-hidden="true">
+              {step + 1} / {content.activities.length}
+            </span>
             <button
               type="button"
-              className="text-button"
+              className="icon-button"
+              aria-label="다음 활동 보기"
+              title="다음 활동"
               disabled={step === content.activities.length - 1}
               onClick={() => {
                 setStep(step + 1);
                 setNotice("");
               }}
             >
-              다음 활동 보기
+              <ChevronRight size={21} aria-hidden="true" />
             </button>
-          </div>
+          </nav>
         </section>
-      )}
-      {notice && (
-        <p role="status" className="settings-hint">
-          {notice}
-        </p>
       )}
       <p className="settings-hint">
         활동을 살펴보거나 장소를 복사해도 방문 완료로 기록되지 않아요.
@@ -155,8 +171,8 @@ export function TodayWorkspace({
               <span>{a.time || "시간 미정"}</span>
               <strong>{a.title}</strong>
               <small>
-                {a.place || "장소 없는 활동"} ·{" "}
-                {a.cost === null ? "비용 미정" : `${a.cost.toLocaleString()}원`}
+                {a.place || "장소 없는 활동"}
+                {!!a.cost && ` · ${a.cost.toLocaleString()}원`}
               </small>
             </button>
           </li>

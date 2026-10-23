@@ -440,7 +440,7 @@ function PlanEditor({
                   </div>
                   <div className="auth-field">
                     <label htmlFor={`activity-${index}-cost`}>
-                      활동 {index + 1} 예상 비용 (원)
+                      활동 {index + 1} 예상 비용 (원, 선택)
                     </label>
                     <input
                       id={`activity-${index}-cost`}

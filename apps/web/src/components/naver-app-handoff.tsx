@@ -1,17 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Settings2 } from "lucide-react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { naverAppLinks, type RouteMode } from "@/lib/naver-app";
 
 export function NaverAppHandoff({
   place,
   site,
   compact = false,
+  extraAction,
 }: {
   place: string;
   site: string;
   compact?: boolean;
+  extraAction?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const optionsId = useId();
   const [platform, setPlatform] = useState<"ios" | "android">("ios");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -37,30 +41,36 @@ export function NaverAppHandoff({
       <p className="settings-hint">이 활동에는 장소가 없어요. 플랜에서 장소를 직접 적어 주세요.</p>
     );
   return (
-    <section aria-label="네이버 지도 앱 이동">
-      {search && (
-        <a
-          className="primary-button"
-          href={search[platform]}
-          rel="noreferrer"
-          referrerPolicy="no-referrer"
+    <section className="naver-handoff" aria-label="네이버 지도 앱 이동">
+      <div className="handoff-actions">
+        {search && (
+          <a
+            className="primary-button"
+            href={search[platform]}
+            rel="noreferrer"
+            referrerPolicy="no-referrer"
+          >
+            네이버 지도
+          </a>
+        )}
+        {extraAction}
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="앱 연결 옵션"
+          title="앱 연결 옵션"
+          aria-expanded={open}
+          aria-controls={optionsId}
+          onClick={() => setOpen(!open)}
         >
-          네이버 지도
-        </a>
-      )}
+          <Settings2 size={19} aria-hidden="true" />
+        </button>
+      </div>
       <p className="settings-hint">
         저장한 장소명·주소로 지도 앱을 열어요. 목적지를 확인하고 운전 길찾기를 선택해 주세요.
       </p>
-      <button
-        type="button"
-        className="text-button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        앱 연결 옵션
-      </button>
       {open && (
-        <div className="plan-review">
+        <div className="plan-review" id={optionsId}>
           <h3>선택한 장소 · {place}</h3>
           <p className="settings-hint">
             앱 열기를 누르면 장소 이름과 직접 입력한 목적지 좌표가 네이버 지도 앱으로 전달돼요. 이
