@@ -603,3 +603,9 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 .wordmark-accent { color: #f0a57e; }
 
 @media (max-width: 840px) { .app-header { gap: 14px; } }
+
+/* Keep the title and date readable beside the compact card actions. */
+.next-appointment { grid-auto-flow: row dense; }
+.next-appointment > h3, .next-appointment > p { grid-column: 1 / -1; }
+
+.next-appointment > a { grid-column: 2; }

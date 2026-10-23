@@ -14,7 +14,7 @@ test("home distinguishes recorded anniversaries and places accessible refresh be
   await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
   await page.goto("/");
   const summary = page.getByRole("region", { name: "디데이와 기념일 요약", exact: true });
-  await expect(summary).toContainText("함께 기억할 날을 등록해 보세요");
+  await expect(summary).toContainText("기념일을 등록해 보세요");
   await summary.getByRole("link", { name: "기념일 관리", exact: true }).click();
   await page.getByRole("button", { name: "기념일 추가하기", exact: true }).click();
   await page.getByLabel("종류").selectOption("custom");
