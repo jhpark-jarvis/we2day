@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { saveReport } from "@/app/actions/reports";
+import { readReports, saveReport } from "@/app/actions/reports";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
@@ -71,7 +71,7 @@ export function ReportWorkspace({
       } else {
         setError(
           result.status === 409
-            ? "다른 화면에서 회고가 바뀌었어요. 입력을 확인한 뒤 최신 페이지를 불러와 주세요."
+            ? "다른 화면에서 회고가 바뀌었어요. 입력을 확인한 뒤 저장된 최신 회고를 불러와 주세요."
             : result.error,
         );
         setConflict(result.status === 409);
@@ -246,26 +246,55 @@ export function ReportWorkspace({
       {newerOwn && (
         <p role="alert" className="note-panel">
           다른 화면에서 저장한 최신 회고가 있어요. 작성 중인 내용은 유지했어요. 필요한 내용을 따로
-          보관한 뒤 최신 페이지를 불러와 주세요.
+          보관한 뒤 저장된 최신 회고를 불러와 주세요.
         </p>
       )}
       {(conflict || newerOwn) && (
-        <a className="text-button" href={`/plans/${plan.id}/report`}>
-          작성 내용을 버리고 최신 페이지 불러오기
-        </a>
+        <button
+          type="button"
+          className="text-button"
+          disabled={pending || refreshing}
+          onClick={() => {
+            if (!window.confirm("작성 중인 내용을 버리고 저장된 최신 회고를 불러올까요?")) return;
+            startTransition(async () => {
+              try {
+                const result = await readReports(plan.id);
+                const latest = result.data?.find((item) => item.author_id === userId);
+                if (!latest) {
+                  setError(result.error || "최신 회고를 불러오지 못했어요. 작성 내용은 유지돼요.");
+                  return;
+                }
+                setReport(latest);
+                setContent(latest.content);
+                setVisits(latest.content.visits.join("\n"));
+                setConflict(false);
+                setError("");
+                setNotice("저장된 최신 회고를 불러왔어요.");
+                request.current = null;
+                router.refresh();
+              } catch {
+                setError("최신 회고를 불러오지 못했어요. 작성 내용은 유지돼요.");
+              }
+            });
+          }}
+        >
+          작성 내용을 버리고 최신 회고 불러오기
+        </button>
       )}
       {notice && (
         <p role="status" className="settings-hint">
           {notice}
         </p>
       )}
-      <h2>상대가 공유한 회고</h2>
-      <RefreshButton
-        label="회고 새로고침"
-        pending={refreshing}
-        disabled={pending}
-        onClick={() => startRefresh(() => router.refresh())}
-      />
+      <div className="section-heading">
+        <h2>상대가 공유한 회고</h2>
+        <RefreshButton
+          label="회고 새로고침"
+          pending={refreshing}
+          disabled={pending}
+          onClick={() => startRefresh(() => router.refresh())}
+        />
+      </div>
       <p className="settings-hint">상대의 공유 내용을 갱신해요. 작성 중인 내 내용은 유지해요.</p>
       {initialReports
         .filter((item) => item.author_id !== userId)

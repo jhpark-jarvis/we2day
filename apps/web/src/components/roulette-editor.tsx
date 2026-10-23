@@ -84,11 +84,15 @@ export function RouletteEditor({
             disabled={pending}
             onClick={() =>
               start(async () => {
-                const result = await readRouletteDraws(id);
-                if (result.data) {
-                  setHistory(result.data);
-                  setError("");
-                } else setError(result.error);
+                try {
+                  const result = await readRouletteDraws(id);
+                  if (result.data) {
+                    setHistory(result.data);
+                    setError("");
+                  } else setError(result.error);
+                } catch {
+                  setError("결과를 불러오지 못했어요. 작성 중인 후보는 유지돼요.");
+                }
               })
             }
           >

@@ -18,7 +18,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     return (
       <section>
         <PageHeading>
-          <h1>데이트 리포트</h1>
+          <h1>데이트 회고</h1>
         </PageHeading>
         <p role="alert">{plan.error || user.error}</p>
         <Link href="/plans" className="text-button">
