@@ -601,3 +601,5 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 
 .wordmark { font-family: "Arial Black", Arial, sans-serif; font-weight: 900; letter-spacing: -.07em; color: #422b21; }
 .wordmark-accent { color: #f0a57e; }
+
+@media (max-width: 840px) { .app-header { gap: 14px; } }

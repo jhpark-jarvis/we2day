@@ -111,13 +111,11 @@ export function QuestionSearch({ start, end }: { start: string; end: string }) {
           )}
           <div className="plan-list">
             {result.items.map((question) => (
-              <article className="plan-card" key={question.id}>
+              <Link className="plan-card" key={question.id} href={`/questions/${question.id}`}>
                 <p className="muted">{question.date}</p>
                 <p className="preserve-lines">{question.prompt}</p>
-                <Link className="text-button" href={`/questions/${question.id}`}>
-                  답변 쓰기·보기
-                </Link>
-              </article>
+                <span className="card-action-hint">답변 쓰기·보기</span>
+              </Link>
             ))}
           </div>
           <div className="calendar-toolbar">

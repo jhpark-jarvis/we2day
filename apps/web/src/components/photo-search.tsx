@@ -149,6 +149,23 @@ export function PhotoSearch({
           <p className="settings-hint">
             {submitted.start_date} ~ {submitted.end_date} · 이번 페이지 {result.items.length}장
           </p>
+          <p className="settings-hint">
+            <span className="sr-only">적용한 상세 필터: </span>
+            <span className="status-chip">
+              {submitted.field === "caption"
+                ? "사진 한마디"
+                : submitted.field === "filename"
+                  ? "원래 파일명"
+                  : "기기 정보"}
+            </span>{" "}
+            <span className="status-chip">
+              {submitted.uploader === "all"
+                ? "둘 다"
+                : submitted.uploader === "mine"
+                  ? names.mine || "내 사진"
+                  : names.partner || "상대 사진"}
+            </span>
+          </p>
           {(changed || error) && (
             <p className="settings-hint">
               아래는 이전에 검색한 결과예요. 새 조건으로 다시 검색해 주세요.
