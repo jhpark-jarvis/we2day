@@ -143,6 +143,16 @@ def review(web, api, production=False, compose=False, worker=None):
         )
     except ValueError:
         add("server_api_url", False)
+    enabled = api.get("WE2DAY_NAVER_SEARCH_ENABLED", "false").lower()
+    add("search_enabled_value", enabled in {"true", "false", "1", "0"})
+    if enabled in {"true", "1"}:
+        add(
+            "search_credentials_present",
+            bool(
+                api.get("WE2DAY_NAVER_SEARCH_CLIENT_ID")
+                and api.get("WE2DAY_NAVER_SEARCH_CLIENT_SECRET")
+            ),
+        )
     add(
         "maps_optional_configuration",
         bool(re.fullmatch(r"[a-zA-Z0-9_-]{3,128}", web.get("WE2DAY_NAVER_MAPS_CLIENT_ID", ""))),

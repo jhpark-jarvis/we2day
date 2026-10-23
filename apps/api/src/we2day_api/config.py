@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     push_automatic_enabled: bool = False
     push_private_key: str | None = Field(default=None, repr=False)
     push_subject: str | None = Field(default=None, repr=False)
+    naver_search_enabled: bool = False
+    naver_search_client_id: str | None = Field(default=None, repr=False)
+    naver_search_client_secret: str | None = Field(default=None, repr=False)
 
 
 @lru_cache
