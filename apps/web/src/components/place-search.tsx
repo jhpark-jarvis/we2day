@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
 import { type PlaceResults, placeText, safePlaceLink, selectedPlaceText } from "@/lib/places";
 
@@ -8,24 +9,41 @@ export function PlaceSearch({
   initialQuery = "",
   label = "네이버 장소 검색",
   onSelect,
+  children,
+  compact = false,
 }: {
   initialQuery?: string;
   label?: string;
   onSelect?: (place: string) => void;
+  children?: ReactNode;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
-    <section className="place-search" aria-label={label}>
+    <section className={`place-search${compact ? " place-search-inline" : ""}`} aria-label={label}>
       <div className="place-search-actions">
+        {children && <div className="place-search-context">{children}</div>}
         <button
           type="button"
-          className="text-button"
+          className={compact ? "icon-button" : "text-button"}
+          aria-label={open ? "검색 닫기" : "장소 검색"}
+          title={open ? "검색 닫기" : "장소 검색"}
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen(!open)}
         >
-          {open ? "검색 닫기" : "장소 검색"}
+          {compact ? (
+            open ? (
+              <X size={18} aria-hidden="true" />
+            ) : (
+              <Search size={18} aria-hidden="true" />
+            )
+          ) : open ? (
+            "검색 닫기"
+          ) : (
+            "장소 검색"
+          )}
         </button>
       </div>
       <div id={id}>

@@ -143,7 +143,14 @@ button { appearance: none; color: var(--foreground); }
 .photo-story-caption > svg { color: var(--muted); }
 .preview-label { color: var(--muted); font-size: 11px; margin-top: 18px; }
 .preview-label a { text-decoration: underline; text-underline-offset: 3px; }
-.appointment-detail { max-width: 640px; margin: 0 auto; }
+.appointment-detail { width: 100%; min-width: 0; max-width: 640px; margin: 0 auto; }
+.appointment-information { min-width: 0; margin-block: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.appointment-information h2 { margin: 0; font-size: 17px; font-weight: 500; }
+.appointment-information .detail-list { margin-block: 8px; }
+.appointment-place { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.appointment-place svg { flex-shrink: 0; }
+.appointment-place span { min-width: 0; overflow-wrap: anywhere; }
+
 .text-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 44px; padding: 9px 13px; margin-block: 4px; border: 1px solid var(--control-border); border-radius: 10px; background: var(--surface); color: var(--foreground); font-size: 13px; font-weight: 500; line-height: 1.5; text-align: center; text-decoration: none; vertical-align: middle; overflow-wrap: anywhere; }
 .text-button + .text-button, .primary-button + .text-button { margin-inline-start: 8px; }
 .calendar-toolbar > .text-button { margin: 0; }
@@ -200,7 +207,7 @@ button { appearance: none; color: var(--foreground); }
 .auth-button:hover { border-color: var(--accent); }
 .auth-panel p { word-break: keep-all; }
 .username-login { display: grid; gap: 18px; margin: 28px 0 22px; }
-.auth-field { display: grid; gap: 7px; min-width: 0; }
+.auth-field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; }
 .auth-field label { font-size: 13px; }
 .auth-field input { width: 100%; min-width: 0; min-height: 48px; border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; background: var(--surface); color: var(--foreground); }
 .auth-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -219,6 +226,10 @@ button { appearance: none; color: var(--foreground); }
 .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 44px; padding: 10px 16px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 500; text-align: center; overflow-wrap: anywhere; }
 .appointment-editor { max-width: 560px; margin: 0 auto; }
 .place-search { margin: 20px 0; padding: 14px 0; border-block: 1px solid var(--line); }
+.place-search-inline { width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; }
+.place-search-context { flex: 1; min-width: 0; }
+.place-search-inline .place-search-actions { flex-wrap: nowrap; gap: 4px; }
+.place-search-inline .place-search-panel { margin-top: 10px; }
 .place-search-panel { display: grid; gap: 14px; margin-top: 18px; }
 .place-search-panel h2 { font-size: 17px; font-weight: 500; }
 .place-search-panel .muted { font-size: 12px; line-height: 1.7; }
@@ -468,12 +479,16 @@ button.plan-card { border-color: var(--control-border); }
 .map-role { min-width: 0; flex-wrap: wrap; }
 .map-role label, .annual-option { min-height: 44px; }
 .check-field input, .annual-option input { flex-shrink: 0; }
-input, textarea, select { scroll-margin-block: 100px; }
+form, fieldset { min-inline-size: 0; max-inline-size: 100%; }
+input, textarea, select { scroll-margin-block: 100px; max-inline-size: 100%; }
+input:not([type="checkbox"]):not([type="radio"]), textarea, select { min-inline-size: 0; }
+.auth-field > *, .form-columns > *, .plan-basics > *, .coordinate-fields > * { min-width: 0; }
+input[type="date"], input[type="time"], input[type="month"] { appearance: none; display: block; }
+input::-webkit-date-and-time-value { text-align: start; min-height: 1.5em; }
+input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 html { scroll-padding-bottom: 100px; }
 
 @media (max-width: 640px) {
-  /* A 16px editable font avoids Safari's automatic focus zoom. */
-  .app-main input:not([type="checkbox"]):not([type="radio"]), .app-main select, .app-main textarea { font-size: 16px; }
   .app-main input[type="date"], .app-main input[type="time"], .app-main input[type="month"] { display: block; min-inline-size: 0; max-inline-size: 100%; }
   .app-header { padding-top: max(23px, env(safe-area-inset-top)); padding-left: max(21px, env(safe-area-inset-left)); padding-right: max(21px, env(safe-area-inset-right)); }
   .app-main { padding-left: max(21px, env(safe-area-inset-left)); padding-right: max(21px, env(safe-area-inset-right)); }
@@ -528,3 +543,9 @@ button[aria-busy="true"]::after { content: ""; position: absolute; inset: 0; mar
 /* WebKit can lose inherited color variables on native selects after navigation. */
 .auth-field select, .record-search-fields select { border: 1px solid #e7ded2; background-color: #fffdf9; color: #46392f; }
 html[data-theme="white"] :is(.auth-field, .record-search-fields) select { border-color: #e4e7e1; background-color: #ffffff; color: #30342f; }
+
+/* Keep editable text at iOS's non-zooming size in portrait and landscape.
+   Pinch zoom remains available through the unchanged viewport metadata. */
+@media (max-width: 840px), (hover: none) and (pointer: coarse) {
+  .app-shell input:not([type="checkbox"]):not([type="radio"]), .app-shell select, .app-shell textarea { font-size: 16px; }
+}

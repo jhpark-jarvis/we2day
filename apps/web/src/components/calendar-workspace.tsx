@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Images,
   MapPin,
+  Pencil,
   RefreshCw,
 } from "lucide-react";
 import Image from "next/image";
@@ -267,25 +268,58 @@ export function CalendarWorkspace({
             height={640}
           />
         )}
-        <dl className="detail-list">
-          <div>
-            <dt>함께</dt>
-            <dd>
-              {preview
-                ? "가상 사용자 1 · 가상 사용자 2"
-                : participantNames.join(" · ") || "이름을 불러오지 못했어요"}
-            </dd>
-          </div>
-          <div>
-            <dt>장소</dt>
-            <dd>
-              <MapPin size={14} aria-hidden="true" />
-              {detail.photo ? "강변 산책길 (예시)" : detail.place || "아직 정하지 않았어요"}
-            </dd>
-          </div>
-        </dl>
-        <p className="note-panel">{detail.note}</p>
-        {!preview && <PlaceSearch initialQuery={detail.place || ""} />}
+        <section className="appointment-information" aria-label="약속 정보">
+          <header className="section-heading">
+            <h2>약속 정보</h2>
+            {!preview && (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="약속 수정하기"
+                title="약속 수정하기"
+                onClick={() =>
+                  setEditing({
+                    appointment: savedEvents.find((event) => event.id === detail.id),
+                    requestId: crypto.randomUUID(),
+                  })
+                }
+              >
+                <Pencil size={18} aria-hidden="true" />
+              </button>
+            )}
+          </header>
+          <dl className="detail-list">
+            <div>
+              <dt>함께</dt>
+              <dd>
+                {preview
+                  ? "가상 사용자 1 · 가상 사용자 2"
+                  : participantNames.join(" · ") || "이름을 불러오지 못했어요"}
+              </dd>
+            </div>
+            <div>
+              <dt>장소</dt>
+              <dd>
+                {preview ? (
+                  <span className="appointment-place">
+                    <MapPin size={14} aria-hidden="true" />
+                    <span>
+                      {detail.photo ? "강변 산책길 (예시)" : detail.place || "아직 정하지 않았어요"}
+                    </span>
+                  </span>
+                ) : (
+                  <PlaceSearch initialQuery={detail.place || ""} compact>
+                    <span className="appointment-place">
+                      <MapPin size={14} aria-hidden="true" />
+                      <span>{detail.place || "아직 정하지 않았어요"}</span>
+                    </span>
+                  </PlaceSearch>
+                )}
+              </dd>
+            </div>
+          </dl>
+          {detail.note && <p className="note-panel">{detail.note}</p>}
+        </section>
         {detail.photo && (
           <details className="photo-metadata">
             <summary>사진 정보</summary>
@@ -305,22 +339,7 @@ export function CalendarWorkspace({
             </dl>
           </details>
         )}
-        {preview ? (
-          <p className="preview-label">화면 미리보기 · 저장되지 않는 예시 데이터</p>
-        ) : (
-          <button
-            type="button"
-            className="text-button"
-            onClick={() =>
-              setEditing({
-                appointment: savedEvents.find((event) => event.id === detail.id),
-                requestId: crypto.randomUUID(),
-              })
-            }
-          >
-            약속 수정하기
-          </button>
-        )}
+        {preview && <p className="preview-label">화면 미리보기 · 저장되지 않는 예시 데이터</p>}
       </section>
     );
 
