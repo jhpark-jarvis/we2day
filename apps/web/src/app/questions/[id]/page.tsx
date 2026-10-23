@@ -2,6 +2,7 @@ import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { AnswerEditor, AnswerRefresh } from "@/components/question-forms";
 import { callApi } from "@/lib/api";
+import type { ProfileView } from "@/lib/profiles";
 import type { QuestionView } from "@/lib/questions";
 export default async function QuestionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +20,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
       </section>
     );
   const { question, mine, partner } = result.data;
+  const profiles = await callApi<ProfileView>("/profiles");
   return (
     <section className="today-workspace">
       <Link className="text-button" href={`/questions?date=${question.date}`}>
@@ -31,13 +33,16 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
       </PageHeading>
       <h2 className="preserve-lines">{question.prompt}</h2>
       <AnswerEditor id={id} initial={mine} />
-      <h2>상대가 공유한 답변</h2>
+      <div className="section-heading">
+        <h2>{profiles.data?.partner?.display_name || "상대"}님의 공유 답변</h2>
+        <AnswerRefresh />
+      </div>
       {partner ? (
         <p className="preserve-lines">{partner.content}</p>
       ) : (
         <p className="muted">지금 볼 수 있는 공유 답변이 없어요.</p>
       )}
-      <AnswerRefresh />
+
       <p className="settings-hint">
         미응답·건너뛰기는 상대에게 표시하지 않아요. 공유를 철회해도 이미 읽거나 복사한 내용까지
         회수하지는 못해요.

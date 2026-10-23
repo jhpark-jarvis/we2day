@@ -2,12 +2,17 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { createQuestion, saveAnswer } from "@/app/actions/together";
+import { RefreshButton } from "@/components/workspace-controls";
 import type { Answer } from "@/lib/questions";
 export function AnswerRefresh() {
+  const router = useRouter();
+  const [pending, start] = useTransition();
   return (
-    <button type="button" className="text-button" onClick={() => window.location.reload()}>
-      작성 내용을 버리고 공유 답변 새로고침
-    </button>
+    <RefreshButton
+      label="공유 답변 새로고침"
+      pending={pending}
+      onClick={() => start(() => router.refresh())}
+    />
   );
 }
 
@@ -59,7 +64,14 @@ export function QuestionForm({ date }: { date: string }) {
           <p role="alert" className="error-message">
             {error}
           </p>
-          <button className="text-button" type="button" onClick={() => window.location.reload()}>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => {
+              if (window.confirm("작성 중인 내용을 버리고 저장된 내용을 불러올까요?"))
+                window.location.reload();
+            }}
+          >
             작성 내용을 버리고 질문 목록 새로고침
           </button>
         </>
@@ -102,7 +114,9 @@ export function AnswerEditor({ id, initial }: { id: string; initial: Answer | nu
   }
   return (
     <section className="report-workspace">
-      <h2>나의 답변</h2>
+      <h2>
+        내 답변 <span className="status-chip">{mine?.shared ? "공유 중" : "나만 보기"}</span>
+      </h2>
       <p className="settings-hint">본인만 수정할 수 있어요. 직접 공유한 답변만 상대에게 보여요.</p>
       {mine?.skipped && <p>건너뛴 질문이에요. 저장하면 답변을 이어갈 수 있어요.</p>}
       <fieldset className="meeting-fields" disabled={pending || conflict}>
@@ -138,7 +152,14 @@ export function AnswerEditor({ id, initial }: { id: string; initial: Answer | nu
         </p>
       )}
       {conflict && (
-        <button type="button" className="text-button" onClick={() => window.location.reload()}>
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            if (window.confirm("작성 중인 내용을 버리고 저장된 내용을 불러올까요?"))
+              window.location.reload();
+          }}
+        >
           작성 내용을 버리고 최신 답변 불러오기
         </button>
       )}

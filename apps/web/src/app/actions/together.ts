@@ -84,3 +84,8 @@ export async function drawRoulette(id: string, version: number, requestId: strin
   if (result.data) revalidatePath(`/roulette/${id}`);
   return result;
 }
+
+export async function readRouletteDraws(id: string) {
+  if (!uuid(id)) return { data: null, status: 422, error: "룰렛을 확인해 주세요." };
+  return callApi<RouletteDraw[]>(`/roulette/${id}/draws?offset=0`);
+}

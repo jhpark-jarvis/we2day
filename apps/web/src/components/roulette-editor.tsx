@@ -1,17 +1,18 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { drawRoulette, saveRoulette } from "@/app/actions/together";
+import { drawRoulette, readRouletteDraws, saveRoulette } from "@/app/actions/together";
 import type { RouletteDraw, RouletteWheel } from "@/lib/roulette";
 import { zonedTimestamp } from "@/lib/timezones";
 export function RouletteEditor({
-  wheel,
+  wheel: initialWheel,
   draws,
 }: {
   wheel: RouletteWheel | null;
   draws: RouletteDraw[];
 }) {
   const router = useRouter();
+  const [wheel, setWheel] = useState(initialWheel);
   const [id] = useState(() => wheel?.id || crypto.randomUUID());
   const [title, setTitle] = useState(wheel?.title || "");
   const [lines, setLines] = useState(wheel?.candidates.join("\n") || "");
@@ -52,72 +53,6 @@ export function RouletteEditor({
   }
   return (
     <div className="plan-editor">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const signature = JSON.stringify([title, candidates, archived, wheel?.version || 0]);
-          if (request.current?.signature !== signature)
-            request.current = { signature, id: crypto.randomUUID() };
-          const requestId = request.current.id;
-          start(async () => {
-            const result = await saveRoulette(
-              id,
-              title,
-              candidates,
-              archived,
-              wheel?.version || 0,
-              requestId,
-            );
-            if (result.data) {
-              setError("");
-              router.push(`/roulette/${id}`);
-              router.refresh();
-            } else {
-              setError(result.error);
-              setConflict(result.status === 409);
-            }
-          });
-        }}
-      >
-        <fieldset className="meeting-fields" disabled={pending || conflict}>
-          <div className="auth-field">
-            <label htmlFor="roulette-title">룰렛 이름</label>
-            <input
-              id="roulette-title"
-              required
-              maxLength={100}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="auth-field">
-            <label htmlFor="roulette-candidates">후보 (한 줄에 하나, 2~20개)</label>
-            <textarea
-              id="roulette-candidates"
-              required
-              rows={6}
-              maxLength={2200}
-              value={lines}
-              onChange={(e) => setLines(e.target.value)}
-            />
-          </div>
-          <p className="settings-hint">
-            후보는 각각 100자까지, 같은 이름은 한 번만 적어요. 수정 후 저장해야 새 후보로 뽑을 수
-            있어요.
-          </p>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={archived}
-              onChange={(e) => setArchived(e.target.checked)}
-            />
-            룰렛 보관 (해제하면 복원)
-          </label>
-          <button className="primary-button" type="submit">
-            룰렛 저장
-          </button>
-        </fieldset>
-      </form>
       {wheel && (
         <section aria-label="저장된 후보 뽑기">
           <RouletteDisc candidates={wheel.candidates} />
@@ -147,12 +82,90 @@ export function RouletteEditor({
             type="button"
             className="text-button"
             disabled={pending}
-            onClick={() => window.location.reload()}
+            onClick={() =>
+              start(async () => {
+                const result = await readRouletteDraws(id);
+                if (result.data) {
+                  setHistory(result.data);
+                  setError("");
+                } else setError(result.error);
+              })
+            }
           >
-            작성 내용을 버리고 최신 결과 불러오기
+            최신 결과 불러오기
           </button>
         </section>
       )}
+      <details className="editor-disclosure" open={!wheel}>
+        <summary>{wheel ? "후보 수정" : "룰렛 작성"}</summary>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const signature = JSON.stringify([title, candidates, archived, wheel?.version || 0]);
+            if (request.current?.signature !== signature)
+              request.current = { signature, id: crypto.randomUUID() };
+            const requestId = request.current.id;
+            start(async () => {
+              const result = await saveRoulette(
+                id,
+                title,
+                candidates,
+                archived,
+                wheel?.version || 0,
+                requestId,
+              );
+              if (result.data) {
+                setWheel(result.data);
+                setError("");
+                router.push(`/roulette/${id}`);
+                router.refresh();
+              } else {
+                setError(result.error);
+                setConflict(result.status === 409);
+              }
+            });
+          }}
+        >
+          <fieldset className="meeting-fields" disabled={pending || conflict}>
+            <div className="auth-field">
+              <label htmlFor="roulette-title">룰렛 이름</label>
+              <input
+                id="roulette-title"
+                required
+                maxLength={100}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            <div className="auth-field">
+              <label htmlFor="roulette-candidates">후보 (한 줄에 하나, 2~20개)</label>
+              <textarea
+                id="roulette-candidates"
+                required
+                rows={6}
+                maxLength={2200}
+                value={lines}
+                onChange={(e) => setLines(e.target.value)}
+              />
+            </div>
+            <p className="settings-hint">
+              후보는 각각 100자까지, 같은 이름은 한 번만 적어요. 수정 후 저장해야 새 후보로 뽑을 수
+              있어요.
+            </p>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={archived}
+                onChange={(e) => setArchived(e.target.checked)}
+              />
+              룰렛 보관 (해제하면 복원)
+            </label>
+            <button className="primary-button" type="submit">
+              룰렛 저장
+            </button>
+          </fieldset>
+        </form>
+      </details>
       {error && (
         <p role="alert" className="error-message">
           {error}
@@ -160,7 +173,14 @@ export function RouletteEditor({
         </p>
       )}
       {conflict && (
-        <button className="text-button" type="button" onClick={() => window.location.reload()}>
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => {
+            if (window.confirm("작성 중인 후보를 버리고 저장된 내용을 불러올까요?"))
+              window.location.reload();
+          }}
+        >
           작성 내용을 버리고 최신 룰렛 불러오기
         </button>
       )}

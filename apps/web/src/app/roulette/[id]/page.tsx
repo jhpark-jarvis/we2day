@@ -42,11 +42,7 @@ export default async function RouletteDetail({
           {draws.error}
         </p>
       )}
-      <RouletteEditor
-        key={`${id}:${wheel.data.version}:${offset}`}
-        wheel={wheel.data}
-        draws={draws.data || []}
-      />
+      <RouletteEditor key={`${id}:${offset}`} wheel={wheel.data} draws={draws.data || []} />
       {offset > 0 && (
         <Link className="text-button" href={`/roulette/${id}`}>
           최근 결과로
