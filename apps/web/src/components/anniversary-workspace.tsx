@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { AnniversaryForm } from "@/components/anniversary-form";
 import { useAnniversaryDay } from "@/components/anniversary-summary";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import { type Anniversary, type AnniversaryList, countdown, kinds } from "@/lib/anniversaries";
@@ -43,13 +44,13 @@ export function AnniversaryWorkspace({
     );
   return (
     <>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR DAYS</p>
           <h1>우리의 기념일</h1>
           <p className="muted">함께한 시간과 앞으로의 특별한 날.</p>
         </div>
-      </header>
+      </PageHeading>
       <div className="calendar-toolbar">
         {data && (
           <button

@@ -15,6 +15,7 @@ import { AppointmentForm } from "@/components/appointment-form";
 import { LoadingRegion } from "@/components/loading-region";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
 import { MeetingDayEditor } from "@/components/meeting-day";
+import { PageHeading } from "@/components/page-heading";
 import { PhotoStory } from "@/components/photo-story";
 import { PlaceSearch } from "@/components/place-search";
 import Link from "@/components/progress-link";
@@ -247,11 +248,13 @@ export function CalendarWorkspace({
           <ArrowLeft size={16} aria-hidden="true" />
           일정으로
         </button>
-        <p className="eyebrow">{detail.photo ? "OUR LITTLE MEMORY" : "OUR NEXT PLAN"}</p>
-        <h1>{detail.title}</h1>
-        <p className="muted">
-          {detail.date.replaceAll("-", ".")} · {detail.time}
-        </p>
+        <PageHeading>
+          <p className="eyebrow">{detail.photo ? "OUR LITTLE MEMORY" : "OUR NEXT PLAN"}</p>
+          <h1>{detail.title}</h1>
+          <p className="muted">
+            {detail.date.replaceAll("-", ".")} · {detail.time}
+          </p>
+        </PageHeading>
         {!preview && <LocalAppointmentTime date={detail.date} time={detail.time} zones={zones} />}
         {detail.photo && (
           <Image
@@ -317,14 +320,14 @@ export function CalendarWorkspace({
 
   return (
     <>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR LITTLE PLANS</p>
           <h1>함께할 날들</h1>
           <p className="muted">사소한 약속도 놓치지 않도록.</p>
         </div>
         {preview && <span className="preview-badge">미리보기</span>}
-      </header>
+      </PageHeading>
       {!preview && (
         <div className="calendar-toolbar">
           {status === "ready" ? (

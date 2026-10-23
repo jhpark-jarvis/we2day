@@ -1,4 +1,5 @@
 import { NextAppointment } from "@/components/next-appointment";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { TimezoneSettings } from "@/components/timezone-settings";
 import { callApi } from "@/lib/api";
@@ -21,9 +22,11 @@ export default async function TimezonesPage() {
       <Link className="text-button" href="/settings">
         ← 설정으로
       </Link>
-      <p className="eyebrow">OUR LOCAL TIME</p>
-      <h1>각자의 시간대</h1>
-      <p className="muted">일정은 한국 시간으로 유지하고 현지 시각을 함께 봐요.</p>
+      <PageHeading>
+        <p className="eyebrow">OUR LOCAL TIME</p>
+        <h1>각자의 시간대</h1>
+        <p className="muted">일정은 한국 시간으로 유지하고 현지 시각을 함께 봐요.</p>
+      </PageHeading>
       {result.data && (
         <NextAppointment data={next?.data || null} error={next?.error || ""} zones={result.data} />
       )}

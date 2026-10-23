@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RouletteEditor } from "@/components/roulette-editor";
 import { callApi } from "@/lib/api";
@@ -21,7 +22,9 @@ export default async function RoulettePage({
   if (!couple.data)
     return (
       <section>
-        <h1>룰렛</h1>
+        <PageHeading>
+          <h1>룰렛</h1>
+        </PageHeading>
         <Link className="text-button" href={couple.status === 401 ? "/login" : "/couple"}>
           공간 연결 확인하기
         </Link>
@@ -30,9 +33,11 @@ export default async function RoulettePage({
 
   return (
     <section className="today-workspace">
-      <p className="eyebrow">PICK ONE, TOGETHER</p>
-      <h1>룰렛</h1>
-      <p className="muted">직접 적은 후보 중 하나를 함께 골라요.</p>
+      <PageHeading>
+        <p className="eyebrow">PICK ONE, TOGETHER</p>
+        <h1>룰렛</h1>
+        <p className="muted">직접 적은 후보 중 하나를 함께 골라요.</p>
+      </PageHeading>
       <nav className="archive-links" aria-label="룰렛 구분">
         <Link href="/roulette" aria-current={!archived ? "page" : undefined}>
           현재

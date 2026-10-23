@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RouteHistory } from "@/components/route-history";
 import { callApi } from "@/lib/api";
@@ -8,7 +9,9 @@ export default async function RoutesPage() {
   if (!couple.data)
     return (
       <section>
-        <h1>동선 모아보기</h1>
+        <PageHeading>
+          <h1>동선 모아보기</h1>
+        </PageHeading>
         <p>{couple.error || "둘의 공간을 연결해 주세요."}</p>
         <Link className="inline-link" href={couple.status === 401 ? "/login" : "/couple"}>
           공간 연결 확인

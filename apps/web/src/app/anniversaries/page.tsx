@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AnniversaryWorkspace } from "@/components/anniversary-workspace";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import type { AnniversaryList } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";
@@ -14,7 +15,9 @@ export default async function AnniversariesPage() {
   if (!couple.data && !couple.error)
     return (
       <section className="auth-panel">
-        <h1>우리의 기념일</h1>
+        <PageHeading>
+          <h1>우리의 기념일</h1>
+        </PageHeading>
         <p>먼저 둘의 공간을 연결해 주세요.</p>
         <Link className="auth-button" href="/couple">
           둘의 공간 연결하기

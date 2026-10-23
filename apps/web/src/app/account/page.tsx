@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { AuthSubmit } from "@/components/auth-submit";
+import { PageHeading } from "@/components/page-heading";
 import { ProfileSettings } from "@/components/profile-settings";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
@@ -24,8 +25,10 @@ export default async function AccountPage({
     }
     return (
       <section className="auth-panel">
-        <h1>계정을 확인하지 못했어요</h1>
-        <p className="muted">연결 상태를 확인하고 잠시 후 다시 시도해 주세요.</p>
+        <PageHeading>
+          <h1>계정을 확인하지 못했어요</h1>
+          <p className="muted">연결 상태를 확인하고 잠시 후 다시 시도해 주세요.</p>
+        </PageHeading>
         <Link className="text-button" href="/account">
           다시 확인하기
         </Link>
@@ -41,11 +44,13 @@ export default async function AccountPage({
   const name = profiles.data?.mine?.display_name;
   return (
     <section className="auth-panel">
-      <p className="eyebrow">YOUR ACCOUNT</p>
-      <h1>내 계정</h1>
-      <p className="muted">
-        {name ? `${name}님, 반가워요.` : "반가워요. 사용할 이름을 등록해 주세요."}
-      </p>
+      <PageHeading>
+        <p className="eyebrow">YOUR ACCOUNT</p>
+        <h1>내 계정</h1>
+        <p className="muted">
+          {name ? `${name}님, 반가워요.` : "반가워요. 사용할 이름을 등록해 주세요."}
+        </p>
+      </PageHeading>
       <dl className="detail-list">
         <div>
           <dt>이름</dt>

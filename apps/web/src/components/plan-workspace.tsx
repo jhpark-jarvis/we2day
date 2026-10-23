@@ -1,7 +1,10 @@
 "use client";
+
+import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { changePlan } from "@/app/actions/plans";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
+import { PageHeading } from "@/components/page-heading";
 import { PlaceSearch } from "@/components/place-search";
 import { PlanChecks } from "@/components/plan-checks";
 import Link from "@/components/progress-link";
@@ -76,11 +79,6 @@ export function PlanWorkspace({
           setSeed({ ...content, title: `${content.title.slice(0, 94)} · 복사`, date: today });
           setNewId(crypto.randomUUID());
         }}
-        onCancel={() => {
-          setSelected(null);
-          setNewId("");
-          setSeed(null);
-        }}
         onSaved={(plan, action) => {
           setNewId("");
           setItems((current) =>
@@ -117,13 +115,13 @@ export function PlanWorkspace({
       <Link href="/" className="text-button">
         ← 일정으로
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR DATE PLANS</p>
           <h1>데이트 플랜</h1>
           <p className="muted">함께 고르고, 순서대로 준비해요.</p>
         </div>
-      </header>
+      </PageHeading>
       <div className="calendar-toolbar">
         <button
           type="button"
@@ -208,7 +206,6 @@ function PlanEditor({
   seed,
   site,
   onClone,
-  onCancel,
   onSaved,
   onReload,
 }: {
@@ -218,7 +215,6 @@ function PlanEditor({
   seed: PlanContent | null;
   site: string;
   onClone: (content: PlanContent) => void;
-  onCancel: () => void;
   onSaved: (plan: DatePlan, action: PlanAction) => void;
   onReload: () => Promise<void>;
 }) {
@@ -309,15 +305,12 @@ function PlanEditor({
   }
   return (
     <section className="plan-editor">
-      <button type="button" className="text-button" disabled={pending} onClick={onCancel}>
-        ← 플랜 목록으로
-      </button>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">{plan ? planStatus(plan) : "NEW PLAN"}</p>
           <h1>{plan?.content.title || "새 데이트 플랜"}</h1>
         </div>
-      </header>
+      </PageHeading>
       {plan?.published_content && (
         <div className="calendar-toolbar">
           <Link className="text-button" href={`/today?date=${plan.published_content.date}`}>
@@ -474,10 +467,60 @@ function PlanEditor({
                     onChange={(event) => activity(index, { place: event.target.value })}
                   />
                 </div>
-                <PlaceSearch initialQuery={item.place} label={`활동 ${index + 1} 장소 검색`} />
+                <PlaceSearch
+                  initialQuery={item.place}
+                  label={`활동 ${index + 1} 장소 검색`}
+                  onSelect={(place) => {
+                    activity(index, { place });
+                    document.getElementById(`activity-${index}-place`)?.focus();
+                  }}
+                />
                 <NaverAppHandoff place={item.place} site={site} compact />
                 <div className="auth-field">
-                  <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>
+                  <div className="activity-note-heading">
+                    <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>
+                    <fieldset
+                      className="activity-actions"
+                      aria-label={`활동 ${index + 1} 순서와 삭제`}
+                    >
+                      <button
+                        type="button"
+                        className="icon-button"
+                        disabled={index === 0}
+                        onClick={() => move(index, -1)}
+                        aria-label={`활동 ${index + 1} 위로`}
+                        title="위로"
+                      >
+                        <ArrowUp size={18} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        disabled={index === content.activities.length - 1}
+                        onClick={() => move(index, 1)}
+                        aria-label={`활동 ${index + 1} 아래로`}
+                        title="아래로"
+                      >
+                        <ArrowDown size={18} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`활동 ${index + 1} 빼기`}
+                        title="활동 빼기"
+                        onClick={() => {
+                          activityKeys.current.splice(index, 1);
+                          setContent({
+                            ...content,
+                            activities: content.activities.filter((_, i) => i !== index),
+                          });
+                          setReview(false);
+                        }}
+                      >
+                        <X size={18} aria-hidden="true" />
+                      </button>
+                    </fieldset>
+                  </div>
                   <textarea
                     id={`activity-${index}-note`}
                     rows={2}
@@ -485,40 +528,6 @@ function PlanEditor({
                     value={item.note}
                     onChange={(event) => activity(index, { note: event.target.value })}
                   />
-                </div>
-                <div className="calendar-toolbar">
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={index === 0}
-                    onClick={() => move(index, -1)}
-                    aria-label={`활동 ${index + 1} 위로`}
-                  >
-                    위로
-                  </button>
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={index === content.activities.length - 1}
-                    onClick={() => move(index, 1)}
-                    aria-label={`활동 ${index + 1} 아래로`}
-                  >
-                    아래로
-                  </button>
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() => {
-                      activityKeys.current.splice(index, 1);
-                      setContent({
-                        ...content,
-                        activities: content.activities.filter((_, i) => i !== index),
-                      });
-                      setReview(false);
-                    }}
-                  >
-                    활동 {index + 1} 빼기
-                  </button>
                 </div>
               </fieldset>
             ))}
@@ -551,7 +560,7 @@ function PlanEditor({
                 onChange={(event) => setPreparation(event.target.value)}
               />
             </div>
-            <button type="submit" className="primary-button" aria-busy={pending}>
+            <button type="submit" className="primary-button plan-save" aria-busy={pending}>
               {"플랜 저장"}
             </button>
             <p className="settings-hint">저장만으로 달력 약속은 바뀌지 않아요.</p>

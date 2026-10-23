@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { WishWorkspace } from "@/components/wish-workspace";
 import { callApi } from "@/lib/api";
@@ -15,8 +16,10 @@ export default async function WishlistPage({
   if (!couple.data)
     return (
       <section>
-        <h1>우리의 위시리스트</h1>
-        <p className="muted">둘의 공간에 연결하면 함께 만들 수 있어요.</p>
+        <PageHeading>
+          <h1>우리의 위시리스트</h1>
+          <p className="muted">둘의 공간에 연결하면 함께 만들 수 있어요.</p>
+        </PageHeading>
         <Link className="text-button" href={couple.status === 401 ? "/login" : "/couple"}>
           공간 연결 확인하기
         </Link>

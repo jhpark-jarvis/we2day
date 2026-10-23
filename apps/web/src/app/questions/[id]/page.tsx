@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { AnswerEditor, AnswerRefresh } from "@/components/question-forms";
 import { callApi } from "@/lib/api";
@@ -23,9 +24,11 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
       <Link className="text-button" href={`/questions?date=${question.date}`}>
         ← 질문 목록으로
       </Link>
-      <p className="eyebrow">OUR ANSWERS</p>
-      <h1>함께 나누는 답변</h1>
-      <p className="muted">{question.date} · 한국 기준</p>
+      <PageHeading>
+        <p className="eyebrow">OUR ANSWERS</p>
+        <h1>함께 나누는 답변</h1>
+        <p className="muted">{question.date} · 한국 기준</p>
+      </PageHeading>
       <h2 className="preserve-lines">{question.prompt}</h2>
       <AnswerEditor id={id} initial={mine} />
       <h2>상대가 공유한 답변</h2>

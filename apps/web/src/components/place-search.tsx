@@ -2,34 +2,57 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
-import { type PlaceResults, placeText, safePlaceLink } from "@/lib/places";
+import { type PlaceResults, placeText, safePlaceLink, selectedPlaceText } from "@/lib/places";
 
 export function PlaceSearch({
   initialQuery = "",
   label = "네이버 장소 검색",
+  onSelect,
 }: {
   initialQuery?: string;
   label?: string;
+  onSelect?: (place: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
     <section className="place-search" aria-label={label}>
-      <button
-        type="button"
-        className="text-button"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? "검색 닫기" : "장소 검색"}
-      </button>
-      <div id={id}>{open && <SearchPanel initialQuery={initialQuery} />}</div>
+      <div className="place-search-actions">
+        <button
+          type="button"
+          className="text-button"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? "검색 닫기" : "장소 검색"}
+        </button>
+      </div>
+      <div id={id}>
+        {open && (
+          <SearchPanel
+            initialQuery={initialQuery}
+            onSelect={
+              onSelect &&
+              ((place) => {
+                onSelect(place);
+                setOpen(false);
+              })
+            }
+          />
+        )}
+      </div>
     </section>
   );
 }
 
-function SearchPanel({ initialQuery }: { initialQuery: string }) {
+function SearchPanel({
+  initialQuery,
+  onSelect,
+}: {
+  initialQuery: string;
+  onSelect?: (place: string) => void;
+}) {
   const id = useId();
   const [query, setQuery] = useState(initialQuery.slice(0, 100));
   const [results, setResults] = useState<PlaceResults | null>(null);
@@ -156,6 +179,7 @@ function SearchPanel({ initialQuery }: { initialQuery: string }) {
               <ol className="place-results">
                 {results.items.map((place, index) => {
                   const link = safePlaceLink(place.link);
+                  const destination = selectedPlaceText(place);
                   return (
                     // Provider order is preserved; no stable place IDs are supplied.
                     // biome-ignore lint/suspicious/noArrayIndexKey: transient immutable result rows
@@ -192,6 +216,24 @@ function SearchPanel({ initialQuery }: { initialQuery: string }) {
                         >
                           상세 보기
                         </a>
+                      )}
+                      {onSelect && (
+                        <div className="place-result-actions">
+                          <button
+                            type="button"
+                            className="text-button"
+                            aria-label={`${placeText(place.title.replace(/<\/?b>/gi, ""))} 선택`}
+                            disabled={!destination || destination.length > 200}
+                            onClick={() => onSelect(destination)}
+                          >
+                            장소 선택
+                          </button>
+                          {destination.length > 200 && (
+                            <span className="settings-hint">
+                              장소명이 길어요. 필요한 이름이나 주소를 직접 입력해 주세요.
+                            </span>
+                          )}
+                        </div>
                       )}
                     </li>
                   );

@@ -1,5 +1,6 @@
 import { ChevronRight, Dices, ListChecks, MessagesSquare, Target } from "lucide-react";
 import type { Metadata } from "next";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 
 export const metadata: Metadata = { title: "함께" };
@@ -14,13 +15,13 @@ const features = [
 export default function TogetherPage() {
   return (
     <>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">LITTLE THINGS, TOGETHER</p>
           <h1>함께</h1>
           <p className="muted">같이 챙길 일과 나누고 싶은 이야기.</p>
         </div>
-      </header>
+      </PageHeading>
       <nav className="together-grid" aria-label="공동 활동">
         {features.map(({ href, label, description, icon: Icon }) => (
           <Link className="together-card" href={href} key={href} aria-label={label}>

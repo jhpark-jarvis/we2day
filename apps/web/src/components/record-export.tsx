@@ -1,5 +1,7 @@
 "use client";
+
 import { useState } from "react";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { downloadRecord } from "@/lib/file-download";
 
@@ -66,12 +68,14 @@ export function RecordExport({ today }: { today: string }) {
       <Link className="text-button" href="/settings">
         ← 설정으로
       </Link>
-      <p className="eyebrow">KEEP A COPY</p>
-      <h1>기록 사본 내보내기</h1>
-      <p className="muted">
-        지금 볼 수 있는 한 종류의 기록을 JSON 파일로 받아요. 계정 비밀번호·초대 코드·상대의 비공개
-        원문은 포함하지 않아요.
-      </p>
+      <PageHeading>
+        <p className="eyebrow">KEEP A COPY</p>
+        <h1>기록 사본 내보내기</h1>
+        <p className="muted">
+          지금 볼 수 있는 한 종류의 기록을 JSON 파일로 받아요. 계정 비밀번호·초대 코드·상대의 비공개
+          원문은 포함하지 않아요.
+        </p>
+      </PageHeading>
       <form
         onSubmit={(e) => {
           e.preventDefault();

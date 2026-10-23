@@ -1,6 +1,8 @@
 "use client";
+
 import { useRef, useState, useTransition } from "react";
 import { saveWish } from "@/app/actions/wishlist";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { Wish, WishContent } from "@/lib/wishlist";
@@ -69,13 +71,13 @@ export function WishWorkspace({
       <Link className="text-button" href="/plans">
         ← 플랜
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR WISHLIST</p>
           <h1>위시리스트</h1>
           <p className="muted">함께 가고 싶은 곳, 해보고 싶은 일을 모아요.</p>
         </div>
-      </header>
+      </PageHeading>
       <div className="calendar-toolbar">
         <button className="primary-button" type="button" onClick={() => setId(crypto.randomUUID())}>
           위시 추가
@@ -186,7 +188,9 @@ function WishEditor({
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
         ← 위시 목록으로
       </button>
-      <h1>{wish ? "위시 수정" : "새로운 위시"}</h1>
+      <PageHeading>
+        <h1>{wish ? "위시 수정" : "새로운 위시"}</h1>
+      </PageHeading>
       <form
         onSubmit={(e) => {
           e.preventDefault();

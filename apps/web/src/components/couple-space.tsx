@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { acceptInvite, createCouple, createInvite } from "@/app/actions/couple";
 import { AuthSubmit } from "@/components/auth-submit";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import type { Couple } from "@/lib/shared-calendar";
 
@@ -13,8 +14,10 @@ export function CoupleSpace({ couple }: { couple: Couple | null }) {
 
   return (
     <>
-      <p className="eyebrow">OUR SPACE</p>
-      <h1>둘의 공간</h1>
+      <PageHeading>
+        <p className="eyebrow">OUR SPACE</p>
+        <h1>둘의 공간</h1>
+      </PageHeading>
       {couple ? (
         <>
           <p className="note-panel" role="status">

@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { QuestionSearch } from "@/components/question-search";
 import { callApi } from "@/lib/api";
@@ -12,9 +13,11 @@ export default async function QuestionSearchPage() {
       <Link className="text-button" href="/questions">
         ← 날짜별 질문으로
       </Link>
-      <p className="eyebrow">OUR QUESTIONS</p>
-      <h1>함께 나눈 질문 찾기</h1>
-      <p className="muted">날짜와 질문 문구로 다시 이야기할 주제를 찾아요.</p>
+      <PageHeading>
+        <p className="eyebrow">OUR QUESTIONS</p>
+        <h1>함께 나눈 질문 찾기</h1>
+        <p className="muted">날짜와 질문 문구로 다시 이야기할 주제를 찾아요.</p>
+      </PageHeading>
       {couple.data ? (
         <QuestionSearch start={`${today.slice(0, 8)}01`} end={today} />
       ) : (

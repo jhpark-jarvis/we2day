@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { saveAnniversary } from "@/app/actions/anniversaries";
+import { PageHeading } from "@/components/page-heading";
 import { type Anniversary, kinds } from "@/lib/anniversaries";
 
 export function AnniversaryForm({
@@ -38,8 +39,10 @@ export function AnniversaryForm({
   }, [state.anniversary, onSaved]);
   return (
     <section className="appointment-editor" aria-label="기념일 입력">
-      <h1>{anniversary ? "기념일 수정" : "새 기념일"}</h1>
-      <p className="muted">둘이 함께 보는 양력 기념일이에요.</p>
+      <PageHeading>
+        <h1>{anniversary ? "기념일 수정" : "새 기념일"}</h1>
+        <p className="muted">둘이 함께 보는 양력 기념일이에요.</p>
+      </PageHeading>
       <form action={action} className="username-login">
         <input type="hidden" name="id" value={anniversary?.id || ""} />
         <input type="hidden" name="version" value={anniversary?.version || ""} />

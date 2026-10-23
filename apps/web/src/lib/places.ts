@@ -9,6 +9,14 @@ export type PlaceResult = {
 
 export type PlaceResults = { items: PlaceResult[] };
 
+// Only a deliberately chosen destination enters the existing editable place field.
+export function selectedPlaceText(place: PlaceResult) {
+  const clean = (value: string) => placeText(value.replace(/<\/?b>/gi, "")).trim();
+  const name = clean(place.title);
+  const address = clean(place.roadAddress || place.address);
+  return address && address !== name ? `${name} (${address})` : name || address;
+}
+
 export function safePlaceLink(value: string) {
   try {
     const url = new URL(value);

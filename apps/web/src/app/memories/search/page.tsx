@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import { PhotoSearch } from "@/components/photo-search";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
@@ -12,9 +13,11 @@ export default async function PhotoSearchPage() {
       <Link className="text-button" href="/memories">
         ← 날짜별 사진으로
       </Link>
-      <p className="eyebrow">FIND OUR MOMENTS</p>
-      <h1>사진 찾아보기</h1>
-      <p className="muted">날짜·한마디·파일명·기기 정보로 기억을 찾아요.</p>
+      <PageHeading>
+        <p className="eyebrow">FIND OUR MOMENTS</p>
+        <h1>사진 찾아보기</h1>
+        <p className="muted">날짜·한마디·파일명·기기 정보로 기억을 찾아요.</p>
+      </PageHeading>
       {couple.data ? (
         <PhotoSearch start={`${today.slice(0, 8)}01`} end={today} />
       ) : (

@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RouletteEditor } from "@/components/roulette-editor";
 import { callApi } from "@/lib/api";
@@ -33,7 +34,9 @@ export default async function RouletteDetail({
       <Link className="text-button" href="/roulette">
         ← 룰렛 목록으로
       </Link>
-      <h1>{wheel.data.title}</h1>
+      <PageHeading>
+        <h1>{wheel.data.title}</h1>
+      </PageHeading>
       {draws.error && (
         <p role="alert" className="error-message">
           {draws.error}

@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { QuestionForm } from "@/components/question-forms";
 import { callApi } from "@/lib/api";
@@ -22,7 +23,9 @@ export default async function QuestionsPage({
   if (!couple.data)
     return (
       <section>
-        <h1>질문</h1>
+        <PageHeading>
+          <h1>질문</h1>
+        </PageHeading>
         <p>둘의 공간에 연결하면 질문을 나눌 수 있어요.</p>
         <Link className="text-button" href={couple.status === 401 ? "/login" : "/couple"}>
           공간 연결 확인하기
@@ -32,9 +35,11 @@ export default async function QuestionsPage({
 
   return (
     <section className="today-workspace">
-      <p className="eyebrow">A QUESTION FOR US</p>
-      <h1>질문</h1>
-      <p className="muted">함께 고른 질문에 각자의 답변을 남겨요.</p>
+      <PageHeading>
+        <p className="eyebrow">A QUESTION FOR US</p>
+        <h1>질문</h1>
+        <p className="muted">함께 고른 질문에 각자의 답변을 남겨요.</p>
+      </PageHeading>
       <Link className="text-button" href="/questions/search">
         날짜·문구로 질문 찾기
       </Link>

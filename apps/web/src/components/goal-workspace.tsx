@@ -1,6 +1,8 @@
 "use client";
+
 import { useRef, useState, useTransition } from "react";
 import { saveGoal } from "@/app/actions/goals";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { Goal, GoalContent, GoalStep } from "@/lib/goals";
@@ -72,13 +74,13 @@ export function GoalWorkspace({
       <Link className="text-button" href="/together">
         ← 함께
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">LITTLE STEPS, TOGETHER</p>
           <h1>목표</h1>
           <p className="muted">함께 이루고 싶은 일을 작은 단계로 나눠요.</p>
         </div>
-      </header>
+      </PageHeading>
       <div className="calendar-toolbar">
         <button
           className="primary-button"
@@ -229,7 +231,9 @@ function GoalEditor({
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
         작성 취소·목표 목록으로
       </button>
-      <h1>{base ? "공동 목표 수정" : "새로운 공동 목표"}</h1>
+      <PageHeading>
+        <h1>{base ? "공동 목표 수정" : "새로운 공동 목표"}</h1>
+      </PageHeading>
       <p className="settings-hint">
         단계는 최대 50개까지 적을 수 있어요. 모두 체크해도 목표 달성은 직접 선택해요. 저장된 단계는
         이름을 수정하거나 체크를 해제할 수 있어요.

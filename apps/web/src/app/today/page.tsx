@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { TodayWorkspace } from "@/components/today-workspace";
 import { callApi } from "@/lib/api";
@@ -31,13 +32,13 @@ export default async function TodayPage({
       <Link className="text-button" href="/">
         ← 일정으로
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR DAY, STEP BY STEP</p>
           <h1>데이트 코스</h1>
           <p className="muted">방문할 장소를 순서대로 보고, 저장한 목적지로 바로 출발해요.</p>
         </div>
-      </header>
+      </PageHeading>
       <form className="calendar-toolbar" action="/today">
         <div className="auth-field">
           <label htmlFor="timeline-date">살펴볼 날짜</label>

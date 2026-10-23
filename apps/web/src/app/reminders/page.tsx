@@ -1,4 +1,5 @@
 import { NotificationPreview } from "@/components/notification-preview";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { ServerRefresh } from "@/components/workspace-controls";
 import { countdown } from "@/lib/anniversaries";
@@ -20,13 +21,13 @@ export default async function RemindersPage({
       <Link className="text-button" href="/">
         ← 일정으로
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">COMING UP TOGETHER</p>
           <h1>다가오는 일정</h1>
           <p className="muted">약속과 기념일을 미리 살펴봐요.</p>
         </div>
-      </header>
+      </PageHeading>
       <div className="calendar-toolbar">
         <Link
           className="timeline-choice"

@@ -1,6 +1,8 @@
 "use client";
+
 import { useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import {
   type RecordKind,
@@ -66,12 +68,14 @@ export function RecordSearch({ today }: { today: string }) {
         <Link className="text-button" href="/memories">
           ← 기록으로
         </Link>
-        <p className="eyebrow">FIND OUR RECORDS</p>
-        <h1>약속·플랜·회고·위시 찾기</h1>
-        <p className="muted">
-          같은 공간의 기록을 최대 366일씩 찾아요. 회고는 나의 원문과 상대가 직접 공유한 내용만
-          보여요.
-        </p>
+        <PageHeading>
+          <p className="eyebrow">FIND OUR RECORDS</p>
+          <h1>약속·플랜·회고·위시 찾기</h1>
+          <p className="muted">
+            같은 공간의 기록을 최대 366일씩 찾아요. 회고는 나의 원문과 상대가 직접 공유한 내용만
+            보여요.
+          </p>
+        </PageHeading>
         <form
           onSubmit={(event) => {
             event.preventDefault();

@@ -1,7 +1,9 @@
 "use client";
+
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { saveReport } from "@/app/actions/reports";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import type { DatePlan } from "@/lib/plans";
@@ -81,7 +83,7 @@ export function ReportWorkspace({
       <Link className="text-button" href="/plans">
         ← 플랜으로
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR DATE REPORT</p>
           <h1>데이트 리포트</h1>
@@ -89,7 +91,7 @@ export function ReportWorkspace({
             {snapshot?.title || plan.content.title} · {snapshot?.date || plan.content.date}
           </p>
         </div>
-      </header>
+      </PageHeading>
       {snapshot && (
         <details className="plan-review">
           <summary>기준이 된 확정 플랜 보기</summary>

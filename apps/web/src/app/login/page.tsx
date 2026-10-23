@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { signIn } from "@/app/actions/auth";
 import { AuthSubmit } from "@/components/auth-submit";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { UsernameLoginForm } from "@/components/username-login-form";
 import { getAuthConfig } from "@/lib/auth/config";
@@ -26,13 +27,15 @@ export default async function LoginPage({
   const error = params.error ? errors[params.error] : undefined;
   return (
     <section className="auth-panel">
-      <p className="eyebrow">OUR DAYS, TOGETHER</p>
-      <h1>둘의 시간에 로그인</h1>
-      <p className="muted">
-        {config?.passwordEnabled
-          ? "지정된 아이디와 비밀번호로 로그인하세요."
-          : "사용하던 계정으로 편하게 시작하세요."}
-      </p>
+      <PageHeading>
+        <p className="eyebrow">OUR DAYS, TOGETHER</p>
+        <h1>둘의 시간에 로그인</h1>
+        <p className="muted">
+          {config?.passwordEnabled
+            ? "지정된 아이디와 비밀번호로 로그인하세요."
+            : "사용하던 계정으로 편하게 시작하세요."}
+        </p>
+      </PageHeading>
       {error && (
         <p className="error-message" role="alert">
           {error}

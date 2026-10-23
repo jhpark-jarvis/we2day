@@ -1,7 +1,9 @@
 "use client";
+
 import { RefreshCw } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { saveChecklist } from "@/app/actions/checklists";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import type { Checklist, ChecklistContent, ChecklistItem } from "@/lib/checklists";
 
@@ -71,13 +73,13 @@ export function ChecklistWorkspace({
       <Link className="text-button" href="/together">
         ← 함께
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">TOGETHER, READY</p>
           <h1>목록</h1>
           <p className="muted">장보기부터 집 데이트 준비까지, 하나씩 함께 챙겨요.</p>
         </div>
-      </header>
+      </PageHeading>
       <div className="calendar-toolbar">
         <button
           className="primary-button"
@@ -253,7 +255,9 @@ function ChecklistEditor({
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
         작성 취소·목록으로
       </button>
-      <h1>{base ? "준비 목록 수정" : "새로운 준비 목록"}</h1>
+      <PageHeading>
+        <h1>{base ? "준비 목록 수정" : "새로운 준비 목록"}</h1>
+      </PageHeading>
       <p className="settings-hint">
         최대 50개까지 적을 수 있어요. 저장된 항목은 수정·체크 해제할 수 있고 목록은 보관 후 복원할
         수 있어요.

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { PushSettings } from "@/components/push-settings";
 import { PwaSettings } from "@/components/pwa-settings";
@@ -40,13 +41,13 @@ export default async function SettingsPage() {
   const theme = resolveTheme(cookieStore.get(THEME_COOKIE)?.value);
   return (
     <>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">MAKE IT YOURS</p>
           <h1>설정</h1>
           <p className="muted">우리의 공간을 편안한 모습으로.</p>
         </div>
-      </header>
+      </PageHeading>
       <section className="settings-section">
         <h2>화면 테마</h2>
         <p className="muted">마음에 드는 분위기를 골라보세요.</p>

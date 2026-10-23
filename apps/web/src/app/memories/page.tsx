@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageHeading } from "@/components/page-heading";
 import { PhotoWorkspace } from "@/components/photo-workspace";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
@@ -24,13 +25,13 @@ export default async function MemoriesPage({
   ]);
   return (
     <>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">OUR LITTLE MOMENTS</p>
           <h1>함께한 날들</h1>
           <p className="muted">약속으로 시작해, 기억으로 남는 날들.</p>
         </div>
-      </header>
+      </PageHeading>
       <nav className="calendar-toolbar" aria-label="기록 둘러보기">
         <Link className="text-button" href={`/memories/month?month=${selectedDate.slice(0, 7)}`}>
           월간 추억

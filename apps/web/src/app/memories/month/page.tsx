@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
@@ -19,13 +20,13 @@ export default async function MonthlyPage({
       <Link className="text-button" href="/memories">
         ← 날짜별 사진으로
       </Link>
-      <header className="page-heading">
+      <PageHeading>
         <div>
           <p className="eyebrow">A MONTH OF US</p>
           <h1>월간 추억</h1>
           <p className="muted">직접 남긴 기록으로 한 달을 돌아봐요.</p>
         </div>
-      </header>
+      </PageHeading>
       <form className="calendar-toolbar" action="/memories/month">
         <div className="auth-field">
           <label htmlFor="memory-month">돌아볼 월</label>
