@@ -60,6 +60,12 @@ const errors: Record<string, string> = {
   photo_retention_active: "휴지통에 보관한 지 30일이 지나야 영구 삭제할 수 있어요.",
   photo_delete_incomplete: "파일 삭제 결과를 확인하지 못했어요. 영구 삭제를 다시 시도해 주세요.",
   invalid_photo_export: "내보낼 사진은 중복 없이 1~20장 선택해 주세요.",
+  invalid_place_search: "검색어를 1~100자로 입력해 주세요.",
+  place_search_not_configured:
+    "장소 검색이 아직 설정되지 않았어요. 직접 입력한 약속은 그대로 저장할 수 있어요.",
+  place_search_limited: "장소 검색 이용 한도에 도달했어요. 잠시 후 다시 시도해 주세요.",
+  place_search_unavailable:
+    "장소 검색에 연결하지 못했어요. 검색어를 유지했으니 다시 시도해 주세요.",
 };
 
 export async function callApi<T>(path: string, init: RequestInit = {}) {

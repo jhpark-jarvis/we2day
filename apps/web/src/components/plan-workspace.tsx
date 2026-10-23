@@ -2,6 +2,7 @@
 import { useRef, useState, useTransition } from "react";
 import { changePlan } from "@/app/actions/plans";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
+import { PlaceSearch } from "@/components/place-search";
 import { PlanChecks } from "@/components/plan-checks";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
@@ -473,6 +474,7 @@ function PlanEditor({
                     onChange={(event) => activity(index, { place: event.target.value })}
                   />
                 </div>
+                <PlaceSearch initialQuery={item.place} label={`활동 ${index + 1} 장소 검색`} />
                 <NaverAppHandoff place={item.place} site={site} compact />
                 <div className="auth-field">
                   <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>
