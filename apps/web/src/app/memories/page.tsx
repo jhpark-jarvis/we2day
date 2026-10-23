@@ -33,20 +33,8 @@ export default async function MemoriesPage({
         </div>
       </PageHeading>
       <nav className="calendar-toolbar" aria-label="기록 둘러보기">
-        <Link className="text-button" href={`/memories/month?month=${selectedDate.slice(0, 7)}`}>
-          월간 추억
-        </Link>
         <Link className="text-button" href="/memories/search">
-          사진 검색
-        </Link>
-        <Link className="text-button" href="/memories/records">
-          기록 검색
-        </Link>
-        <Link className="text-button" href="/memories/routes">
-          동선
-        </Link>
-        <Link className="text-button" href="/memories/export">
-          내보내기
+          검색
         </Link>
       </nav>
 
@@ -76,11 +64,6 @@ export default async function MemoriesPage({
             작년에 같은 날짜가 없거나 기록 지원 범위를 벗어났어요. 월간 추억에서 다른 날짜를
             골라보세요.
           </p>
-        )}
-        {selectedDate !== today && (
-          <Link className="text-button" href={`/memories?date=${today}`}>
-            오늘의 사진으로 돌아오기
-          </Link>
         )}
       </section>
     </>

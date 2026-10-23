@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/page-heading";
 import { PhotoWorkspace } from "@/components/photo-workspace";
-import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
 import { type ProfileView, profileNames } from "@/lib/profiles";
@@ -18,9 +17,6 @@ export default async function PhotoTrashPage() {
       <PageHeading>
         <h1>사진 휴지통</h1>
       </PageHeading>
-      <Link className="text-button" href="/settings">
-        ← 설정으로
-      </Link>
       <PhotoWorkspace
         today={seoulToday()}
         userId={user.data?.id || null}

@@ -94,9 +94,6 @@ export default async function AccountPage({
           </form>
         </div>
       </section>
-      <Link href="/settings" className="text-button">
-        설정으로 돌아가기
-      </Link>
     </section>
   );
 }

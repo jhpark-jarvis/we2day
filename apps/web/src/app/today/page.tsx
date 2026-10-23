@@ -30,9 +30,6 @@ export default async function TodayPage({
   const plans = couple.data ? timeline : { data: null, error: couple.error };
   return (
     <section>
-      <Link className="text-button" href="/">
-        ← 일정으로
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">OUR DAY, STEP BY STEP</p>

@@ -53,7 +53,7 @@ test("calendar preview keeps photos tied to a date and fits narrow screens", asy
   await page.getByRole("button", { name: /15:00 가을 산책/ }).click();
   await page.getByText("사진 정보", { exact: true }).click();
   await expect(page.getByText("iPhone 15 · 15:42 (예시)")).toBeVisible();
-  await page.getByRole("button", { name: "일정으로" }).click();
+  await page.goto("/preview");
   await page.getByRole("button", { name: "다음 달" }).click();
   await expect(page.getByRole("heading", { name: "2026년 11월" })).toBeVisible();
   await page.setViewportSize({ width: 320, height: 850 });

@@ -1,6 +1,5 @@
 import { NextAppointment } from "@/components/next-appointment";
 import { PageHeading } from "@/components/page-heading";
-import Link from "@/components/progress-link";
 import { TimezoneSettings } from "@/components/timezone-settings";
 import { callApi } from "@/lib/api";
 import type { TimezoneView } from "@/lib/timezones";
@@ -19,9 +18,6 @@ export default async function TimezonesPage() {
   ].sort();
   return (
     <section className="today-workspace">
-      <Link className="text-button" href="/settings">
-        ← 설정으로
-      </Link>
       <PageHeading>
         <p className="eyebrow">OUR LOCAL TIME</p>
         <h1>각자의 시간대</h1>

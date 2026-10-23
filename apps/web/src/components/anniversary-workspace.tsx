@@ -63,9 +63,6 @@ export function AnniversaryWorkspace({
           </button>
         )}
         <RefreshButton label="기념일 새로고침" pending={refreshing} onClick={reload} />
-        <Link className="text-button" href="/">
-          일정으로
-        </Link>
       </div>
       {error && (
         <p className="error-message" role="alert">

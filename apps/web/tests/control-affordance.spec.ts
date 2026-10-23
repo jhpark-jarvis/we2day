@@ -15,6 +15,10 @@ async function open(page: Page, url: string) {
 
 async function auditControls(page: Page, label: string) {
   await expect(page.locator(".page-loading")).toHaveCount(0, { timeout: 30_000 });
+  await expect(
+    page.locator("main").getByRole("link", { name: /^(←|뒤로|.*으로 돌아|일정으로$)/ }),
+  ).toHaveCount(0);
+
   if (mobileDeepAudit && textScale === 1) {
     for (const field of await page
       .locator(
@@ -500,14 +504,16 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
         await open(current, route);
         await auditControls(current, `${theme}/${width}/${route}`);
         if (route !== "/page-not-found-fixture") {
-          const expected = route.startsWith("/memories")
-            ? "/memories"
-            : /^\/(together|checklists|goals|questions|roulette)(?:\/|$)/.test(route)
-              ? "/together"
-              : route.startsWith("/settings") ||
-                  ["/account", "/couple", "/login", "/timezones"].includes(route)
-                ? "/settings"
-                : "/";
+          const expected =
+            route.startsWith("/memories") && route !== "/memories/export"
+              ? "/memories"
+              : /^\/(together|checklists|goals|questions|roulette)(?:\/|$)/.test(route)
+                ? "/together"
+                : route.startsWith("/settings") ||
+                    route === "/memories/export" ||
+                    ["/account", "/couple", "/login", "/timezones"].includes(route)
+                  ? "/settings"
+                  : "/";
           await expect(current.locator('.app-navigation [aria-current="page"]')).toHaveAttribute(
             "href",
             expected,

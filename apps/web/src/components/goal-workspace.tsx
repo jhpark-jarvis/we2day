@@ -243,7 +243,7 @@ function GoalEditor({
   return (
     <section className="plan-editor goal-editor">
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
-        작성 취소·목표 목록으로
+        작성 취소
       </button>
       <PageHeading>
         <h1>{base ? "공동 목표 수정" : "새로운 공동 목표"}</h1>

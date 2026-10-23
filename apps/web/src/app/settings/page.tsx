@@ -55,6 +55,9 @@ export default async function SettingsPage() {
       </section>
       <section className="settings-section" aria-label="기록 관리">
         <h2>기록 관리</h2>
+        <Link className="text-button" href="/settings/export">
+          기록 내보내기
+        </Link>
         <Link className="text-button" href="/settings/trash">
           사진 휴지통
         </Link>

@@ -115,9 +115,6 @@ export function PlanWorkspace({
     );
   return (
     <section className="plan-workspace">
-      <Link href="/" className="text-button">
-        ← 일정으로
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">OUR DATE PLANS</p>

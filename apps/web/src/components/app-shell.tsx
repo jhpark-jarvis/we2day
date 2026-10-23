@@ -57,7 +57,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     (href === "/settings" &&
                       ["/timezones", "/account", "/couple", "/login"].includes(pathname));
             return (
-              <Link key={href} href={href} aria-current={active ? "page" : undefined}>
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                onClick={() => {
+                  if (href === "/" && pathname === "/")
+                    window.dispatchEvent(new Event("we2day:calendar-home"));
+                }}
+              >
                 <Icon size={19} aria-hidden="true" />
                 <span>{label}</span>
               </Link>

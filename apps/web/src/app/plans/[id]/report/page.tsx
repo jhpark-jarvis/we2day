@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { PageHeading } from "@/components/page-heading";
-import Link from "@/components/progress-link";
 import { ReportWorkspace } from "@/components/report-workspace";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
@@ -21,9 +20,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <h1>데이트 회고</h1>
         </PageHeading>
         <p role="alert">{plan.error || user.error}</p>
-        <Link href="/plans" className="text-button">
-          플랜으로 돌아가기
-        </Link>
       </section>
     );
   return (

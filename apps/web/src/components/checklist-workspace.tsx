@@ -251,7 +251,7 @@ function ChecklistEditor({
   return (
     <section className="plan-editor">
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
-        작성 취소·목록으로
+        작성 취소
       </button>
       <PageHeading>
         <h1>{base ? "준비 목록 수정" : "새로운 준비 목록"}</h1>

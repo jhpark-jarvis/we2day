@@ -43,3 +43,16 @@ export async function POST(request: NextRequest) {
     reader.releaseLock();
   }
 }
+
+export async function GET(request: NextRequest) {
+  const month = request.nextUrl.searchParams.get("month") || "";
+  if (!/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(month))
+    return NextResponse.json({ error: "조회할 월을 확인해 주세요." }, { status: 422, headers });
+  const result = await callApi<import("@/lib/monthly").MonthlyMemories>(
+    `/memories/month?month=${month}`,
+  );
+  return NextResponse.json(result.error ? { error: result.error } : result.data, {
+    status: result.status,
+    headers,
+  });
+}

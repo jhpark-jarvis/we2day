@@ -69,9 +69,6 @@ export function WishWorkspace({
     );
   return (
     <section>
-      <Link className="text-button" href="/plans">
-        ← 플랜
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">OUR WISHLIST</p>
@@ -189,7 +186,7 @@ function WishEditor({
   return (
     <section className="plan-editor">
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
-        ← 위시 목록으로
+        작성 취소
       </button>
       <PageHeading>
         <h1>{wish ? "위시 수정" : "새로운 위시"}</h1>
@@ -262,7 +259,7 @@ function WishEditor({
       )}
       {conflict && (
         <button className="text-button" type="button" onClick={onClose}>
-          작성 내용을 버리고 목록으로
+          작성 내용 폐기
         </button>
       )}
     </section>

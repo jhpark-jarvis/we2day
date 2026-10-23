@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -103,6 +102,14 @@ export function CalendarWorkspace({
   const [editing, setEditing] = useState<{ appointment?: Appointment; requestId: string } | null>(
     null,
   );
+  useEffect(() => {
+    const reset = () => {
+      setDetail(null);
+      setEditing(null);
+    };
+    window.addEventListener("we2day:calendar-home", reset);
+    return () => window.removeEventListener("we2day:calendar-home", reset);
+  }, []);
   const [year, month, day] = parseDate(selected);
   const events: CalendarEvent[] = preview
     ? examples
@@ -247,10 +254,6 @@ export function CalendarWorkspace({
   if (detail)
     return (
       <section className="appointment-detail">
-        <button className="text-button" type="button" onClick={() => setDetail(null)}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          일정으로
-        </button>
         <PageHeading>
           <p className="eyebrow">{detail.photo ? "OUR LITTLE MEMORY" : "OUR NEXT PLAN"}</p>
           <h1>{detail.title}</h1>
@@ -577,11 +580,7 @@ export function CalendarWorkspace({
           </div>
         </div>
       </LoadingRegion>
-      {preview && (
-        <p className="preview-label">
-          화면 미리보기 · 저장되지 않는 예시 일정 · <Link href="/">내 일정으로</Link>
-        </p>
-      )}
+      {preview && <p className="preview-label">화면 미리보기 · 저장되지 않는 예시 일정</p>}
     </>
   );
 }

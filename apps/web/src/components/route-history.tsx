@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
-import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RouteMap } from "@/components/route-map";
 import { downloadRecord } from "@/lib/file-download";
@@ -74,17 +73,9 @@ export function RouteHistory({ today, apiKey }: { today: string; apiKey: string 
   return (
     <LoadingRegion busy={pending} label="동선을 불러오는 중">
       <section className="today-workspace">
-        <Link className="text-button" href="/memories">
-          ← 기록으로
-        </Link>
-        <PageHeading>
-          <p className="eyebrow">OUR RECORDED PLACES</p>
-          <h1>함께한 동선 모아보기</h1>
-          <p className="muted">
-            직접 남긴 날짜별 출발점과 도착점을 찾아요. 날짜 사이를 연결하거나 실제 주행 경로를
-            추정하지 않아요.
-          </p>
-        </PageHeading>
+        <p className="settings-hint">
+          직접 남긴 출발점·도착점을 찾아요. 날짜 사이를 연결하거나 실제 주행 경로를 추정하지 않아요.
+        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();

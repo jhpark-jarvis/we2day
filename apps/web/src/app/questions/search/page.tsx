@@ -10,9 +10,6 @@ export default async function QuestionSearchPage() {
   const today = seoulToday();
   return (
     <section className="today-workspace">
-      <Link className="text-button" href="/questions">
-        ← 날짜별 질문으로
-      </Link>
       <PageHeading>
         <p className="eyebrow">OUR QUESTIONS</p>
         <h1>함께 나눈 질문 찾기</h1>

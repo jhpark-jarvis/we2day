@@ -17,7 +17,12 @@ test("last-year links change album dates on the same route and survive reload", 
   const dates: string[] = [];
   await page.route("**/api/photos?**", async (route) => {
     expect(route.request().method()).toBe("GET");
-    dates.push(new URL(route.request().url()).searchParams.get("date") || "");
+    const query = new URL(route.request().url()).searchParams;
+    if (query.has("month")) {
+      await route.fulfill({ json: { month: query.get("month"), days: [] } });
+      return;
+    }
+    dates.push(query.get("date") || "");
     await route.fulfill({ json: { items: [], next_after: null } });
   });
   await page.goto("/memories");
@@ -48,7 +53,10 @@ test("last-year links change album dates on the same route and survive reload", 
     path: testInfo.outputPath("last-year-memory-mobile.png"),
     fullPage: true,
   });
-  await page.getByRole("link", { name: "오늘의 사진으로 돌아오기", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "주요 메뉴" })
+    .getByRole("link", { name: "기록", exact: true })
+    .click();
   await expect(
     page.getByText(`${today.slice(0, 4)}년 ${today.slice(5, 7)}월 ${today.slice(8, 10)}일`, {
       exact: true,

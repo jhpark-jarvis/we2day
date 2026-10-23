@@ -111,12 +111,17 @@ test("settings separates feature links and reflects the confirmed account", asyn
   await expect(navigation.getByRole("link", { name: "함께", exact: true })).toBeVisible();
   await page.goto("/memories");
   const records = page.getByRole("navigation", { name: "기록 둘러보기", exact: true });
-  await expect(records.getByRole("link", { name: "동선", exact: true })).toHaveAttribute(
-    "href",
-    "/memories/routes",
+  await expect(records.getByRole("link")).toHaveCount(1);
+  await records.getByRole("link", { name: "검색", exact: true }).click();
+  await expect(page).toHaveURL(/\/memories\/search$/);
+  await expect(page.getByLabel("검색 대상", { exact: true })).toBeVisible();
+  await navigation.getByRole("link", { name: "설정", exact: true }).click();
+  await page.getByRole("link", { name: "기록 내보내기", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/export$/);
+  await expect(navigation.getByRole("link", { name: "설정", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
   );
-  await records.getByRole("link", { name: "내보내기", exact: true }).click();
-  await expect(page).toHaveURL(/\/memories\/export$/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

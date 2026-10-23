@@ -642,3 +642,14 @@ body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidd
 .shared-photo-section > .calendar-toolbar { flex-wrap: nowrap; }
 .shared-photo-section > .calendar-toolbar > h2 { flex: 1; min-width: 0; }
 .photo-album-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+/* Keep album controls beside their date without shrinking touch targets. */
+.album-heading { flex-wrap: nowrap; gap: 4px; }
+.album-heading-date { flex: 1; display: flex; align-items: center; min-width: 0; gap: 2px; }
+.album-heading-date h2 { margin: 0; min-width: 0; font-size: clamp(14px, 3.6vw, 20px); line-height: 1.4; }
+.album-heading-date .album-date { flex-shrink: 0; margin-block: 0; }
+.explorer-condition { max-width: 360px; margin-bottom: 20px; }
+.record-explorer > [hidden] { display: none; }
+.record-explorer .today-workspace { margin-top: 0; }
+
+.shared-photo-section:has(.album-heading) { margin-top: 20px; padding-top: 16px; }

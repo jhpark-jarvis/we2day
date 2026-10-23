@@ -18,9 +18,6 @@ export default async function RemindersPage({
   ]);
   return (
     <section className="reminder-workspace">
-      <Link className="text-button" href="/">
-        ← 일정으로
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">COMING UP TOGETHER</p>

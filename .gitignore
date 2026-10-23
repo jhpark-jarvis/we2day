@@ -58,3 +58,6 @@
 
 !/apps/web/src/app/settings/trash/
 !/apps/web/src/app/settings/trash/page.tsx
+
+!/apps/web/src/app/settings/export/
+!/apps/web/src/app/settings/export/page.tsx

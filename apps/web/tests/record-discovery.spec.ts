@@ -6,15 +6,21 @@ test("record discovery respects sharing and next appointment preserves date-only
   test.setTimeout(240_000);
   const first = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
+    serviceWorkers: "block",
     viewport: { width: 390, height: 844 },
   });
   const second = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
+    serviceWorkers: "block",
     viewport: { width: 390, height: 844 },
   });
   try {
     const a = await first.newPage(),
       b = await second.newPage();
+    const pageErrors: string[] = [];
+    b.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
     for (const [page, name] of [
       [a, "member"],
       [b, "partner"],
@@ -92,6 +98,55 @@ test("record discovery respects sharing and next appointment preserves date-only
     await b.getByLabel("기록 검색어").fill("우리의 작은 산책");
     await b.getByRole("button", { name: "기록 검색", exact: true }).click();
     await expect(results).toContainText("확정됨");
+
+    // Switching search targets is client-side and preserves each visited form/result.
+    let routeReads = 0,
+      monthlyReads = 0;
+    b.on("request", (request) => {
+      if (request.url().includes("/api/routes/history")) routeReads++;
+      if (request.url().includes("/api/records/search?month=")) monthlyReads++;
+    });
+    const target = b.getByLabel("검색 대상", { exact: true });
+    await target.selectOption("photos");
+    await b.getByLabel("사진 한마디 검색어 (선택)", { exact: true }).fill("통합 검색 유지");
+    await expect(b.getByRole("heading", { level: 1 })).toHaveCount(1);
+    await target.selectOption("routes");
+    expect(routeReads).toBe(0);
+    expect(monthlyReads).toBe(0);
+    await target.selectOption("monthly");
+    await expect(b.getByLabel("선택한 달의 기록 합계")).toBeVisible();
+    expect(monthlyReads).toBe(1);
+    await target.selectOption("records");
+    await expect(b.getByLabel("기록 검색어")).toHaveValue("우리의 작은 산책");
+    await expect(results).toContainText("우리의 작은 산책");
+    await target.selectOption("photos");
+    await expect(b.getByLabel("사진 한마디 검색어 (선택)", { exact: true })).toHaveValue(
+      "통합 검색 유지",
+    );
+    await target.selectOption("monthly");
+    expect(monthlyReads).toBe(1);
+    await b.getByLabel("돌아볼 월").fill("2000-01");
+    await expect(b.getByLabel("돌아볼 월")).toHaveValue("2000-01");
+    await b.route("**/api/records/search?month=2000-01", (route) =>
+      route.fulfill({ status: 503, json: { error: "합성 월간 조회 실패" } }),
+    );
+    await b.getByRole("button", { name: "이 달 보기", exact: true }).click();
+    await expect.poll(() => monthlyReads).toBe(2);
+    await expect(b.getByRole("button", { name: "이 달 보기", exact: true })).toBeEnabled();
+    await expect(b.getByRole("alert").filter({ hasText: "월간 추억" })).toContainText("이전 결과");
+    await expect(b.getByLabel("선택한 달의 기록 합계")).toBeVisible();
+    await b.unroute("**/api/records/search?month=2000-01");
+    await b.route("**/api/records/search?month=2000-01", (route) => route.abort());
+    await b.getByRole("button", { name: "이 달 보기", exact: true }).click();
+    await expect.poll(() => monthlyReads).toBe(3);
+    await expect(b.getByLabel("선택한 달의 기록 합계")).toBeVisible();
+    await expect(b.getByRole("button", { name: "이 달 보기", exact: true })).toBeEnabled();
+    await b.unroute("**/api/records/search?month=2000-01");
+
+    await target.selectOption("records");
+    const badMonth = await second.request.get("/api/records/search?month=2000-13");
+    expect(badMonth.status()).toBe(422);
+    expect(badMonth.headers()["cache-control"]).toContain("no-store");
     await second.setOffline(true);
     await b.getByRole("button", { name: "기록 검색", exact: true }).click();
     await expect(b.getByRole("alert").filter({ hasText: "조건과 이전 결과" })).toBeVisible();
@@ -109,6 +164,7 @@ test("record discovery respects sharing and next appointment preserves date-only
     await a.getByLabel("약속 이름").fill("합성 다음 약속");
     await a.getByLabel("날짜", { exact: true }).fill(futureDate);
     await a.getByRole("button", { name: "약속 저장하기", exact: true }).click();
+    await expect(a.getByRole("button", { name: /합성 다음 약속/ })).toBeVisible();
     await a.goto("/timezones");
     await a.getByText("약속 시간 미리보기", { exact: true }).click();
     const next = a.getByRole("complementary", { name: "다음 약속", exact: true });
@@ -123,6 +179,15 @@ test("record discovery respects sharing and next appointment preserves date-only
     await next.getByRole("link", { name: "달력에서 약속 보기", exact: true }).click();
     await expect(a).toHaveURL(new RegExp(`date=${futureDate}`), { timeout: 20_000 });
     await expect(a.getByRole("button", { name: /합성 다음 약속/ })).toBeVisible();
+    await a.getByRole("button", { name: /합성 다음 약속/ }).click();
+    await expect(a.getByRole("button", { name: "약속 수정하기", exact: true })).toBeVisible();
+    await expect(a.getByRole("button", { name: "일정으로", exact: true })).toHaveCount(0);
+    await a
+      .getByRole("navigation", { name: "주요 메뉴" })
+      .getByRole("link", { name: "일정", exact: true })
+      .click();
+    await expect(a.locator(".month-calendar")).toBeVisible();
+    expect(pageErrors).toEqual([]);
   } finally {
     await first.close();
     await second.close();

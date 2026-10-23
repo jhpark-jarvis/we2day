@@ -1,5 +1,4 @@
 import { PageHeading } from "@/components/page-heading";
-import Link from "@/components/progress-link";
 import { AnswerEditor, AnswerRefresh } from "@/components/question-forms";
 import { callApi } from "@/lib/api";
 import type { ProfileView } from "@/lib/profiles";
@@ -13,9 +12,6 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
   if (!result.data)
     return (
       <section>
-        <Link className="text-button" href="/questions">
-          ← 질문 목록으로
-        </Link>
         <p role="alert">{result.error}</p>
       </section>
     );
@@ -23,9 +19,6 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
   const profiles = await callApi<ProfileView>("/profiles");
   return (
     <section className="today-workspace">
-      <Link className="text-button" href={`/questions?date=${question.date}`}>
-        ← 질문 목록으로
-      </Link>
       <PageHeading>
         <p className="eyebrow">OUR ANSWERS</p>
         <h1>함께 나누는 답변</h1>

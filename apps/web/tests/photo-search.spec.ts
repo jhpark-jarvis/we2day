@@ -80,7 +80,7 @@ test("photo reference search shares active photos and preserves conditions after
       )
       .toBe(true);
     await page.getByText("상세 필터", { exact: true }).click();
-    await page.getByLabel("검색 대상", { exact: true }).selectOption("filename");
+    await page.getByLabel("사진 검색 항목", { exact: true }).selectOption("filename");
     await page.getByLabel("원래 파일명 검색어 (선택)").fill("SYNTHETIC-SEARCH");
     await page.getByLabel("올린 사람", { exact: true }).selectOption("mine");
     await page.getByRole("button", { name: "사진 검색", exact: true }).click();
@@ -100,7 +100,7 @@ test("photo reference search shares active photos and preserves conditions after
     await expect(partner.getByRole("region", { name: "사진 검색 결과" })).toContainText(
       "합성 산책 100%",
     );
-    await page.getByLabel("검색 대상", { exact: true }).selectOption("caption");
+    await page.getByLabel("사진 검색 항목", { exact: true }).selectOption("caption");
     await page.getByLabel("사진 한마디 검색어 (선택)").fill("연결 실패 중 작성한 조건");
     await page.context().setOffline(true);
     await page.getByRole("button", { name: "사진 검색", exact: true }).click();

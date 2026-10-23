@@ -1,13 +1,9 @@
 import { CalendarExport } from "@/components/calendar-export";
 import { PageHeading } from "@/components/page-heading";
-import Link from "@/components/progress-link";
 import { seoulToday } from "@/lib/calendar";
 export default function CalendarExportPage() {
   return (
     <section className="plan-editor">
-      <Link className="text-button" href="/">
-        ← 일정으로
-      </Link>
       <PageHeading>
         <div>
           <p className="eyebrow">TAKE OUR PLANS WITH YOU</p>

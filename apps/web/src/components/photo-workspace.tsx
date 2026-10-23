@@ -1,5 +1,5 @@
 "use client";
-import { CalendarDays, ChevronLeft, ChevronRight, ImageUp, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Download, ImageUp, X } from "lucide-react";
 import {
   Children,
   type KeyboardEvent,
@@ -167,14 +167,28 @@ export function PhotoWorkspace({
           className="shared-photo-section"
           aria-label={trash ? "둘의 사진 휴지통" : "날짜별 사진 앨범"}
         >
-          <div className="calendar-toolbar">
-            <h2>
-              {trash
-                ? "둘의 사진 휴지통"
-                : isSupportedDate(date)
-                  ? `${date.slice(0, 4)}년 ${date.slice(5, 7)}월 ${date.slice(8, 10)}일`
-                  : "사진을 볼 날짜를 선택해 주세요"}
-            </h2>
+          <div className="calendar-toolbar album-heading">
+            <div className="album-heading-date">
+              {!trash && (
+                <AlbumDatePicker
+                  date={date || today}
+                  refresh={refresh}
+                  onChange={(day) => {
+                    if (day === date) return;
+                    active.current?.abort();
+                    setLoading(true);
+                    setDate(day);
+                  }}
+                />
+              )}
+              <h2>
+                {trash
+                  ? "둘의 사진 휴지통"
+                  : isSupportedDate(date)
+                    ? `${date.slice(0, 4)}년 ${date.slice(5, 7)}월 ${date.slice(8, 10)}일`
+                    : "사진을 볼 날짜를 선택해 주세요"}
+              </h2>
+            </div>
             <div className="photo-album-actions">
               <RefreshButton
                 label="사진 새로고침"
@@ -193,20 +207,27 @@ export function PhotoWorkspace({
                   }}
                 />
               )}
+              {!trash && (
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label={selecting ? "사진 선택 닫기" : "사진 내보내기"}
+                  title={selecting ? "사진 선택 닫기" : "사진 내보내기"}
+                  aria-pressed={selecting}
+                  disabled={
+                    loading || exporting || loadedAlbum !== album || items.length === 0 || !!error
+                  }
+                  onClick={() => {
+                    setSelecting(!selecting);
+                    setSelected([]);
+                    setExportError("");
+                  }}
+                >
+                  <Download size={20} aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
-          {!trash && (
-            <AlbumDatePicker
-              date={date || today}
-              refresh={refresh}
-              onChange={(day) => {
-                if (day === date) return;
-                active.current?.abort();
-                setLoading(true);
-                setDate(day);
-              }}
-            />
-          )}
           {trash && (
             <div className="trash-filters">
               <div className="auth-field">
@@ -275,19 +296,6 @@ export function PhotoWorkspace({
               inert={loadedAlbum !== album}
               style={{ visibility: loadedAlbum && loadedAlbum !== album ? "hidden" : undefined }}
             >
-              {!trash && items.length > 0 && (
-                <button
-                  type="button"
-                  className="text-button"
-                  aria-pressed={selecting}
-                  onClick={() => {
-                    setSelecting(!selecting);
-                    setSelected([]);
-                  }}
-                >
-                  {selecting ? "사진 선택 닫기" : "사진 내보내기"}
-                </button>
-              )}
               {!trash && selecting && items.length > 0 && (
                 <div className="photo-export-toolbar">
                   <button
@@ -574,7 +582,8 @@ function AlbumDatePicker({
       <button
         ref={trigger}
         type="button"
-        className="text-button album-date-trigger"
+        className="icon-button album-date-trigger"
+        title="앨범 날짜"
         aria-label="앨범 날짜"
         aria-haspopup="dialog"
         onClick={() => {
@@ -583,7 +592,7 @@ function AlbumDatePicker({
           dialog.current?.showModal();
         }}
       >
-        <CalendarDays size={18} aria-hidden="true" /> 앨범 날짜
+        <CalendarDays size={20} aria-hidden="true" />
       </button>
       <dialog
         ref={dialog}

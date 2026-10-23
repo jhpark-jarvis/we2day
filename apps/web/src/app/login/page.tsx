@@ -93,9 +93,6 @@ export default async function LoginPage({
         <p className="note-panel">로그인을 준비 중이에요. 잠시 후 다시 방문해 주세요.</p>
       )}
       <p className="settings-hint">로그인해도 서로의 기록이 자동으로 연결되지는 않아요.</p>
-      <Link href="/" className="text-button">
-        일정으로 돌아가기
-      </Link>
     </section>
   );
 }

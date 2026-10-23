@@ -22,18 +22,12 @@ export default async function RouletteDetail({
   if (!wheel.data)
     return (
       <section>
-        <Link className="text-button" href="/roulette">
-          ← 룰렛 목록으로
-        </Link>
         <p role="alert">{wheel.error}</p>
       </section>
     );
   const draws = await callApi<RouletteDraw[]>(`/roulette/${id}/draws?offset=${offset}`);
   return (
     <section className="today-workspace">
-      <Link className="text-button" href="/roulette">
-        ← 룰렛 목록으로
-      </Link>
       <PageHeading>
         <h1>{wheel.data.title}</h1>
       </PageHeading>

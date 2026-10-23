@@ -83,7 +83,7 @@ export function PhotoSearch({
             <summary>상세 필터</summary>
             <div className="plan-basics">
               <div className="auth-field">
-                <label htmlFor="photo-search-field">검색 대상</label>
+                <label htmlFor="photo-search-field">사진 검색 항목</label>
                 <select
                   id="photo-search-field"
                   value={field}

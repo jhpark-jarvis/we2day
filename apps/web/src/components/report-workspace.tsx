@@ -80,9 +80,6 @@ export function ReportWorkspace({
   }
   return (
     <section className="plan-editor report-workspace">
-      <Link className="text-button" href="/plans">
-        ← 플랜으로
-      </Link>
       <p className="status-chip">{report?.shared ? "공유 중" : "나만 보기"}</p>
       <PageHeading>
         <div>
