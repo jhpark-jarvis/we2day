@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 test("naver handoff encodes selected place and discards temporary coordinates without recording visits", async ({
   page,
@@ -22,14 +22,15 @@ test("naver handoff encodes selected place and discards temporary coordinates wi
     if (url.pathname === "/api/visits" && request.method() === "POST") visitWrites++;
     await route.continue();
   });
-  await page.goto("/login");
+  await open(page, "/login");
   await page.getByLabel("아이디", { exact: true }).fill("member");
   await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/account$/);
-  await page.goto("/couple");
+  await open(page, "/couple");
   await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
-  await page.goto("/plans");
+  await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
+  await open(page, "/plans");
   await page.getByRole("button", { name: "플랜 만들기", exact: true }).click();
   await page.getByLabel("플랜 이름", { exact: true }).fill("합성 앱 이동 플랜");
   const date = await page.getByLabel("플랜 날짜").inputValue();
@@ -42,7 +43,7 @@ test("naver handoff encodes selected place and discards temporary coordinates wi
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
   await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
   await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
-  await page.goto(`/today?date=${date}`);
+  await open(page, `/today?date=${date}`);
   await page.getByRole("button", { name: "앱 연결 옵션", exact: true }).click();
   const search = page.getByRole("link", { name: "네이버 지도", exact: true });
   expect(new URL((await search.getAttribute("href")) || "").searchParams.get("query")).toBe(
@@ -86,17 +87,19 @@ test("saved date course opens stored places through direct map links without sea
     if (request.url().includes("/api/visits") && request.method() === "POST") visits++;
     if (request.url().includes("/api/places/search")) searches++;
   });
-  await page.goto("/login");
+  await open(page, "/login");
   await page.getByLabel("아이디", { exact: true }).fill("audit");
   await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/account$/);
-  await page.goto("/couple");
+  await open(page, "/couple");
   await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
   const date = "2026-11-09";
-  await page.goto(`/?date=${date}`);
+  await open(page, `/?date=${date}`);
   const agenda = page.getByRole("region", { name: "선택한 날짜의 약속", exact: true });
-  await expect(agenda.getByRole("link", { name: "코스 등록", exact: true })).toBeVisible();
+  await expect(agenda.getByRole("link", { name: "데이트 코스", exact: true })).toBeVisible();
+  await expect(agenda.getByRole("link", { name: "코스 등록", exact: true })).toHaveCount(0);
   await expect(
     page.locator("main > .calendar-toolbar").getByRole("link", { name: "코스 등록", exact: true }),
   ).toHaveCount(0);
@@ -120,6 +123,7 @@ test("saved date course opens stored places through direct map links without sea
   await expect(
     page.getByRole("link", { name: "데이트 코스", exact: true }).first(),
   ).toHaveAttribute("href", `/today?date=${date}`);
+  await agenda.getByRole("link", { name: "데이트 코스", exact: true }).click();
   await page.getByRole("link", { name: "코스 등록", exact: true }).click();
   await expect(page.getByLabel("플랜 날짜")).toHaveValue(date);
   await page.getByLabel("플랜 이름", { exact: true }).fill("미리 준비한 코스");
@@ -139,7 +143,7 @@ test("saved date course opens stored places through direct map links without sea
   const id = saved.find(
     (p: { content: { title: string } }) => p.content.title === "미리 준비한 코스",
   ).id;
-  await page.goto(`/today?date=${date}`);
+  await open(page, `/today?date=${date}`);
   const map = page.getByRole("link", { name: "네이버 지도", exact: true });
   await expect(map).toBeVisible();
   await expect(map).toHaveAttribute("href", /^nmap:\/\/search\?/);
@@ -151,7 +155,10 @@ test("saved date course opens stored places through direct map links without sea
   await expect(page.locator(".today-workspace")).not.toContainText("비용 미정");
   await expect(page.getByText("입력한 활동 비용", { exact: false })).toHaveCount(0);
   const focus = page.getByRole("region", { name: "살펴보는 활동" });
-  await expect(focus).toHaveCSS("border-top-width", "1px");
+  await expect(page.locator(".activity-card").filter({ has: focus })).toHaveCSS(
+    "border-top-width",
+    "1px",
+  );
   await expect(page.getByRole("button", { name: "이 날짜 보기", exact: true })).toHaveClass(
     "icon-button",
   );
@@ -216,7 +223,7 @@ test("saved date course opens stored places through direct map links without sea
     "직접 정한 장소 2 & 예시 주소 2",
   );
   // Unconfirmed place edits must not change the actual day's course.
-  await page.goto(`/plans?item=${id}`);
+  await open(page, `/plans?item=${id}`);
   await page.waitForLoadState("networkidle");
   await expect(page.getByLabel("활동 1 장소", { exact: true })).toHaveValue(
     "직접 정한 장소 1 & 예시 주소 1",
@@ -228,7 +235,7 @@ test("saved date course opens stored places through direct map links without sea
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await expect(page.getByRole("region", { name: "플랜 확정 내용", exact: true })).toBeVisible();
   await expect(page.getByText("변경안 · 다시 확정 필요", { exact: true })).toBeVisible();
-  await page.goto(`/today?date=${date}`);
+  await open(page, `/today?date=${date}`);
   expect(new URL((await map.getAttribute("href")) || "").searchParams.get("query")).toBe(
     "직접 정한 장소 1 & 예시 주소 1",
   );
@@ -251,8 +258,12 @@ test("saved date course opens stored places through direct map links without sea
 
   // Optional amounts retain their stored zero/null semantics while read-only zero labels disappear.
   for (const positive of [false, true]) {
-    await page.goto(`/plans?item=${id}`);
+    await open(page, `/plans?item=${id}`);
     await page.waitForLoadState("networkidle");
+    await page.getByText("예산 (선택)", { exact: true }).click();
+    await page.locator(".activity-editor-disclosure").nth(1).locator("summary").first().click();
+    await page.getByText("비용 (선택)", { exact: true }).nth(0).click();
+    await page.getByText("비용 (선택)", { exact: true }).nth(1).click();
     await page.getByLabel("전체 예산 (원, 선택)").fill(positive ? "20000" : "0");
     await page.getByLabel("활동 1 예상 비용 (원, 선택)", { exact: true }).fill("0");
     await page
@@ -264,7 +275,7 @@ test("saved date course opens stored places through direct map links without sea
     await expect(
       page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
     ).toBeEnabled();
-    await page.goto(`/today?date=${date}`);
+    await open(page, `/today?date=${date}`);
     await expect(page.locator(".day-timeline")).not.toContainText(/(?:^|\D)0원/);
     if (positive) {
       await expect(page.locator(".today-workspace > header")).toContainText(
@@ -280,7 +291,7 @@ test("saved date course opens stored places through direct map links without sea
   await page.getByRole("button", { name: "이 날짜 보기", exact: true }).click();
   await expect(page).toHaveURL(/date=2026-11-10/);
   await expect(page.getByText("이 날짜에 확정한 플랜이 없어요.", { exact: true })).toBeVisible();
-  await page.goto("/anniversaries");
+  await open(page, "/anniversaries");
   await page.getByRole("button", { name: "기념일 추가하기", exact: true }).click();
   await page.getByLabel("종류", { exact: true }).selectOption("custom");
   const longAnniversary = "함께기억하는아주긴기념일이름".repeat(3);
@@ -289,7 +300,7 @@ test("saved date course opens stored places through direct map links without sea
   await expect(page.getByRole("button", { name: "기념일 추가하기", exact: true })).toBeVisible();
   for (const width of [320, 393, 1425]) {
     await page.setViewportSize({ width, height: 852 });
-    await page.goto("/");
+    await open(page, "/");
     await expect(anniversary).toContainText(longAnniversary);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -302,7 +313,7 @@ test("saved date course opens stored places through direct map links without sea
   for (const route of ["/settings", "/memories/records", "/today"]) {
     for (const width of [320, 393, 1024, 1425]) {
       await page.setViewportSize({ width, height: 852 });
-      await page.goto(route);
+      await open(page, route);
       await page.waitForLoadState("networkidle");
       expect(
         await page.evaluate(
@@ -321,3 +332,9 @@ test("saved date course opens stored places through direct map links without sea
     }
   }
 });
+
+async function open(page: Page, url: string) {
+  await page.waitForLoadState("networkidle");
+  await page.goto(url);
+  await page.waitForLoadState("networkidle");
+}

@@ -9,7 +9,7 @@ test("사용자 이름 저장과 설정 표시 및 새로고침 유지", async (
   await expect(page.getByText("member", { exact: true })).toHaveCount(0);
   await page.getByLabel("사용자 이름", { exact: true }).fill("예시 별명");
   await page.getByRole("button", { name: "이름 저장", exact: true }).click();
-  await expect(page.getByText("예시 별명님, 반가워요.", { exact: true })).toBeVisible();
+  await expect(page.locator(".detail-list").getByText("예시 별명", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("사용자 이름", { exact: true })).toHaveValue("예시 별명");
   await page.goto("/settings");
@@ -19,7 +19,7 @@ test("사용자 이름 저장과 설정 표시 및 새로고침 유지", async (
   await page.goto("/account");
   await page.getByLabel("사용자 이름", { exact: true }).fill("새 별명");
   await page.getByRole("button", { name: "이름 저장", exact: true }).click();
-  await expect(page.getByText("새 별명님, 반가워요.", { exact: true })).toBeVisible();
+  await expect(page.locator(".detail-list").getByText("새 별명", { exact: true })).toBeVisible();
 });
 
 test("two users share appointments through real SQL and preserve edits on failures", async ({
@@ -57,7 +57,7 @@ test("two users share appointments through real SQL and preserve edits on failur
     ] as const) {
       await page.getByLabel("사용자 이름", { exact: true }).fill(name);
       await page.getByRole("button", { name: "이름 저장", exact: true }).click();
-      await expect(page.getByText(`${name}님, 반가워요.`, { exact: true })).toBeVisible();
+      await expect(page.locator(".detail-list").getByText(name, { exact: true })).toBeVisible();
     }
     await a.goto("/couple");
     await a.getByRole("button", { name: "새 공간 만들기" }).click();

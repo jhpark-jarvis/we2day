@@ -50,9 +50,19 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     expect(scripts).toBe(0);
     await a.getByRole("button", { name: "동선 기록 열기" }).click();
     await a.getByLabel("직접 정한 출발 장소 이름").fill("직접 지정한 출발");
+    await a
+      .locator(".route-point")
+      .filter({ hasText: "출발점" })
+      .getByText("좌표 직접 입력", { exact: true })
+      .click();
     await a.getByLabel("출발 위도").fill("37.5");
     await a.getByLabel("출발 경도").fill("127");
     await a.getByLabel("직접 정한 도착 장소 이름").fill("직접 지정한 도착");
+    await a
+      .locator(".route-point")
+      .filter({ hasText: "도착점" })
+      .getByText("좌표 직접 입력", { exact: true })
+      .click();
     await a.getByLabel("도착 위도").fill("37.6");
     await a.getByLabel("도착 경도").fill("127.1");
     await a.getByRole("button", { name: "지도에서 두 점 지정하기" }).click();
@@ -92,6 +102,7 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     await a.getByRole("button", { name: "활동 2 위로", exact: true }).click();
     await expect(a.getByLabel("활동 1 이름")).toHaveValue("카페");
     await a.getByRole("button", { name: "활동 1 아래로", exact: true }).click();
+    await a.getByText("준비물 (선택)", { exact: true }).click();
     await a.getByLabel("준비물 (한 줄에 하나, 최대 30개)").fill("물\n우산");
     await a.getByRole("button", { name: "플랜 저장", exact: true }).click();
     await expect(a.getByRole("heading", { name: "함께하는 주말", exact: true })).toBeVisible();

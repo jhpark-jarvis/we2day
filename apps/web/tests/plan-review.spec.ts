@@ -17,10 +17,16 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   const checks = page.getByLabel("플랜 시간·예산 점검", { exact: true });
   await expect(checks).toContainText("활동을 추가하면");
   await page.getByLabel("플랜 이름", { exact: true }).fill("시간·예산 점검 예시");
+  await page.getByText("예산 (선택)", { exact: true }).click();
   await page.getByLabel("전체 예산 (원, 선택)").fill("10000");
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 1 이름", { exact: true }).fill("산책");
   await page.getByLabel("활동 1 시간", { exact: true }).fill("14:00");
+  await page
+    .locator(".activity-editor-disclosure")
+    .nth(0)
+    .getByText("비용 (선택)", { exact: true })
+    .click();
   await page.getByLabel("활동 1 예상 비용 (원, 선택)", { exact: true }).fill("12000");
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 2 이름", { exact: true }).fill("카페");
@@ -39,12 +45,24 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   await expect(
     page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
   ).toBeVisible();
+  await page.locator(".activity-editor-disclosure > summary").nth(1).click();
   await page.getByLabel("활동 2 시간", { exact: true }).fill("14:00");
   await expect(checks).toContainText("과 같아요");
   await page.getByLabel("활동 2 시간", { exact: true }).fill("13:00");
   await page.getByRole("button", { name: "활동 2 위로", exact: true }).click();
   await expect(checks).not.toContainText("보다 일러요");
+  await page
+    .locator(".activity-editor-disclosure")
+    .nth(0)
+    .getByText("비용 (선택)", { exact: true })
+    .click();
   await page.getByLabel("활동 1 예상 비용 (원, 선택)", { exact: true }).fill("0");
+  await page.locator(".activity-editor-disclosure > summary").nth(1).click();
+  await page
+    .locator(".activity-editor-disclosure")
+    .nth(1)
+    .getByText("비용 (선택)", { exact: true })
+    .click();
   await page.getByLabel("활동 2 예상 비용 (원, 선택)", { exact: true }).fill("8000");
   await expect(checks).toContainText("예상 비용 합계 8,000원");
   await expect(checks).toContainText("전체 예산 이내예요");

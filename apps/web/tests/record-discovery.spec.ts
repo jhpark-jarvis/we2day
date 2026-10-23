@@ -62,7 +62,10 @@ test("record discovery respects sharing and next appointment preserves date-only
     await a.getByRole("button", { name: "개인 초안 저장", exact: true }).click();
     await expect(a.getByRole("status")).toContainText("나만 보는 초안");
     await b.goto("/memories/records");
-    await b.getByLabel("기록 종류").selectOption("report");
+    await b
+      .getByRole("group", { name: "기록 종류", exact: true })
+      .getByRole("button", { name: "회고", exact: true })
+      .click();
     await b.getByLabel("기록 검색어").fill("%_");
     await b.getByRole("button", { name: "기록 검색", exact: true }).click();
     const results = b.getByRole("region", { name: "기록 검색 결과" });
@@ -82,7 +85,10 @@ test("record discovery respects sharing and next appointment preserves date-only
     await expect(a.getByRole("status")).toContainText("더 이상 표시되지 않아요");
     await b.getByRole("button", { name: "기록 검색", exact: true }).click();
     await expect(results).not.toContainText("합성 검색 비공개 원문 %_");
-    await b.getByLabel("기록 종류").selectOption("plan");
+    await b
+      .getByRole("group", { name: "기록 종류", exact: true })
+      .getByRole("button", { name: "플랜", exact: true })
+      .click();
     await b.getByLabel("기록 검색어").fill("우리의 작은 산책");
     await b.getByRole("button", { name: "기록 검색", exact: true }).click();
     await expect(results).toContainText("확정됨");
@@ -104,6 +110,7 @@ test("record discovery respects sharing and next appointment preserves date-only
     await a.getByLabel("날짜", { exact: true }).fill(futureDate);
     await a.getByRole("button", { name: "약속 저장하기", exact: true }).click();
     await a.goto("/timezones");
+    await a.getByText("약속 시간 미리보기", { exact: true }).click();
     const next = a.getByRole("complementary", { name: "다음 약속", exact: true });
     await expect(next).toContainText("합성 다음 약속");
     await expect(next).toContainText("D-2 · 시간 미정");

@@ -32,6 +32,10 @@ test("question prompt search preserves answer privacy and recovers from network 
     await partner.getByRole("button", { name: "초대 수락하기", exact: true }).click();
     await expect(partner.getByRole("status")).toContainText("두 사람이 연결되었어요");
     await page.goto("/questions?date=2026-10-24");
+    await page
+      .locator("summary")
+      .filter({ hasText: /^질문 추가$/ })
+      .click();
     await page.getByLabel("함께 나눌 질문").fill("함께 하고 싶은 일 100% · 합성 질문");
     await page.getByRole("button", { name: "질문 추가", exact: true }).click();
     await expect(page).toHaveURL(/\/questions\/[a-f0-9-]+$/);
@@ -79,7 +83,7 @@ test("question prompt search preserves answer privacy and recovers from network 
       fullPage: true,
       caret: "initial",
     });
-    await page.getByRole("link", { name: "답변 쓰기·보기", exact: true }).click();
+    await page.getByRole("link", { name: /답변 쓰기·보기/ }).click();
     await expect(page).toHaveURL(questionUrl);
     await expect(page.getByLabel("답변 내용", { exact: true })).toHaveValue(
       "답변전용 비공개검색어",

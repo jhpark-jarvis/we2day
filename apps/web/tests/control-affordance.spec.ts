@@ -46,6 +46,7 @@ async function auditControls(page: Page, label: string) {
   const issues = await page.locator("main").evaluate((main, deep) => {
     const problems: string[] = [];
     for (const control of main.querySelectorAll<HTMLElement>("button, a, summary")) {
+      if (control.closest("[inert]")) continue;
       const bounds = control.getBoundingClientRect();
       if (!bounds.width || !bounds.height || getComputedStyle(control).visibility === "hidden")
         continue;
@@ -149,23 +150,26 @@ async function auditControls(page: Page, label: string) {
     }
     return problems;
   }, mobileDeepAudit);
-  const headingIssues = await page.locator(".app-header").evaluate((header) => {
-    const issues: string[] = [];
-    const word = header.querySelector<HTMLElement>(".wordmark")?.getBoundingClientRect();
-    const titles = [...header.querySelectorAll<HTMLElement>("h1")].filter((h) =>
-      h.checkVisibility(),
-    );
-    if (titles.length !== 1) issues.push("expected one visible page heading in header");
-    for (const title of titles) {
-      const box = title.getBoundingClientRect();
-      if (word && box.left < word.right + 7) issues.push("page heading overlaps wordmark");
-      if (box.right > document.documentElement.clientWidth + 1)
-        issues.push("page heading overflow");
-      if (getComputedStyle(title).textAlign !== "right")
-        issues.push("page heading is not right aligned");
-    }
-    return issues;
-  });
+  // The worker's standalone offline document deliberately has no application shell.
+  const headingIssues = label.startsWith("offline-notice/")
+    ? []
+    : await page.locator(".app-header").evaluate((header) => {
+        const issues: string[] = [];
+        const word = header.querySelector<HTMLElement>(".wordmark")?.getBoundingClientRect();
+        const titles = [...header.querySelectorAll<HTMLElement>("h1")].filter((h) =>
+          h.checkVisibility(),
+        );
+        if (titles.length !== 1) issues.push("expected one visible page heading in header");
+        for (const title of titles) {
+          const box = title.getBoundingClientRect();
+          if (word && box.left < word.right + 7) issues.push("page heading overlaps wordmark");
+          if (box.right > document.documentElement.clientWidth + 1)
+            issues.push("page heading overflow");
+          if (getComputedStyle(title).textAlign !== "right")
+            issues.push("page heading is not right aligned");
+        }
+        return issues;
+      });
   issues.push(...headingIssues);
   if (mobileDeepAudit) {
     const reachability = await page.locator("body").evaluate((body) => {
@@ -329,6 +333,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await page.getByLabel("이 날 만났어요", { exact: true }).check();
   await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
   await open(page, "/memories");
+  await page.getByText("사진 추가", { exact: true }).click();
   await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
   await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
   await page.getByLabel("이 사진의 한마디").fill("긴사진설명과함께남기는하루의기록".repeat(4));
@@ -337,11 +342,16 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
     page.getByText("둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요."),
   ).toBeVisible();
   await open(page, "/questions");
+  await page
+    .locator("summary")
+    .filter({ hasText: /^질문 추가$/ })
+    .click();
   await page.getByLabel("함께 나눌 질문").fill("화면 확인용 질문");
   await page.getByRole("button", { name: "질문 추가", exact: true }).click();
   await expect(page).toHaveURL(/\/questions\/[a-f0-9-]+$/, { timeout: 30_000 });
   const question = new URL(page.url()).pathname;
   await open(page, "/roulette");
+  await page.getByText("룰렛 만들기", { exact: true }).click();
   await page.getByLabel("룰렛 이름").fill("화면 확인용 선택");
   await page.getByLabel("후보 (한 줄에 하나, 2~20개)").fill("산책\n카페");
   await page.getByRole("button", { name: "룰렛 저장", exact: true }).click();
@@ -420,6 +430,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       scale: "css",
     });
     await open(page, "/memories");
+    await page.getByText("사진 추가", { exact: true }).click();
     await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
     await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
     await page
@@ -493,7 +504,8 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
             ? "/memories"
             : /^\/(together|checklists|goals|questions|roulette)(?:\/|$)/.test(route)
               ? "/together"
-              : ["/settings", "/account", "/couple", "/login", "/timezones"].includes(route)
+              : route.startsWith("/settings") ||
+                  ["/account", "/couple", "/login", "/timezones"].includes(route)
                 ? "/settings"
                 : "/";
           await expect(current.locator('.app-navigation [aria-current="page"]')).toHaveAttribute(
@@ -560,6 +572,11 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       await open(current, "/");
       await current.getByRole("button", { name: "동선 기록 열기", exact: true }).click();
       await expect(current.getByLabel("직접 정한 출발 장소 이름")).toBeVisible();
+      await current
+        .locator(".route-point")
+        .filter({ hasText: "출발점" })
+        .getByText("좌표 직접 입력", { exact: true })
+        .click();
       await current.getByLabel("출발 경도", { exact: true }).fill("127.0276368");
       await auditControls(current, `${theme}/${width}/route-editor`);
       await current.screenshot({
@@ -616,12 +633,22 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       });
     }
     textScale = 1;
-    await open(page, "/login");
-    await page.getByLabel("아이디", { exact: true }).fill("missing");
-    await page.getByLabel("비밀번호", { exact: true }).fill("wrong-password");
-    await page.getByRole("button", { name: "로그인", exact: true }).click();
-    await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
-    await auditControls(page, "login/error");
+    const guest = await browser.newContext({
+      baseURL: "http://127.0.0.1:3100",
+      viewport: { width: 390, height: 844 },
+      serviceWorkers: "block",
+    });
+    try {
+      const loginPage = await guest.newPage();
+      await open(loginPage, "/login");
+      await loginPage.getByLabel("아이디", { exact: true }).fill("missing");
+      await loginPage.getByLabel("비밀번호", { exact: true }).fill("wrong-password");
+      await loginPage.getByRole("button", { name: "로그인", exact: true }).click();
+      await expect(loginPage.getByRole("main").getByRole("alert")).toBeVisible();
+      await auditControls(loginPage, "login/error");
+    } finally {
+      await guest.close();
+    }
     await open(page, "/plans");
     await page.route("**/api/plans?*", (route) =>
       route.fulfill({

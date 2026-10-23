@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
+test.use({ actionTimeout: 15_000 });
+
 test("route history and private record copies support explicit download and failed reads", async ({
   browser,
 }, testInfo) => {
@@ -36,6 +38,16 @@ test("route history and private record copies support explicit download and fail
     await expect(b.getByRole("status")).toContainText("두 사람이 연결되었어요");
     await a.goto("/?date=2026-10-01");
     await a.getByRole("button", { name: "동선 기록 열기", exact: true }).click();
+    await a
+      .locator(".route-point")
+      .filter({ hasText: "출발점" })
+      .getByText("좌표 직접 입력", { exact: true })
+      .click();
+    await a
+      .locator(".route-point")
+      .filter({ hasText: "도착점" })
+      .getByText("좌표 직접 입력", { exact: true })
+      .click();
     for (const [label, value] of [
       ["직접 정한 출발 장소 이름", "합성 출발"],
       ["출발 위도", "37.5"],

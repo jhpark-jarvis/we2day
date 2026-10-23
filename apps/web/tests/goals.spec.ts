@@ -57,6 +57,7 @@ test("shared goal separates steps from completion and restores conflicts and arc
     await expect(stale.getByLabel("목표 이름", { exact: true })).toHaveValue(
       "충돌 시 보존할 목표 이름",
     );
+    stale.once("dialog", (dialog) => dialog.accept());
     await stale
       .getByRole("button", { name: "작성 내용을 버리고 최신본 불러오기", exact: true })
       .click();

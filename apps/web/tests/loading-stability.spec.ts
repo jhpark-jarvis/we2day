@@ -86,6 +86,7 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
   await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
   await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
   await open(page, "/memories");
+  await page.getByText("사진 추가", { exact: true }).click();
   await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
   await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
   await page.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
@@ -201,7 +202,7 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
 
     await open(page, "/memories");
     const album = page.getByRole("region", { name: "날짜별 사진 앨범" });
-    await expect(album.locator(".shared-photo-grid article")).toHaveCount(1);
+    await expect(album.locator(".shared-photo-carousel article")).toHaveCount(1);
     const albumBox = await geometry(album);
     const photos = await pause(page, "**/api/photos?*");
     try {
@@ -212,7 +213,7 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
       expect(spinner).not.toBeNull();
       expect(spinner?.y).toBeGreaterThanOrEqual(0);
       expect((spinner?.y ?? 0) + (spinner?.height ?? 0)).toBeLessThanOrEqual(844);
-      await expect(album.locator(".shared-photo-grid article")).toHaveCount(1);
+      await expect(album.locator(".shared-photo-carousel article")).toHaveCount(1);
       unchanged(await geometry(album), albumBox);
       await page.screenshot({
         path: info.outputPath(`album-pending-${width}.png`),
@@ -231,17 +232,17 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
       json: { error: "합성 조회 실패" },
     });
     try {
-      await page.getByLabel("만난 날짜", { exact: true }).fill("2025-01-01");
+      await page.getByLabel("앨범 날짜", { exact: true }).fill("2025-01-01");
       await failure.started;
       expect(
-        await album.locator(".shared-photo-grid").evaluate((node) => !!node.closest("[inert]")),
+        await album.locator(".shared-photo-carousel").evaluate((node) => !!node.closest("[inert]")),
       ).toBe(true);
     } finally {
       failure.release();
     }
     await expect(album.getByRole("alert")).toHaveText("합성 조회 실패");
     await expect(album.locator(".loading-veil")).toHaveCount(0);
-    await expect(album.locator(".shared-photo-grid")).toBeHidden();
+    await expect(album.locator(".shared-photo-carousel")).toBeHidden();
     await failure.remove();
     await album.getByRole("button", { name: "사진 새로고침", exact: true }).click();
     await expect(

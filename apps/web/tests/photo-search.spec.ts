@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 test("photo reference search shares active photos and preserves conditions after network failure", async ({
   page,
@@ -17,7 +17,7 @@ test("photo reference search shares active photos and preserves conditions after
       [page, "member"],
       [partner, "partner"],
     ] as const) {
-      await view.goto("/login");
+      await open(view, "/login");
       await view.getByLabel("아이디", { exact: true }).fill(username);
       await view.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
       await view.getByRole("button", { name: "로그인", exact: true }).click();
@@ -25,17 +25,18 @@ test("photo reference search shares active photos and preserves conditions after
       const name = username === "member" ? "가상 사진 작성자 가" : "가상 사진 작성자 나";
       await view.getByLabel("사용자 이름", { exact: true }).fill(name);
       await view.getByRole("button", { name: "이름 저장", exact: true }).click();
-      await expect(view.getByText(`${name}님, 반가워요.`, { exact: true })).toBeVisible();
+      await expect(view.locator(".detail-list").getByText(name, { exact: true })).toBeVisible();
     }
-    await page.goto("/couple");
+    await open(page, "/couple");
     await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
     await page.getByRole("button", { name: "초대 코드 만들기", exact: true }).click();
     const code = await page.getByLabel("상대에게 전달할 코드").inputValue();
-    await partner.goto("/couple");
+    await open(partner, "/couple");
     await partner.getByLabel("받은 초대 코드").fill(code);
     await partner.getByRole("button", { name: "초대 수락하기", exact: true }).click();
     await expect(partner.getByRole("status")).toContainText("두 사람이 연결되었어요");
-    await page.goto("/memories");
+    await open(page, "/memories");
+    await page.getByText("사진 추가", { exact: true }).click();
     const image = await page.evaluate(() => {
       const canvas = document.createElement("canvas");
       canvas.width = 320;
@@ -60,7 +61,7 @@ test("photo reference search shares active photos and preserves conditions after
       page.getByText("둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요."),
     ).toBeVisible({ timeout: 30_000 });
     for (const view of [page, partner]) {
-      await view.goto("/memories/search");
+      await open(view, "/memories/search");
       await view.getByLabel("시작 날짜", { exact: true }).fill("2026-10-01");
       await view.getByLabel("마지막 날짜", { exact: true }).fill("2026-10-31");
       await view.getByLabel("사진 한마디 검색어 (선택)").fill("100%");
@@ -78,6 +79,7 @@ test("photo reference search shares active photos and preserves conditions after
           .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
       )
       .toBe(true);
+    await page.getByText("상세 필터", { exact: true }).click();
     await page.getByLabel("검색 대상", { exact: true }).selectOption("filename");
     await page.getByLabel("원래 파일명 검색어 (선택)").fill("SYNTHETIC-SEARCH");
     await page.getByLabel("올린 사람", { exact: true }).selectOption("mine");
@@ -89,6 +91,7 @@ test("photo reference search shares active photos and preserves conditions after
     await expect(page.locator(".photo-reference")).toContainText("가상 사진 작성자 가");
     await expect(page.locator(".photo-reference")).toContainText("synthetic-search.jpg");
     await expect(page.locator(".photo-reference")).toContainText("제공된 정보 없음");
+    await partner.getByText("상세 필터", { exact: true }).click();
     await partner.getByLabel("올린 사람", { exact: true }).selectOption("mine");
     await partner.getByRole("button", { name: "사진 검색", exact: true }).click();
     await expect(partner.getByText("이 조건에 맞는 사진이 없어요.", { exact: true })).toBeVisible();
@@ -135,3 +138,9 @@ test("photo reference search shares active photos and preserves conditions after
     await partnerContext.close();
   }
 });
+
+async function open(page: Page, url: string) {
+  await page.waitForLoadState("networkidle");
+  await page.goto(url);
+  await page.waitForLoadState("networkidle");
+}
