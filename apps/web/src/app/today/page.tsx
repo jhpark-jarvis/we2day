@@ -37,7 +37,7 @@ export default async function TodayPage({
         <div>
           <p className="eyebrow">OUR DAY, STEP BY STEP</p>
           <h1>데이트 코스</h1>
-          <p className="muted">방문할 장소를 순서대로 보고, 저장한 목적지로 바로 출발해요.</p>
+          <p className="muted">오늘의 장소를 확인하고 네이버 지도로 출발해요.</p>
         </div>
       </PageHeading>
       <form className="date-filter" action="/today">

@@ -97,7 +97,7 @@ button { appearance: none; color: var(--foreground); }
 .page-title-slot .page-heading { display: block; margin: 0; text-align: right; }
 .page-title-slot h1 { font-size: 22px; line-height: 1.35; letter-spacing: -.7px; margin: 0; word-break: normal; overflow-wrap: anywhere; }
 .page-title-slot .eyebrow { font-size: 9px; letter-spacing: 1px; margin: 0 0 3px; }
-.page-title-slot .muted { font-size: 12px; line-height: 1.45; margin-top: 4px; }
+.page-title-slot .muted { font-size: 12px; line-height: 1.45; margin-top: 4px; word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty; }
 .eyebrow { font-size: 11px; letter-spacing: 1.8px; color: var(--muted); margin-bottom: 7px; }
 .muted { color: var(--muted); font-size: 13px; }
 .preview-badge { border: 1px solid var(--line); border-radius: 20px; padding: 4px 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
