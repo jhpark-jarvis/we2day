@@ -339,9 +339,6 @@ export function CalendarWorkspace({
               >
                 약속 추가하기
               </button>
-              <Link className="text-button" href={`/plans?date=${selected}&new=1`}>
-                코스 등록
-              </Link>
               <details className="schedule-tools">
                 <summary>일정 도구</summary>
                 <nav aria-label="일정 도구">
@@ -477,9 +474,12 @@ export function CalendarWorkspace({
                 <span className="muted">약속 {dayEvents.length}</span>
               </header>
               {!preview && status === "ready" && (
-                <div className="calendar-toolbar">
+                <div className="calendar-toolbar agenda-actions">
                   <Link className="text-button" href={`/today?date=${selected}`}>
                     {selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
+                  </Link>
+                  <Link className="text-button" href={`/plans?date=${selected}&new=1`}>
+                    코스 등록
                   </Link>
                 </div>
               )}

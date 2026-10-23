@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarHeart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "@/components/progress-link";
@@ -30,7 +31,6 @@ export function AnniversarySummary({ data }: { data: AnniversaryList | null }) {
   return (
     <section className="anniversary-summary" aria-label="디데이와 기념일 요약">
       <div>
-        <p className="muted">OUR DAYS</p>
         <strong>
           {!data
             ? "우리의 기념일"
@@ -40,7 +40,7 @@ export function AnniversarySummary({ data }: { data: AnniversaryList | null }) {
                 ? `${relationship.title} ${countdown(relationship.days_until)}`
                 : data.items.length
                   ? "우리의 기념일"
-                  : "함께 기억할 날을 등록해 보세요"}
+                  : "기념일을 등록해 보세요"}
         </strong>
         {upcoming && (
           <p>
@@ -48,8 +48,13 @@ export function AnniversarySummary({ data }: { data: AnniversaryList | null }) {
           </p>
         )}
       </div>
-      <Link className="text-button" href="/anniversaries">
-        기념일 관리
+      <Link
+        className="icon-button"
+        href="/anniversaries"
+        aria-label="기념일 관리"
+        title="기념일 관리"
+      >
+        <CalendarHeart size={20} aria-hidden="true" />
       </Link>
     </section>
   );
