@@ -1,5 +1,5 @@
 "use client";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ImageUp, X } from "lucide-react";
 import {
   Children,
   type KeyboardEvent,
@@ -15,7 +15,7 @@ import { PhotoCard } from "@/components/photo-card";
 import { PhotoPreparation } from "@/components/photo-preparation";
 import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
-import { isSupportedDate } from "@/lib/calendar";
+import { calendarDate, daysInMonth, isSupportedDate, parseDate } from "@/lib/calendar";
 import type { PhotoPage, SharedPhoto } from "@/lib/photos";
 
 export function PhotoWorkspace({
@@ -175,31 +175,37 @@ export function PhotoWorkspace({
                   ? `${date.slice(0, 4)}년 ${date.slice(5, 7)}월 ${date.slice(8, 10)}일`
                   : "사진을 볼 날짜를 선택해 주세요"}
             </h2>
-            <RefreshButton
-              label="사진 새로고침"
-              pending={loading}
-              disabled={!trash && !isSupportedDate(date)}
-              onClick={() => {
-                setRefresh((value) => value + 1);
-              }}
-            />
-          </div>
-          {!trash && (
-            <div className="auth-field album-date">
-              <label htmlFor="album-date">앨범 날짜</label>
-              <input
-                id="album-date"
-                type="date"
-                min="2000-01-01"
-                max="2100-12-31"
-                value={date}
-                onChange={(e) => {
-                  active.current?.abort();
-                  setLoading(true);
-                  setDate(e.target.value);
+            <div className="photo-album-actions">
+              <RefreshButton
+                label="사진 새로고침"
+                pending={loading}
+                onClick={() => {
+                  setRefresh((value) => value + 1);
                 }}
               />
+              {!trash && (
+                <PhotoUploadDialog
+                  today={date || today}
+                  canSave={canSave}
+                  onSaved={(day) => {
+                    setDate(day);
+                    setRefresh((value) => value + 1);
+                  }}
+                />
+              )}
             </div>
+          </div>
+          {!trash && (
+            <AlbumDatePicker
+              date={date || today}
+              refresh={refresh}
+              onChange={(day) => {
+                if (day === date) return;
+                active.current?.abort();
+                setLoading(true);
+                setDate(day);
+              }}
+            />
           )}
           {trash && (
             <div className="trash-filters">
@@ -357,20 +363,10 @@ export function PhotoWorkspace({
           </LoadingRegion>
         </section>
       )}{" "}
-      {!trash && (
-        <details className="editor-disclosure" open={!canSave}>
-          <summary>사진 추가</summary>
-          <PhotoPreparation
-            today={today}
-            selectedDate={date}
-            canSave={canSave}
-            onDateChange={(day) => {
-              setLoading(canSave);
-              setDate(day);
-            }}
-            onSaved={() => setRefresh((value) => value + 1)}
-          />
-        </details>
+      {!trash && !canSave && (
+        <div className="calendar-toolbar">
+          <PhotoUploadDialog today={today} canSave={false} onSaved={() => {}} />
+        </div>
       )}
     </>
   );
@@ -466,5 +462,234 @@ function PhotoCollection({
         ))}
       </section>
     </>
+  );
+}
+
+function PhotoUploadDialog({
+  today,
+  canSave,
+  onSaved,
+}: {
+  today: string;
+  canSave: boolean;
+  onSaved: (date: string) => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className="icon-button"
+        aria-label="사진 업로드"
+        title="사진 업로드"
+        aria-haspopup="dialog"
+        onClick={() => dialog.current?.showModal()}
+      >
+        <ImageUp size={21} aria-hidden="true" />
+      </button>
+      <dialog
+        ref={dialog}
+        className="photo-upload-dialog"
+        aria-labelledby="photo-upload-title"
+        onClose={() => trigger.current?.focus()}
+      >
+        <div className="section-heading">
+          <h2 id="photo-upload-title">사진 업로드</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="사진 업로드 닫기"
+            title="닫기"
+            onClick={() => dialog.current?.close()}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <PhotoPreparation today={today} canSave={canSave} onSaved={onSaved} />
+      </dialog>
+    </>
+  );
+}
+
+function AlbumDatePicker({
+  date,
+  refresh,
+  onChange,
+}: {
+  date: string;
+  refresh: number;
+  onChange: (date: string) => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [month, setMonth] = useState(date.slice(0, 7));
+  const [days, setDays] = useState<{ date: string; count: number }[]>([]);
+  const [loadedMonth, setLoadedMonth] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    setMonth(date.slice(0, 7));
+  }, [date]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refresh/retry invalidate the same month's availability
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    void (async () => {
+      try {
+        const response = await fetch(`/api/photos?month=${month}`, {
+          cache: "no-store",
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+        });
+        const body = await response.json();
+        if (controller.signal.aborted) return;
+        if (!response.ok) {
+          setError(body.error || "앨범 날짜를 불러오지 못했어요.");
+          return;
+        }
+        setDays(body.days);
+        setLoadedMonth(month);
+        setError("");
+      } catch {
+        if (!controller.signal.aborted)
+          setError("앨범 날짜를 불러오지 못했어요. 다시 시도해 주세요.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [month, refresh, retry]);
+  const [year, monthIndex] = parseDate(`${month}-01`);
+  const start = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
+  const count = daysInMonth(year, monthIndex);
+  const available = new Map(days.map((day) => [day.date, day.count]));
+  function shift(delta: number) {
+    const next = new Date(Date.UTC(year, monthIndex + delta, 1));
+    setMonth(calendarDate(next.getUTCFullYear(), next.getUTCMonth(), 1).slice(0, 7));
+  }
+  return (
+    <div className="album-date">
+      <button
+        ref={trigger}
+        type="button"
+        className="text-button album-date-trigger"
+        aria-label="앨범 날짜"
+        aria-haspopup="dialog"
+        onClick={() => {
+          setLoading(true);
+          setRetry((value) => value + 1);
+          dialog.current?.showModal();
+        }}
+      >
+        <CalendarDays size={18} aria-hidden="true" /> 앨범 날짜
+      </button>
+      <dialog
+        ref={dialog}
+        className="photo-album-dialog"
+        aria-labelledby="album-picker-title"
+        onClose={() => trigger.current?.focus()}
+      >
+        <div className="section-heading">
+          <h2 id="album-picker-title">앨범 날짜</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="앨범 날짜 닫기"
+            title="닫기"
+            onClick={() => dialog.current?.close()}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="album-month-heading">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="이전 앨범 월"
+            title="이전 달"
+            disabled={month === "2000-01"}
+            onClick={() => shift(-1)}
+          >
+            <ChevronLeft size={20} aria-hidden="true" />
+          </button>
+          <input
+            id="album-month"
+            aria-label="앨범 월"
+            type="month"
+            min="2000-01"
+            max="2100-12"
+            value={month}
+            onChange={(event) => {
+              if (/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(event.target.value))
+                setMonth(event.target.value);
+            }}
+          />
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="다음 앨범 월"
+            title="다음 달"
+            disabled={month === "2100-12"}
+            onClick={() => shift(1)}
+          >
+            <ChevronRight size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="settings-hint">사진이 있는 날짜만 선택할 수 있어요.</p>
+        <LoadingRegion busy={loading} label="앨범 날짜를 불러오는 중">
+          <section
+            className="album-calendar"
+            aria-label={`${year}년 ${monthIndex + 1}월 사진 날짜`}
+          >
+            {["일", "월", "화", "수", "목", "금", "토"].map((name) => (
+              <span className="album-weekday" key={name}>
+                {name}
+              </span>
+            ))}
+            {["일", "월", "화", "수", "목", "금", "토"].slice(0, start).map((name) => (
+              <span key={`blank-${name}`} />
+            ))}
+            {Array.from({ length: count }, (_, index) => {
+              const day = calendarDate(year, monthIndex, index + 1);
+              const total = available.get(day) || 0;
+              return (
+                <button
+                  type="button"
+                  key={day}
+                  className="album-calendar-day"
+                  disabled={loading || !!error || loadedMonth !== month || !total}
+                  aria-label={`${day} · 사진 ${total}장`}
+                  aria-pressed={day === date}
+                  onClick={() => {
+                    onChange(day);
+                    dialog.current?.close();
+                  }}
+                >
+                  {index + 1}
+                  {total > 0 && loadedMonth === month && <span className="album-photo-dot" />}
+                </button>
+              );
+            })}
+          </section>
+        </LoadingRegion>
+        {error && (
+          <div className="album-calendar-error">
+            <p role="alert" className="error-message">
+              {error}
+            </p>
+            <RefreshButton
+              label="앨범 날짜 다시 불러오기"
+              pending={loading}
+              onClick={() => setRetry((value) => value + 1)}
+            />
+          </div>
+        )}
+        {!loading && !error && days.length === 0 && (
+          <p className="settings-hint">이 달에는 사진이 없어요.</p>
+        )}
+      </dialog>
+    </div>
   );
 }

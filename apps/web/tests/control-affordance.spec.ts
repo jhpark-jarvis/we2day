@@ -333,13 +333,13 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await page.getByLabel("이 날 만났어요", { exact: true }).check();
   await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
   await open(page, "/memories");
-  await page.getByText("사진 추가", { exact: true }).click();
+  await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
   await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
   await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
   await page.getByLabel("이 사진의 한마디").fill("긴사진설명과함께남기는하루의기록".repeat(4));
   await page.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
   await expect(
-    page.getByText("둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요."),
+    page.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
   ).toBeVisible();
   await open(page, "/questions");
   await page
@@ -430,7 +430,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       scale: "css",
     });
     await open(page, "/memories");
-    await page.getByText("사진 추가", { exact: true }).click();
+    await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
     await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
     await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
     await page

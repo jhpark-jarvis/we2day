@@ -36,7 +36,7 @@ test("photo reference search shares active photos and preserves conditions after
     await partner.getByRole("button", { name: "초대 수락하기", exact: true }).click();
     await expect(partner.getByRole("status")).toContainText("두 사람이 연결되었어요");
     await open(page, "/memories");
-    await page.getByText("사진 추가", { exact: true }).click();
+    await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
     const image = await page.evaluate(() => {
       const canvas = document.createElement("canvas");
       canvas.width = 320;
@@ -58,7 +58,7 @@ test("photo reference search shares active photos and preserves conditions after
     await page.getByLabel("이 사진의 한마디").fill("합성 산책 100%");
     await page.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
     await expect(
-      page.getByText("둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요."),
+      page.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
     ).toBeVisible({ timeout: 30_000 });
     for (const view of [page, partner]) {
       await open(view, "/memories/search");

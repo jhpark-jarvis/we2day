@@ -20,7 +20,7 @@ export function PhotoPreparation({
   selectedDate?: string;
   canSave?: boolean;
   onDateChange?: (date: string) => void;
-  onSaved?: () => void;
+  onSaved?: (date: string) => void;
 }) {
   const [date, setDate] = useState(today);
   useEffect(() => {
@@ -121,7 +121,7 @@ export function PhotoPreparation({
         return;
       }
       setSaved(true);
-      onSaved?.();
+      onSaved?.(date);
     } catch {
       setSaveError("저장 결과를 확인하지 못했어요. 같은 사진으로 다시 시도해 주세요.");
     } finally {
@@ -273,7 +273,7 @@ export function PhotoPreparation({
               </button>
               {saved && (
                 <p role="status">
-                  둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요.
+                  둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요.
                 </p>
               )}
               {saveError && (

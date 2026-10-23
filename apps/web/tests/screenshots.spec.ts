@@ -127,6 +127,7 @@ test("generate public screenshots using disposable synthetic records only", asyn
     await capture(page, "plan-desktop.png", page.getByRole("region", { name: "플랜 확정 내용" }));
 
     await page.goto("/memories?date=2026-10-10");
+    await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
     await expect(page.getByLabel("사진 선택")).toBeEnabled({ timeout: 30_000 });
     await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
     await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible({
@@ -135,7 +136,7 @@ test("generate public screenshots using disposable synthetic records only", asyn
     await page.getByLabel("이 사진의 한마디").fill("함께 걸었던 가을 오후");
     await page.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
     await expect(
-      page.getByText("둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요."),
+      page.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
     ).toBeVisible();
     await page.setViewportSize({ width: 390, height: 1100 });
     await page.goto("/memories/month?month=2026-10");

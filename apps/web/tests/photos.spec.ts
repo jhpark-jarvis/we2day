@@ -61,6 +61,7 @@ test("photo preparation preserves allowed references locally and strips original
     await expect(page.getByRole("status").filter({ hasText: "1년" })).toBeVisible();
   }
   await page.goto("/memories");
+  await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
   await expect(page.getByLabel("\uc0ac\uc9c4 \uc120\ud0dd")).toBeEnabled();
   const transmissions: string[] = [];
   page.on("request", (request) => {
@@ -113,6 +114,7 @@ test("invalid files recover to a photo without invented device or capture data",
   page,
 }) => {
   await page.goto("/memories");
+  await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
   await expect(page.getByLabel("\uc0ac\uc9c4 \uc120\ud0dd")).toBeEnabled();
   const input = page.getByLabel("사진 선택");
   await input.setInputFiles({
@@ -173,6 +175,7 @@ test("clearing during decode cannot restore an obsolete photo", async ({ page })
     }) as typeof createImageBitmap;
   });
   await page.goto("/memories");
+  await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
   await expect(page.getByLabel("\uc0ac\uc9c4 \uc120\ud0dd")).toBeEnabled();
   await page.getByLabel("사진 선택").setInputFiles({
     name: "cancel.png",
@@ -198,6 +201,7 @@ test("unsupported WebP encoder falls back to a metadata-free bounded JPEG", asyn
     };
   });
   await page.goto("/memories");
+  await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
   await expect(page.getByLabel("사진 선택")).toBeEnabled();
   const source = withExif(await image(page));
   const writes: string[] = [];

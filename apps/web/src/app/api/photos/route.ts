@@ -1,12 +1,37 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
+import type { MonthlyMemories } from "@/lib/monthly";
 import type { PhotoPage, SharedPhoto } from "@/lib/photos";
 
 const headers = { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(request: NextRequest) {
+  const month = request.nextUrl.searchParams.get("month");
+  if (month !== null) {
+    if (
+      !/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(month) ||
+      ["date", "trash", "after"].some((key) => request.nextUrl.searchParams.has(key))
+    )
+      return NextResponse.json({ error: "앨범 월을 확인해 주세요." }, { status: 422, headers });
+    const result = await callApi<MonthlyMemories>(`/memories/month?month=${month}`);
+    return NextResponse.json(
+      result.error
+        ? { error: result.error }
+        : {
+            month,
+            days:
+              result.data?.days
+                .filter((day) => day.photo_count > 0)
+                .map((day) => ({
+                  date: day.date,
+                  count: day.photo_count,
+                })) || [],
+          },
+      { status: result.status, headers },
+    );
+  }
   const date = request.nextUrl.searchParams.get("date") || "";
   const after = request.nextUrl.searchParams.get("after");
   const trash = request.nextUrl.searchParams.get("trash") === "true";

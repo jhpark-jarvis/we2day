@@ -620,3 +620,25 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 .roulette-create-dialog .plan-editor { max-width: 100%; }
 .roulette-create-dialog .meeting-fields { min-width: 0; }
 body:has(.roulette-create-dialog[open]) { overflow: hidden; }
+
+.photo-upload-dialog, .photo-album-dialog { box-sizing: border-box; width: min(640px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--foreground); overflow-y: auto; overscroll-behavior: contain; }
+.photo-upload-dialog::backdrop, .photo-album-dialog::backdrop { background: rgb(30 22 18 / 45%); }
+body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidden; }
+.photo-upload-dialog .section-heading, .photo-album-dialog .section-heading { margin-bottom: 12px; }
+.photo-upload-dialog .photo-preparation { margin: 0; }
+.photo-upload-dialog .photo-controls { grid-template-columns: minmax(0, 1fr); }
+.photo-album-dialog { width: min(400px, calc(100% - 24px)); padding: 16px; }
+.album-date-trigger { display: inline-flex; align-items: center; gap: 8px; }
+.album-month-heading { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 6px; margin-block: 12px; }
+.album-month-heading input { width: 100%; min-width: 0; }
+.album-calendar { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 2px; }
+.album-weekday { font-size: 12px; text-align: center; padding-block: 8px; color: var(--muted); }
+.album-calendar-day { position: relative; display: grid; place-items: center; min-height: 44px; min-width: 0; padding: 4px 0; border: 0; border-radius: 10px; background: transparent; color: var(--foreground); }
+.album-calendar-day:disabled { opacity: .32; }
+.album-calendar-day[aria-pressed="true"]:not(:disabled) { color: var(--on-accent); background: var(--accent); }
+.album-photo-dot { position: absolute; bottom: 3px; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.album-calendar-error { display: flex; align-items: center; gap: 8px; }
+
+.shared-photo-section > .calendar-toolbar { flex-wrap: nowrap; }
+.shared-photo-section > .calendar-toolbar > h2 { flex: 1; min-width: 0; }
+.photo-album-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }

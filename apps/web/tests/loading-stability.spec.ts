@@ -86,12 +86,12 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
   await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
   await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
   await open(page, "/memories");
-  await page.getByText("사진 추가", { exact: true }).click();
+  await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
   await page.getByLabel("사진 선택").setInputFiles(path.resolve("public/demo/autumn.jpg"));
   await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
   await page.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
   await expect(
-    page.getByText("둘의 사진으로 저장했어요. 아래 날짜별 앨범에서 확인할 수 있어요."),
+    page.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
   ).toBeVisible();
 
   for (const [width, theme] of [
@@ -208,8 +208,10 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
     try {
       await album.getByRole("button", { name: "사진 새로고침", exact: true }).click();
       await photos.started;
-      await expect(album.locator(".loading-veil")).toBeVisible();
-      const spinner = await album.locator(".loading-veil > .loading-spinner").boundingBox();
+      await expect(album.locator(".loading-results > .loading-veil")).toBeVisible();
+      const spinner = await album
+        .locator(".loading-results > .loading-veil > .loading-spinner")
+        .boundingBox();
       expect(spinner).not.toBeNull();
       expect(spinner?.y).toBeGreaterThanOrEqual(0);
       expect((spinner?.y ?? 0) + (spinner?.height ?? 0)).toBeLessThanOrEqual(844);
@@ -222,17 +224,27 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
     } finally {
       photos.release();
     }
-    await expect(album.locator(".loading-veil")).toHaveCount(0);
+    await expect(album.locator(".loading-results > .loading-veil")).toHaveCount(0);
     unchanged(await geometry(album), albumBox);
     await photos.remove();
 
     // Changing date may replace actual results, but failed reads must never expose the old album as editable.
-    const failure = await pause(page, "**/api/photos?*", {
+    await page.route("**/api/photos?month=2025-01", (route) =>
+      route.fulfill({
+        json: { month: "2025-01", days: [{ date: "2025-01-01", count: 1 }] },
+      }),
+    );
+    await page.getByRole("button", { name: "앨범 날짜", exact: true }).click();
+    await page.getByLabel("앨범 월", { exact: true }).fill("2025-01");
+    await expect(
+      page.getByRole("button", { name: "2025-01-01 · 사진 1장", exact: true }),
+    ).toBeEnabled();
+    const failure = await pause(page, "**/api/photos?date=2025-01-01", {
       status: 503,
       json: { error: "합성 조회 실패" },
     });
     try {
-      await page.getByLabel("앨범 날짜", { exact: true }).fill("2025-01-01");
+      await page.getByRole("button", { name: "2025-01-01 · 사진 1장", exact: true }).click();
       await failure.started;
       expect(
         await album.locator(".shared-photo-carousel").evaluate((node) => !!node.closest("[inert]")),
@@ -241,9 +253,10 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
       failure.release();
     }
     await expect(album.getByRole("alert")).toHaveText("합성 조회 실패");
-    await expect(album.locator(".loading-veil")).toHaveCount(0);
+    await expect(album.locator(".loading-results > .loading-veil")).toHaveCount(0);
     await expect(album.locator(".shared-photo-carousel")).toBeHidden();
     await failure.remove();
+    await page.unroute("**/api/photos?month=2025-01");
     await album.getByRole("button", { name: "사진 새로고침", exact: true }).click();
     await expect(
       album.getByText("아직 이 날의 사진이 없어요. 첫 장면을 남겨보세요."),
