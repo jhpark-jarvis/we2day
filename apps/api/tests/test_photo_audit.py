@@ -2,7 +2,7 @@ import psycopg
 from test_database import USERS, connect_pair, reset_database  # noqa: F401
 from test_photo_database import reserve
 
-from we2day_api.photo_audit import audit
+from we2day_api.photo_audit import read_audit
 
 
 def test_inventory_distinguishes_recent_uploads_from_stale_and_missing(database_url):
@@ -25,8 +25,7 @@ def test_inventory_distinguishes_recent_uploads_from_stale_and_missing(database_
             "values('we2day-photos','unknown', '{\"size\":42}',now()-interval '25 hours')"
         )
         db.commit()
-        db.execute("set transaction read only")
-        result = audit(db)
+        result = read_audit({"conninfo": database_url})
         assert (
             result["stale_pending"]
             == result["missing_objects"]

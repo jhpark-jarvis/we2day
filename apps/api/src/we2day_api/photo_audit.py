@@ -51,17 +51,24 @@ def audit(db):
     }
 
 
+def read_audit(options):
+    with psycopg.connect(**options, autocommit=True) as db:
+        with db.transaction():
+            # Poolers may not retain startup defaults; enforce this transaction explicitly.
+            db.execute("set transaction read only")
+            db.execute("set local statement_timeout='15s'")
+            if db.execute("show transaction_read_only").fetchone()[0] != "on":
+                raise ValueError("read_only_required")
+            return audit(db)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     args = parser.parse_args()
     try:
         options = connection_options(configuration(args.config))
-        options["options"] += " -c statement_timeout=15000"
-        with psycopg.connect(**options) as db:
-            if db.execute("show transaction_read_only").fetchone()[0] != "on":
-                raise ValueError("read_only_required")
-            print(json.dumps(audit(db)))
+        print(json.dumps(read_audit(options)))
         return 0
     except Exception:
         print(
