@@ -67,6 +67,8 @@ class DataAPI:
             "invalid_report",
             "report_not_ready",
             "invalid_wish",
+            "invalid_favorite_place",
+            "favorite_place_not_found",
             "wish_not_found",
             "invalid_checklist",
             "checklist_not_found",

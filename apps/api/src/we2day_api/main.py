@@ -14,6 +14,7 @@ from we2day_api.calendar import router as calendar_router
 from we2day_api.calendar_export import router as calendar_export_router
 from we2day_api.checklists import router as checklists_router
 from we2day_api.config import Settings, get_settings
+from we2day_api.favorite_places import router as favorite_places_router
 from we2day_api.goals import router as goals_router
 from we2day_api.meetings import router as meetings_router
 from we2day_api.monthly import router as monthly_router
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(meetings_router)
     application.include_router(monthly_router)
     application.include_router(places_router)
+    application.include_router(favorite_places_router)
     application.include_router(plans_router)
     application.include_router(profiles_router)
     application.include_router(visits_router)
