@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { callApi } from "@/lib/api";
 import type { DatePlan, PlanAction, PlanContent } from "@/lib/plans";
 export async function changePlan(
@@ -26,6 +27,8 @@ export async function changePlan(
     revalidatePath("/");
     revalidatePath("/plans");
     revalidatePath("/today");
+    if (action === "confirm" && result.data?.published_content)
+      redirect(`/?date=${encodeURIComponent(result.data.published_content.date)}`);
   }
   return result;
 }

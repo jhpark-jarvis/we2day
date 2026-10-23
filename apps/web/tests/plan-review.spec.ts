@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 test("plan review updates on edit and reorder while preserving save and confirm", async ({
   page,
@@ -17,6 +18,7 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   const checks = page.getByLabel("플랜 시간·예산 점검", { exact: true });
   await expect(checks).toContainText("활동을 추가하면");
   await page.getByLabel("플랜 이름", { exact: true }).fill("시간·예산 점검 예시");
+  await page.getByLabel("플랜 날짜", { exact: true }).fill("2026-11-07");
   await page.getByText("예산 (선택)", { exact: true }).click();
   await page.getByLabel("전체 예산 (원, 선택)").fill("10000");
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
@@ -41,7 +43,7 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await expect(page.getByRole("button", { name: "확정 내용 확인", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
-  await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+  await confirmPlanAndReopen(page);
   await expect(
     page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
   ).toBeVisible();

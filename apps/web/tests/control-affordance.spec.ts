@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 const mobileDeepAudit = process.env.WE2DAY_TEST_MOBILE_DEEP === "1";
 let textScale = 1;
@@ -370,7 +371,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await expect(page.getByRole("button", { name: "확정 내용 확인", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
-  await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+  await confirmPlanAndReopen(page);
   await expect(
     page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
   ).toBeVisible();

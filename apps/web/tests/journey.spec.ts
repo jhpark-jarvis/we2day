@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 test("wishlist to published day and author-controlled report sharing", async ({
   browser,
@@ -54,7 +55,7 @@ test("wishlist to published day and author-controlled report sharing", async ({
     await open(b, `/today?date=${date}`);
     await expect(b.getByText("이 날짜에 확정한 플랜이 없어요.")).toBeVisible();
     await a.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
-    await a.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+    await confirmPlanAndReopen(a);
     await expect(a.getByText("확정됨", { exact: true })).toBeVisible();
     await a.getByLabel("플랜 이름", { exact: true }).fill("아직 확정하지 않은 변경안");
     await a.getByRole("button", { name: "플랜 저장", exact: true }).click();

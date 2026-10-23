@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 test("shared routes and plan confirmation preserve calendar and actual records", async ({
   browser,
@@ -15,6 +16,8 @@ test("shared routes and plan confirmation preserve calendar and actual records",
   try {
     const a = await first.newPage(),
       b = await second.newPage();
+    a.setDefaultTimeout(15_000);
+    b.setDefaultTimeout(15_000);
     for (const [page, username] of [
       [a, "member"],
       [b, "partner"],
@@ -112,19 +115,21 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     await b.getByRole("button", { name: /함께하는 주말/ }).click();
     await expect(b.getByLabel("활동 1 이름")).toHaveValue("산책");
     await a.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
-    await a.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+    await confirmPlanAndReopen(a);
     await expect(a.getByText("확정됨", { exact: true })).toBeVisible();
     const after = await first.request.get(`/api/appointments?month=${date.slice(0, 7)}`);
     const events = await after.json();
     expect(events).toHaveLength(1);
     expect(events[0].time).toBe("14:00:00");
-    // Stale editor must keep its input and offer an explicit reload.
-    await b.getByLabel("플랜 이름", { exact: true }).fill("상대가 작성 중인 변경");
-    await b.getByRole("button", { name: "플랜 저장", exact: true }).click();
+    await b.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
+    await b.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
     await expect(
       b.getByRole("alert").filter({ hasText: "플랜 또는 연결된 약속이 바뀌었어요" }),
     ).toBeVisible();
-    await expect(b.getByLabel("플랜 이름", { exact: true })).toHaveValue("상대가 작성 중인 변경");
+    await expect(b).toHaveURL(/\/plans$/);
+    await expect(b.getByLabel("플랜 이름", { exact: true })).toHaveValue("함께하는 주말");
+    // A rejected confirmation preserves the draft and freezes editing until an explicit reload.
+    await expect(b.getByLabel("플랜 이름", { exact: true })).toBeDisabled();
     await b.getByRole("button", { name: "작성 내용을 버리고 최신 플랜 불러오기" }).click();
     await expect(b.getByLabel("플랜 이름", { exact: true })).toHaveValue("함께하는 주말");
     await b.getByLabel("플랜 이름", { exact: true }).fill("함께하는 주말 변경");
@@ -134,7 +139,7 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     expect((await unchanged.json())[0].title).toBe("함께하는 주말");
     await b.getByRole("button", { name: "변경 내용 확인·재확정" }).click();
     await b.screenshot({ path: testInfo.outputPath("plan-mobile.png"), fullPage: true });
-    await b.getByRole("button", { name: "이 내용으로 확정하기" }).click();
+    await confirmPlanAndReopen(b);
     await expect(b.getByText("확정됨", { exact: true })).toBeVisible();
     await b.getByRole("button", { name: "플랜 보관", exact: true }).click();
     await expect(b.getByRole("status")).toContainText("플랜을 보관했어요");

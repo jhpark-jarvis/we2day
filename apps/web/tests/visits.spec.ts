@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 test.use({ serviceWorkers: "block" });
 
@@ -47,7 +48,7 @@ test("activity cards show latest publication and handle shared state conflicts a
     await page.route("**/api/visits?*", (request) =>
       request.fulfill({ status: 503, json: { error: "합성 방문 조회 실패" } }),
     );
-    await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+    await confirmPlanAndReopen(page);
     await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
     await page.goto(`/today?date=${date}`);
     const initialProgress = page.getByRole("region", { name: "데이트 활동", exact: true });
@@ -118,7 +119,7 @@ test("activity cards show latest publication and handle shared state conflicts a
     await page.getByLabel("활동 1 이름").fill("변경한 합성 활동");
     await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
     await page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }).click();
-    await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+    await confirmPlanAndReopen(page);
     await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
     await page.goto(`/today?date=${date}`);
     await expect(

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 test("naver handoff encodes selected place and discards temporary coordinates without recording visits", async ({
   page,
@@ -41,7 +42,7 @@ test("naver handoff encodes selected place and discards temporary coordinates wi
   await page.getByLabel("활동 2 이름").fill("장소 없는 합성 활동");
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
-  await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+  await confirmPlanAndReopen(page);
   await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
   await open(page, `/today?date=${date}`);
   await page.getByRole("button", { name: "앱 연결 옵션", exact: true }).click();
@@ -137,7 +138,7 @@ test("saved date course opens stored places through direct map links without sea
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await expect(page.getByRole("region", { name: "플랜 확정 내용", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
-  await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+  await confirmPlanAndReopen(page);
   await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
   const saved = await (await page.request.get("/api/plans")).json();
   const id = saved.find(
@@ -244,7 +245,7 @@ test("saved date course opens stored places through direct map links without sea
   await expect(page.locator(".day-timeline")).not.toContainText("새로 추가한 활동");
   await page.getByRole("link", { name: "변경안 확인·반영", exact: true }).click();
   await expect(page.getByRole("region", { name: "플랜 확정 내용", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+  await confirmPlanAndReopen(page);
   await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
   // Return through the actual link: the previously visited course must be invalidated.
   await page.getByRole("link", { name: "데이트 코스", exact: true }).click();
@@ -271,7 +272,7 @@ test("saved date course opens stored places through direct map links without sea
       .fill(positive ? "12000" : "0");
     await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
     await page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }).click();
-    await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+    await confirmPlanAndReopen(page);
     await expect(
       page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
     ).toBeEnabled();
