@@ -97,6 +97,28 @@ test("saved date course opens stored places through direct map links without sea
   await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
   const date = "2026-11-09";
   await page.goto(`/?date=${date}`);
+  const agenda = page.getByRole("region", { name: "선택한 날짜의 약속", exact: true });
+  await expect(agenda.getByRole("link", { name: "코스 등록", exact: true })).toBeVisible();
+  await expect(
+    page.locator("main > .calendar-toolbar").getByRole("link", { name: "코스 등록", exact: true }),
+  ).toHaveCount(0);
+  const anniversary = page.getByRole("region", { name: "디데이와 기념일 요약", exact: true });
+  await expect(anniversary.getByRole("link", { name: "기념일 관리", exact: true })).toHaveClass(
+    "icon-button",
+  );
+  await expect(anniversary).toHaveCSS("padding-top", "7px");
+  await expect(anniversary.getByRole("link", { name: "기념일 관리", exact: true })).toHaveCSS(
+    "border-top-width",
+    "0px",
+  );
+  for (const width of [320, 393, 1425]) {
+    await page.setViewportSize({ width, height: 852 });
+    const compact = await anniversary.boundingBox();
+    expect(compact?.height).toBeLessThanOrEqual(64);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
   await expect(
     page.getByRole("link", { name: "데이트 코스", exact: true }).first(),
   ).toHaveAttribute("href", `/today?date=${date}`);
@@ -111,6 +133,7 @@ test("saved date course opens stored places through direct map links without sea
       .fill(`직접 정한 장소 ${index} & 예시 주소 ${index}`);
   }
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
+  await expect(page.getByRole("region", { name: "플랜 확정 내용", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
   await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
   await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
@@ -201,7 +224,11 @@ test("saved date course opens stored places through direct map links without sea
     "직접 정한 장소 1 & 예시 주소 1",
   );
   await page.getByLabel("활동 1 장소", { exact: true }).fill("다른 장소 초안");
+  await page.getByRole("button", { name: "활동 추가", exact: true }).click();
+  await page.getByLabel("활동 3 이름", { exact: true }).fill("새로 추가한 활동");
+  await page.getByLabel("활동 3 장소", { exact: true }).fill("직접 지정한 새 장소");
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
+  await expect(page.getByRole("region", { name: "플랜 확정 내용", exact: true })).toBeVisible();
   await expect(page.getByText("변경안 · 다시 확정 필요", { exact: true })).toBeVisible();
   await page.goto(`/today?date=${date}`);
   expect(new URL((await map.getAttribute("href")) || "").searchParams.get("query")).toBe(
@@ -209,6 +236,20 @@ test("saved date course opens stored places through direct map links without sea
   );
   expect(visits).toBe(0);
   expect(searches).toBe(0);
+  await expect(page.locator(".day-timeline")).not.toContainText("새로 추가한 활동");
+  await page.getByRole("link", { name: "변경안 확인·반영", exact: true }).click();
+  await expect(page.getByRole("region", { name: "플랜 확정 내용", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+  await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
+  // Return through the actual link: the previously visited course must be invalidated.
+  await page.getByRole("link", { name: "데이트 코스", exact: true }).click();
+  await expect(page.locator(".day-timeline")).toContainText("새로 추가한 활동");
+  expect(new URL((await map.getAttribute("href")) || "").searchParams.get("query")).toBe(
+    "다른 장소 초안",
+  );
+  await expect(page.getByRole("link", { name: "변경안 확인·반영", exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(".day-timeline")).toContainText("새로 추가한 활동");
 
   // Optional amounts retain their stored zero/null semantics while read-only zero labels disappear.
   for (const positive of [false, true]) {
@@ -241,6 +282,25 @@ test("saved date course opens stored places through direct map links without sea
   await page.getByRole("button", { name: "이 날짜 보기", exact: true }).click();
   await expect(page).toHaveURL(/date=2026-11-10/);
   await expect(page.getByText("이 날짜에 확정한 플랜이 없어요.", { exact: true })).toBeVisible();
+  await page.goto("/anniversaries");
+  await page.getByRole("button", { name: "기념일 추가하기", exact: true }).click();
+  await page.getByLabel("종류", { exact: true }).selectOption("custom");
+  const longAnniversary = "함께기억하는아주긴기념일이름".repeat(3);
+  await page.getByLabel("기념일 이름", { exact: true }).fill(longAnniversary);
+  await page.getByRole("button", { name: "기념일 저장하기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "기념일 추가하기", exact: true })).toBeVisible();
+  for (const width of [320, 393, 1425]) {
+    await page.setViewportSize({ width, height: 852 });
+    await page.goto("/");
+    await expect(anniversary).toContainText(longAnniversary);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await expect(anniversary.getByRole("link", { name: "기념일 관리", exact: true })).toHaveCSS(
+      "width",
+      "44px",
+    );
+  }
   for (const route of ["/settings", "/memories/records", "/today"]) {
     for (const width of [320, 393, 1024, 1425]) {
       await page.setViewportSize({ width, height: 852 });
