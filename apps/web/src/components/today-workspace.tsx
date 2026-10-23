@@ -160,29 +160,16 @@ export function TodayWorkspace({
       <p className="settings-hint">
         활동을 살펴보거나 장소를 복사해도 방문 완료로 기록되지 않아요.
       </p>
-      <ol className="day-timeline">
-        {content.activities.map((a, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: Read-only published snapshot keeps this order for the page lifetime.
-          <li key={`${plan.id}:activity:${index}`}>
-            <button
-              className="timeline-item"
-              type="button"
-              aria-pressed={step === index}
-              onClick={() => {
-                setStep(index);
-                setNotice("");
-              }}
-            >
-              <span>{a.time || "시간 미정"}</span>
-              <strong>{a.title}</strong>
-              <small>
-                {a.place || "장소 없는 활동"}
-                {!!a.cost && ` · ${a.cost.toLocaleString()}원`}
-              </small>
-            </button>
-          </li>
-        ))}
-      </ol>
+      <VisitProgressPanel
+        key={`${plan.id}:${plan.published_revision}`}
+        plan={plan}
+        today={today}
+        selectedActivity={step}
+        onSelectActivity={(index) => {
+          setStep(index);
+          setNotice("");
+        }}
+      />
       <section className="plan-review">
         <h2>준비물</h2>
         {content.preparation.length ? (
@@ -196,7 +183,6 @@ export function TodayWorkspace({
           <p className="muted">아직 적어둔 준비물이 없어요.</p>
         )}
       </section>
-      <VisitProgressPanel key={`${plan.id}:${plan.published_revision}`} plan={plan} today={today} />
       <div className="calendar-toolbar">
         <Link className="text-button" href={`/plans/${plan.id}/report`}>
           이 플랜의 리포트 작성·보기

@@ -348,6 +348,14 @@ button.plan-card { border-color: var(--control-border); }
 .timeline-item { width: 100%; display: grid; gap: 9px; min-height: 90px; text-align: left; padding: 17px; margin-block: 8px; background: var(--surface); color: var(--foreground); border: 1px solid var(--control-border); border-left-width: 3px; border-radius: 10px; overflow-wrap: anywhere; }
 .timeline-item[aria-pressed="true"] { border-left-color: var(--accent); background: var(--soft); }
 .timeline-item span,.timeline-item small { color: var(--muted); font-size: 12px; }
+.day-timeline .activity-card { margin-block: 10px; border: 1px solid var(--control-border); border-left-width: 3px; border-radius: 10px; background: var(--surface); overflow: hidden; }
+.day-timeline .activity-card[data-selected="true"] { border-left-color: var(--accent); background: var(--soft); }
+.activity-card .timeline-item { border: 0; border-radius: 0; margin: 0; min-height: 0; padding: 14px 14px 6px; background: transparent; }
+.activity-card .timeline-item[aria-pressed="true"] { background: transparent; }
+.activity-progress { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px 8px 14px; }
+.visit-state { min-width: 0; color: var(--muted); font-size: 12px; }
+.visit-actions { display: flex; gap: 4px; border: 0; padding: 0; margin: 0; }
+.visit-action[aria-pressed="true"] { color: var(--accent); background: var(--panel); }
 .plan-workspace > .text-button { margin-right: 18px; }
 .reminder-workspace { max-width: 720px; margin: 0 auto; }
 .upcoming-list { list-style: none; margin: 24px 0; padding: 0; }

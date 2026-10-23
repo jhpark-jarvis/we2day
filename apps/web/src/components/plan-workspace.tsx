@@ -622,12 +622,6 @@ function PlanEditor({
                         : "아직 코스에 반영되지 않았어요. 아래 내용을 확인하고 확정해 주세요."}
                     </p>
                     <PlanPreview content={content} />
-                    {plan.published_content && (
-                      <details>
-                        <summary>이전 확정 플랜과 비교</summary>
-                        <PlanPreview content={plan.published_content} />
-                      </details>
-                    )}
                     <p>
                       <strong>{content.title}</strong>
                       <br />
