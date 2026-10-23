@@ -35,6 +35,7 @@ export async function changePhoto(
       ),
     };
   revalidatePath("/memories");
+  revalidatePath("/settings/trash");
   return {
     error: "",
     changed:

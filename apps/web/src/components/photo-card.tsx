@@ -1,14 +1,32 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { Download, Maximize2, Trash2, X } from "lucide-react";
+import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { changePhoto } from "@/app/actions/photos";
 import { koreanTimestamp, type SharedPhoto } from "@/lib/photos";
 
-function ActionSubmit({ children, ready }: { children: string; ready: boolean }) {
+function ActionSubmit({
+  children,
+  ready,
+  icon = false,
+  label,
+}: {
+  children: ReactNode;
+  ready: boolean;
+  icon?: boolean;
+  label: string;
+}) {
   const { pending } = useFormStatus();
   return (
-    <button className="text-button" type="submit" disabled={!ready || pending} aria-busy={pending}>
+    <button
+      className={icon ? "icon-button" : "text-button"}
+      type="submit"
+      disabled={!ready || pending}
+      aria-busy={pending}
+      aria-label={label}
+      title={label}
+    >
       {children}
     </button>
   );
@@ -19,11 +37,15 @@ function PhotoActionForm({
   action,
   label,
   onChanged,
+  icon = false,
+  onError,
 }: {
   photo: SharedPhoto;
   action: "trash" | "restore" | "purge";
   label: string;
   onChanged: (message: string) => void;
+  icon?: boolean;
+  onError?: (message: string) => void;
 }) {
   const [requestId, setRequestId] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -34,8 +56,11 @@ function PhotoActionForm({
   useEffect(() => {
     if (state.changed) onChanged(state.changed);
   }, [state.changed, onChanged]);
+  useEffect(() => {
+    if (icon) onError?.(state.error);
+  }, [state.error, icon, onError]);
   return (
-    <form action={submit} className="photo-action-form">
+    <form action={submit} className={`photo-action-form${icon ? " photo-action-icon" : ""}`}>
       <input type="hidden" name="id" value={photo.id} />
       <input type="hidden" name="version" value={photo.lifecycle_version} />
       <input type="hidden" name="request_id" value={requestId} />
@@ -59,8 +84,10 @@ function PhotoActionForm({
           </div>
         </>
       )}
-      <ActionSubmit ready={!!requestId}>{label}</ActionSubmit>
-      {state.error && (
+      <ActionSubmit ready={!!requestId} icon={icon} label={label}>
+        {icon ? <Trash2 size={18} aria-hidden="true" /> : label}
+      </ActionSubmit>
+      {state.error && !icon && (
         <p className="error-message" role="alert">
           {state.error}
         </p>
@@ -90,6 +117,14 @@ export function PhotoCard({
 }) {
   const [now, setNow] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const viewer = useRef<HTMLDialogElement>(null);
+  const opener = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (expanded && !viewer.current?.open) viewer.current?.showModal();
+    else if (!expanded && viewer.current?.open) viewer.current.close();
+  }, [expanded]);
   useEffect(() => {
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -112,15 +147,49 @@ export function PhotoCard({
       )}
       {!photo.purging_at && (
         <figure className="photo-draft-story">
-          {/* biome-ignore lint/performance/noImgElement: private authenticated image, no public proxy */}
-          <img
-            src={imagePath}
-            alt={photo.caption || `${photo.date} 함께한 날의 사진`}
-            width={photo.width}
-            height={photo.height}
-            loading="lazy"
-            onError={() => setImageError(true)}
-          />
+          <div className="photo-image-frame">
+            <fieldset className="photo-image-actions" aria-label="사진 작업">
+              <button
+                className="icon-button"
+                type="button"
+                ref={opener}
+                aria-label="사진 크게 보기"
+                title="사진 크게 보기"
+                disabled={imageError}
+                onClick={() => setExpanded(true)}
+              >
+                <Maximize2 size={18} aria-hidden="true" />
+              </button>
+              <a
+                className="icon-button"
+                href={imagePath}
+                download={`we2day-${photo.date}.webp`}
+                aria-label="저장된 압축본 내려받기"
+                title="저장된 압축본 내려받기"
+              >
+                <Download size={18} aria-hidden="true" />
+              </a>
+              {!trash && (
+                <PhotoActionForm
+                  photo={photo}
+                  action="trash"
+                  label="사진 휴지통으로 이동"
+                  onChanged={onChanged}
+                  icon
+                  onError={setActionError}
+                />
+              )}
+            </fieldset>
+            {/* biome-ignore lint/performance/noImgElement: private authenticated image, no public proxy */}
+            <img
+              src={imagePath}
+              alt={photo.caption || `${photo.date} 함께한 날의 사진`}
+              width={photo.width}
+              height={photo.height}
+              loading="lazy"
+              onError={() => setImageError(true)}
+            />
+          </div>
           <figcaption>
             <small>
               {photo.date} ·{" "}
@@ -131,6 +200,40 @@ export function PhotoCard({
             <strong>{photo.caption || "함께한 하루의 한 장면"}</strong>
           </figcaption>
         </figure>
+      )}
+      <dialog
+        ref={viewer}
+        className="photo-viewer"
+        aria-label="사진 크게 보기"
+        onCancel={() => setExpanded(false)}
+        onClose={() => {
+          setExpanded(false);
+          opener.current?.focus({ preventScroll: true });
+        }}
+      >
+        <button
+          className="icon-button photo-viewer-close"
+          type="button"
+          aria-label="사진 크게 보기 닫기"
+          title="닫기"
+          onClick={() => setExpanded(false)}
+        >
+          <X size={22} aria-hidden="true" />
+        </button>
+        {expanded && (
+          // biome-ignore lint/performance/noImgElement: same private authenticated image, no public proxy
+          <img
+            src={imagePath}
+            alt={photo.caption || `${photo.date} 함께한 날의 사진`}
+            width={photo.width}
+            height={photo.height}
+          />
+        )}
+      </dialog>
+      {actionError && (
+        <p className="error-message" role="alert">
+          {actionError}
+        </p>
       )}
       {imageError && (
         <p className="error-message">사진을 불러오지 못했어요. 목록을 새로고침해 주세요.</p>
@@ -171,19 +274,7 @@ export function PhotoCard({
           </div>
         </dl>
       </details>
-      {!trash ? (
-        <>
-          <a className="text-button" href={imagePath} download={`we2day-${photo.date}.webp`}>
-            저장된 압축본 내려받기
-          </a>
-          <PhotoActionForm
-            photo={photo}
-            action="trash"
-            label="사진 휴지통으로 이동"
-            onChanged={onChanged}
-          />
-        </>
-      ) : (
+      {trash && (
         <>
           {photo.trashed_at && (
             <p className="settings-hint">

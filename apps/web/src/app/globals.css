@@ -549,3 +549,19 @@ html[data-theme="white"] :is(.auth-field, .record-search-fields) select { border
 @media (max-width: 840px), (hover: none) and (pointer: coarse) {
   .app-shell input:not([type="checkbox"]):not([type="radio"]), .app-shell select, .app-shell textarea { font-size: 16px; }
 }
+
+/* Sideways scrolling stays inside the photo strip. */
+.shared-photo-carousel { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 16px; min-width: 0; max-width: 100%; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-inline: contain; scrollbar-width: thin; padding-bottom: 12px; }
+.shared-photo-carousel > .photo-slide { min-width: 0; scroll-snap-align: start; }
+.photo-slide-navigation { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-block: 8px; }
+.photo-slide-navigation > span { margin-right: 8px; color: var(--muted); font-size: 13px; }
+.photo-image-frame { position: relative; min-width: 0; }
+.photo-image-frame > img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+.photo-image-actions { border: 0; margin: 0; position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 10px; background: var(--surface); z-index: 1; }
+.photo-image-actions .photo-action-icon { display: block; margin: 0; }
+.photo-viewer { width: min(1100px, 94vw); max-width: 94vw; max-height: 94svh; padding: 56px 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--foreground); }
+.photo-viewer::backdrop { background: rgb(0 0 0 / 65%); }
+.photo-viewer img { display: block; width: 100%; height: auto; max-height: calc(94svh - 80px); object-fit: contain; }
+.photo-viewer-close { position: absolute; top: 6px; right: 6px; }
+.trash-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-block: 18px; }
+.trash-filters > .auth-field:has(select), .trash-filters > p { grid-column: 1 / -1; }

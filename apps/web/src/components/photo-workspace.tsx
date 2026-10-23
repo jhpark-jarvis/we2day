@@ -1,5 +1,15 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Children,
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { LoadingRegion } from "@/components/loading-region";
 import { PhotoCard } from "@/components/photo-card";
 import { PhotoPreparation } from "@/components/photo-preparation";
@@ -13,21 +23,23 @@ export function PhotoWorkspace({
   userId,
   canSave,
   names = {},
+  trash = false,
 }: {
   today: string;
   userId: string | null;
   canSave: boolean;
   names?: Record<string, string>;
+  trash?: boolean;
 }) {
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(trash ? "" : today);
+  const [recordId, setRecordId] = useState("");
   const [items, setItems] = useState<SharedPhoto[]>([]);
   const [loadedAlbum, setLoadedAlbum] = useState("");
   const [after, setAfter] = useState<string | null>(null);
   const [loading, setLoading] = useState(canSave);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
-  const [trash, setTrash] = useState(false);
-  const album = trash ? "trash" : date;
+  const album = trash ? `trash:${date}` : date;
   const [notice, setNotice] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
@@ -84,6 +96,7 @@ export function PhotoWorkspace({
   };
   const changed = useCallback((message: string) => {
     setNotice(message);
+    setRecordId("");
     setRefresh((value) => value + 1);
   }, []);
   const active = useRef<AbortController | null>(null);
@@ -98,7 +111,7 @@ export function PhotoWorkspace({
     }
     try {
       const response = await fetch(
-        `/api/photos?${trash ? "trash=true" : `date=${day}`}${cursor ? `&after=${cursor}` : ""}`,
+        `/api/photos?${trash ? `trash=true${day ? `&date=${day}` : ""}` : `date=${day}`}${cursor ? `&after=${cursor}` : ""}`,
         {
           cache: "no-store",
           signal: controller.signal,
@@ -112,8 +125,11 @@ export function PhotoWorkspace({
       }
       setError("");
       setExportError("");
-      if (!cursor) setSelected([]);
-      setLoadedAlbum(trash ? "trash" : day);
+      if (!cursor) {
+        setSelected([]);
+        setRecordId((current) => (body.items.some((photo) => photo.id === current) ? current : ""));
+      }
+      setLoadedAlbum(trash ? `trash:${day}` : day);
       setItems((previous) => (cursor ? [...previous, ...body.items] : body.items));
       setAfter(body.next_after);
     } catch {
@@ -138,24 +154,26 @@ export function PhotoWorkspace({
     <>
       {!canSave && (
         <p className="photo-local-notice">
-          사진 준비는 바로 할 수 있어요. 함께 저장하려면{" "}
+          {trash ? "사진 휴지통을 보려면 " : "사진 준비는 바로 할 수 있어요. 함께 저장하려면 "}
           <Link className="inline-link" href={userId ? "/couple" : "/login"}>
             {userId ? "둘의 공간을 연결해 주세요" : "로그인해 주세요"}
           </Link>
           .
         </p>
       )}
-      <div hidden={trash}>
-        <PhotoPreparation
-          today={today}
-          canSave={canSave}
-          onDateChange={(day) => {
-            setLoading(canSave);
-            setDate(day);
-          }}
-          onSaved={() => setRefresh((value) => value + 1)}
-        />
-      </div>
+      {!trash && (
+        <div>
+          <PhotoPreparation
+            today={today}
+            canSave={canSave}
+            onDateChange={(day) => {
+              setLoading(canSave);
+              setDate(day);
+            }}
+            onSaved={() => setRefresh((value) => value + 1)}
+          />
+        </div>
+      )}
       {canSave && (
         <section
           className="shared-photo-section"
@@ -166,27 +184,9 @@ export function PhotoWorkspace({
               {trash
                 ? "둘의 사진 휴지통"
                 : isSupportedDate(date)
-                  ? `${date}의 사진`
+                  ? `${date.slice(0, 4)}년 ${date.slice(5, 7)}월 ${date.slice(8, 10)}일`
                   : "사진을 볼 날짜를 선택해 주세요"}
             </h2>
-            <fieldset className="list-view-toggle" aria-label="사진 구분" disabled={loading}>
-              {[false, true].map((value) => (
-                <button
-                  type="button"
-                  key={String(value)}
-                  aria-pressed={trash === value}
-                  onClick={() => {
-                    if (trash === value) return;
-                    active.current?.abort();
-                    setLoading(true);
-                    setTrash(value);
-                    setNotice("");
-                  }}
-                >
-                  {value ? "휴지통" : "앨범"}
-                </button>
-              ))}
-            </fieldset>
             <RefreshButton
               label="사진 새로고침"
               pending={loading}
@@ -196,6 +196,57 @@ export function PhotoWorkspace({
               }}
             />
           </div>
+          {trash && (
+            <div className="trash-filters">
+              <div className="auth-field">
+                <label htmlFor="trash-date">기록 날짜 (선택)</label>
+                <input
+                  id="trash-date"
+                  type="date"
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  value={date}
+                  onChange={(e) => {
+                    active.current?.abort();
+                    setLoading(true);
+                    setDate(e.target.value);
+                    setRecordId("");
+                    setNotice("");
+                  }}
+                />
+              </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  setDate("");
+                  setRecordId("");
+                }}
+              >
+                전체 날짜
+              </button>
+              <div className="auth-field">
+                <label htmlFor="trash-record">사진 기록</label>
+                <select
+                  id="trash-record"
+                  value={recordId}
+                  disabled={loading}
+                  onChange={(e) => setRecordId(e.target.value)}
+                >
+                  <option value="">불러온 기록 전체</option>
+                  {items.map((photo) => (
+                    <option key={photo.id} value={photo.id}>
+                      {photo.date} · {photo.caption || photo.filename}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="settings-hint">
+                사진에 지정한 기록 날짜로 찾아요. 추가 기록이 있으면 ‘사진 더 보기’로 불러올 수
+                있어요.
+              </p>
+            </div>
+          )}
           {notice && <p role="status">{notice}</p>}
           {trash && (
             <p className="settings-hint">
@@ -242,32 +293,34 @@ export function PhotoWorkspace({
                     : "아직 이 날의 사진이 없어요. 첫 장면을 남겨보세요."}
                 </p>
               )}
-              <div className="shared-photo-grid">
-                {items.map((photo) => (
-                  <PhotoCard
-                    authorName={names[photo.created_by]}
-                    key={`${photo.id}:${photo.lifecycle_version}`}
-                    photo={photo}
-                    userId={userId}
-                    trash={trash}
-                    onChanged={changed}
-                    selected={selected.includes(photo.id)}
-                    selectingDisabled={exporting}
-                    onSelect={() => {
-                      if (!selected.includes(photo.id) && selected.length >= 20) {
-                        setExportError("한 번에 최대20장까지 선택해 주세요.");
-                        return;
-                      }
-                      setExportError("");
-                      setSelected((current) =>
-                        current.includes(photo.id)
-                          ? current.filter((id) => id !== photo.id)
-                          : [...current, photo.id],
-                      );
-                    }}
-                  />
-                ))}
-              </div>
+              <PhotoCollection carousel={!trash} count={items.length}>
+                {items
+                  .filter((photo) => !recordId || photo.id === recordId)
+                  .map((photo) => (
+                    <PhotoCard
+                      authorName={names[photo.created_by]}
+                      key={`${photo.id}:${photo.lifecycle_version}`}
+                      photo={photo}
+                      userId={userId}
+                      trash={trash}
+                      onChanged={changed}
+                      selected={selected.includes(photo.id)}
+                      selectingDisabled={exporting}
+                      onSelect={() => {
+                        if (!selected.includes(photo.id) && selected.length >= 20) {
+                          setExportError("한 번에 최대20장까지 선택해 주세요.");
+                          return;
+                        }
+                        setExportError("");
+                        setSelected((current) =>
+                          current.includes(photo.id)
+                            ? current.filter((id) => id !== photo.id)
+                            : [...current, photo.id],
+                        );
+                      }}
+                    />
+                  ))}
+              </PhotoCollection>
               {after && (
                 <button
                   className="auth-button"
@@ -282,6 +335,99 @@ export function PhotoWorkspace({
           </LoadingRegion>
         </section>
       )}
+    </>
+  );
+}
+
+function PhotoCollection({
+  children,
+  carousel,
+  count,
+}: {
+  children: ReactNode;
+  carousel: boolean;
+  count: number;
+}) {
+  const id = useId();
+  const strip = useRef<HTMLElement>(null);
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    setIndex((current) => Math.max(0, Math.min(current, count - 1)));
+  }, [count]);
+  function move(next: number) {
+    const element = strip.current;
+    if (!element) return;
+    const target = element.children[Math.max(0, Math.min(count - 1, next))] as
+      | HTMLElement
+      | undefined;
+    if (target)
+      element.scrollTo({
+        left:
+          target.getBoundingClientRect().left -
+          element.getBoundingClientRect().left +
+          element.scrollLeft,
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      });
+  }
+  function keydown(event: KeyboardEvent<HTMLElement>) {
+    if (event.target !== event.currentTarget || !["ArrowLeft", "ArrowRight"].includes(event.key))
+      return;
+    event.preventDefault();
+    move(index + (event.key === "ArrowRight" ? 1 : -1));
+  }
+  if (!carousel) return <div className="shared-photo-grid">{children}</div>;
+  return (
+    <>
+      {count > 0 && (
+        <nav className="photo-slide-navigation" aria-label="사진 이동">
+          <span aria-live="polite">
+            {index + 1} / {count}
+          </span>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="이전 사진"
+            title="이전 사진"
+            aria-controls={id}
+            disabled={index === 0}
+            onClick={() => move(index - 1)}
+          >
+            <ChevronLeft size={20} aria-hidden="true" />
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="다음 사진"
+            title="다음 사진"
+            aria-controls={id}
+            disabled={index >= count - 1}
+            onClick={() => move(index + 1)}
+          >
+            <ChevronRight size={20} aria-hidden="true" />
+          </button>
+        </nav>
+      )}
+      <section
+        id={id}
+        ref={strip}
+        className="shared-photo-carousel"
+        aria-label="사진 슬라이드"
+        tabIndex={count ? 0 : -1}
+        onKeyDown={keydown}
+        onScroll={() => {
+          const el = strip.current;
+          if (el?.clientWidth)
+            setIndex(
+              Math.max(0, Math.min(count - 1, Math.round(el.scrollLeft / (el.clientWidth + 16)))),
+            );
+        }}
+      >
+        {Children.map(children, (child, position) => (
+          <div className="photo-slide" inert={position !== index} aria-hidden={position !== index}>
+            {child}
+          </div>
+        ))}
+      </section>
     </>
   );
 }

@@ -55,3 +55,6 @@
 **/dist/
 **/AGENTS.md
 **/next-env.d.ts
+
+!/apps/web/src/app/settings/trash/
+!/apps/web/src/app/settings/trash/page.tsx

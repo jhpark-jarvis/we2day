@@ -53,6 +53,13 @@ export default async function SettingsPage() {
         <p className="muted">마음에 드는 분위기를 골라보세요.</p>
         <ThemePicker initialTheme={theme} />
       </section>
+      <section className="settings-section" aria-label="기록 관리">
+        <h2>기록 관리</h2>
+        <Link className="text-button" href="/settings/trash">
+          사진 휴지통
+        </Link>
+        <p className="settings-hint">날짜와 사진 기록을 찾아 복구하거나 영구 삭제를 확인해요.</p>
+      </section>
       <PwaSettings />
       <PushSettings />
       <section className="settings-section account-settings">
