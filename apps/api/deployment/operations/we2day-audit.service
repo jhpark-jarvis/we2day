@@ -1,0 +1,17 @@
+[Unit]
+Description=WE2DAY read-only backup integrity and photo inventory
+After=docker.service network-online.target we2day-backup.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/we2day-operations
+ExecStart=/usr/bin/python3 audit.py --config config.json
+TimeoutStartSec=2400
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/we2day-operations
+UMask=0077

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily WE2DAY read-only data integrity checks
+
+[Timer]
+OnCalendar=*-*-* 04:40:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=we2day-audit.service
+
+[Install]
+WantedBy=timers.target

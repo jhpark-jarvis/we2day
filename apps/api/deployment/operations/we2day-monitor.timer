@@ -1,0 +1,11 @@
+[Unit]
+Description=Check WE2DAY every thirty minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+Unit=we2day-monitor.service
+
+[Install]
+WantedBy=timers.target

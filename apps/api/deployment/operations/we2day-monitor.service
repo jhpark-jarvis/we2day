@@ -1,0 +1,17 @@
+[Unit]
+Description=WE2DAY operational health checks
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/we2day-operations
+ExecStart=/usr/bin/python3 monitor.py --config config.json --output status.json
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/we2day-operations
+UMask=0077

@@ -423,3 +423,38 @@ SQL의 행 수와 파일 해시가 일치한 뒤에도 다음 단계를 확인�
 시험 환경의 외부 통신과 호스트 포트는 막고, 운영 DB·Storage 주소나 관리자 키를 연결하지 마세요. 시험용 JWT로 사용자 정보를 조회한 결과를 원래 세션 키·소셜 공급자 설정의 복구 완료로 판단하지 않습니다. 실제 전환에는 운영 주소·TLS·OAuth 콜백·메일/푸시 설정과 사용자 로그인 확인이 추가로 필요합니다.
 
 [README로 돌아가기](../README.md)
+
+## 운영 상태와 자료 점검
+
+[운영 점검 도구](../apps/api/deployment/operations/monitor.py)는 앱 컨테이너·백업/알림 예약과 최근 실행, 백업 36시간 지연, 디스크 80% 또는 여유 2GiB 미만, HTTPS 인증서 잔여 21일을 확인합니다. 30분 간격 서비스로 실행하며 상태 JSON과 서버 journal에 결과를 남깁니다. 외부 이메일·메신저 알림은 전송하지 않습니다.
+
+일별 [자료 점검](../apps/api/deployment/operations/audit.py)은 한국 시간 04:40에 기존 백업 환경에서 모든 관리 사본의 복호화·무결성을 검사하고 사진 메타데이터와 Storage 객체 참조를 읽기 전용으로 대조합니다. 24시간 이상 미완료 업로드·참조 없는 객체·누락 파일·중단된 삭제를 집계합니다. 방금 업로드 중인 파일은 잔여 후보에서 제외합니다. 정상 휴지통의 보관기간 만료는 별도 수치이며 자동 영구 삭제 대상이 아닙니다. DB 전체 크기와 사진 객체 크기는 운영 참고치로, Supabase 콘솔의 월간 전송량·청구 지표를 대신하지 않습니다.
+
+### 설치와 확인
+
+`operations/`의 Python 파일과 서비스·타이머를 저장소 밖의 운영 전용 디렉터리에 설치하고 해당 디렉터리를 서비스의 `WorkingDirectory`·`ReadWritePaths`에 지정합니다. 파일은 운영자 소유, 디렉터리0700·설정0600으로 제한합니다. `config.json`에는 아래 경로와 공개 도메인만 지정하며 비밀번호나 키 값을 넣지 않습니다. 기존 backup Compose·보호된 자격/키 마운트를 재사용합니다. 앱 API 권한은 추가하지 않습니다.
+
+```json
+{
+  "containers": ["we2day-web-1", "we2day-api-1"],
+  "timers": ["we2day-backup.timer", "we2day-reminders.timer"],
+  "services": ["we2day-backup.service", "we2day-reminders.service"],
+  "disk": "/",
+  "domain": "your-domain.example",
+  "backup_status": "/private/daily-copies/.we2day-backup-status.json",
+  "backup_scheduler": "/private/backup-scheduler",
+  "photo_audit": "/private/operations/photo-audit.json",
+  "integrity_audit": "/private/operations/integrity-audit.json"
+}
+```
+
+1. 갱신한 백업 이미지에 `photo_audit`가 포함됐는지 확인하고 백업용 Compose 이미지 설정만 변경합니다. 기존 자격·복구키·사본은 유지합니다.
+2. `python3 audit.py --config config.json`과 `python3 monitor.py --config config.json --output status.json`을 수동 실행합니다. 숫자와 점검 결과만 출력하며 원래 파일명·사진·자격은 출력하지 않습니다.
+3. 서비스·타이머를 `/etc/systemd/system/`에 설치하고 `systemd-analyze verify`로 확인합니다. 수동 실행 성공 후 `we2day-audit.timer`, `we2day-monitor.timer`를 활성화합니다.
+4. `systemctl status we2day-monitor.service we2day-audit.service`, `journalctl -u we2day-monitor.service -u we2day-audit.service` 및 보호된 상태 JSON으로 결과를 확인합니다. 이상 상태는 0이 아닌 종료 코드로 기록되며 다음 예약에서 재검사합니다. 타이머는 중지할 수 있고 기존 앱 서비스에는 영향을 주지 않습니다.
+
+### 백업 정리와 복구 경계
+
+일별7·주별4 보관 후보는 계속 계산합니다. 별도 복구키 보관과 복구 검토를 완료하기 전 사본 자동 삭제는 활성화하지 않습니다. 사진 잔여 후보도 자동 삭제하지 않으며, 실제 운영 자료와 확인한 뒤 기존 사진 수명주기 절차로 처리합니다. 손상 사본 발견 시 다른 정상 사본도 보존합니다.
+
+DB·사진의 격리 복구와 전체 서비스 전환은 별개입니다. 실제 전환에는 DB 역할 로그인 자격, Auth JWT/서명 설정, 소셜 공급자 Client Secret·허용 주소, Storage/API 설정과 TLS·앱 환경을 별도로 준비해야 합니다. 복구키와 암호화 사본을 같은 장치에만 두지 말고, 운영 DB에 복원하기 전 격리 환경에서 확인하세요.
