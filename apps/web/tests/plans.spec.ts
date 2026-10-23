@@ -86,7 +86,7 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     await a.getByRole("button", { name: "활동 추가", exact: true }).click();
     await a.getByLabel("활동 1 이름").fill("산책");
     await a.getByLabel("활동 1 시간").fill("14:00");
-    await a.getByLabel("활동 1 장소").fill("직접 정한 공원");
+    await a.getByLabel("활동 1 장소", { exact: true }).fill("직접 정한 공원");
     await a.getByRole("button", { name: "활동 추가", exact: true }).click();
     await a.getByLabel("활동 2 이름").fill("카페");
     await a.getByRole("button", { name: "활동 2 위로", exact: true }).click();

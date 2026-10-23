@@ -56,7 +56,7 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   await expect(
     page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
   ).toBeEnabled();
-  await page.getByRole("button", { name: "← 플랜 목록으로", exact: true }).click();
+  await page.goto("/plans");
   await page.getByRole("button", { name: /시간·예산 점검 예시/ }).click();
   await expect(checks).toContainText("예상 비용 합계 8,000원");
   await expect(page.getByLabel("활동 1 이름", { exact: true })).toHaveValue("카페");

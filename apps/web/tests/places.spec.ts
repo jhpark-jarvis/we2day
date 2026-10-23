@@ -153,4 +153,82 @@ test("in-app place lists preserve appointment and activity drafts, loading geome
     );
   }
   await page.screenshot({ path: testInfo.outputPath("activity-place-list.png"), fullPage: true });
+  for (const width of [320, 393]) {
+    await page.setViewportSize({ width, height: 852 });
+    const saveBox = await page
+      .getByRole("button", { name: "플랜 저장", exact: true })
+      .boundingBox();
+    const inputBox = await page.getByLabel("플랜 이름", { exact: true }).boundingBox();
+    const searchBox = await second.getByRole("button", { name: "검색", exact: true }).boundingBox();
+    const queryBox = await second.getByLabel("장소 검색어").boundingBox();
+    const actions = page.getByRole("group", { name: "활동 2 순서와 삭제", exact: true });
+    const actionBox = await actions.boundingBox();
+    const memoBox = await page.getByLabel("활동 2 메모", { exact: true }).boundingBox();
+    if (!saveBox || !inputBox || !searchBox || !queryBox || !actionBox || !memoBox)
+      throw new Error("Editor controls missing");
+    expect(Math.abs(saveBox.x + saveBox.width - inputBox.x - inputBox.width)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(
+      Math.abs(searchBox.x + searchBox.width - queryBox.x - queryBox.width),
+    ).toBeLessThanOrEqual(1);
+    expect(actionBox.y + actionBox.height).toBeLessThanOrEqual(memoBox.y);
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(memoBox.x + memoBox.width + 1);
+    for (const icon of await actions.getByRole("button").all())
+      await expect(icon).toHaveCSS("border-top-width", "0px");
+  }
+  // Selection affects only this activity's editable destination, never submits the parent form.
+  await second.getByRole("button", { name: "가상 카페 & 정원 선택", exact: true }).click();
+  await expect(page.getByLabel("활동 2 장소", { exact: true })).toHaveValue(
+    "가상 카페 & 정원 (예시 거리)",
+  );
+  await expect(page.getByLabel("활동 1 장소", { exact: true })).toHaveValue(
+    "직접 작성한 코스 장소",
+  );
+  await expect(second.getByRole("button", { name: "장소 검색", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(page.getByLabel("활동 2 장소", { exact: true })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "새 데이트 플랜", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "← 플랜 목록으로", exact: true })).toHaveCount(0);
+  await page.getByLabel("활동 2 이름", { exact: true }).fill("두 번째 활동");
+  await page.getByLabel("활동 2 메모", { exact: true }).fill("순서 이동 뒤에도 유지할 메모");
+  await page.getByRole("button", { name: "활동 2 위로", exact: true }).click();
+  await expect(page.getByLabel("활동 1 장소", { exact: true })).toHaveValue(
+    "가상 카페 & 정원 (예시 거리)",
+  );
+  await expect(page.getByLabel("활동 1 메모", { exact: true })).toHaveValue(
+    "순서 이동 뒤에도 유지할 메모",
+  );
+  await page.getByRole("button", { name: "활동 1 빼기", exact: true }).click();
+  await expect(page.getByLabel("활동 1 장소", { exact: true })).toHaveValue(
+    "직접 작성한 코스 장소",
+  );
+  await expect(page.getByLabel("활동 2 장소", { exact: true })).toHaveCount(0);
+
+  // Appointment selection is an explicit prefill; cancelling never creates an appointment.
+  await page.goto("/");
+  await page.getByRole("button", { name: "약속 추가하기", exact: true }).click();
+  await page.getByLabel("약속 이름").fill("선택만 확인하는 약속");
+  await page.getByRole("button", { name: "장소 검색", exact: true }).click();
+  await page.getByLabel("장소 검색어").fill("가상 장소");
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await expect(page.locator(".place-results li")).toHaveCount(2);
+  await expect(page.locator(".place-results li").last()).toHaveCSS("border-bottom-width", "0px");
+  await page.getByRole("button", { name: "가상 카페 & 정원 선택", exact: true }).click();
+  await expect(page.getByLabel("만날 장소 (선택)")).toHaveValue("가상 카페 & 정원 (예시 거리)");
+  await expect(page.getByLabel("약속 이름")).toHaveValue("선택만 확인하는 약속");
+  await page.getByRole("button", { name: "취소", exact: true }).click();
+  await expect(page.getByRole("button", { name: /선택만 확인하는 약속/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "약속 추가하기", exact: true }).click();
+  await page.getByLabel("약속 이름").fill("선택한 장소 저장 확인");
+  await page.getByRole("button", { name: "장소 검색", exact: true }).click();
+  await page.getByLabel("장소 검색어").fill("가상 장소");
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await page.getByRole("button", { name: "가상 카페 & 정원 선택", exact: true }).click();
+  await page.getByRole("button", { name: "약속 저장하기", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: /선택한 장소 저장 확인/ }).click();
+  await expect(page.locator(".detail-list")).toContainText("가상 카페 & 정원 (예시 거리)");
 });

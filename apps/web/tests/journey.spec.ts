@@ -42,7 +42,7 @@ test("wishlist to published day and author-controlled report sharing", async ({
     await b.goto("/wishlist");
     await expect(b.getByRole("heading", { name: "우리의 작은 산책", exact: true })).toBeVisible();
     await a.getByRole("link", { name: "이 위시로 플랜 초안 만들기" }).click();
-    await expect(a.getByLabel("활동 1 장소")).toHaveValue("우리의 작은 산책");
+    await expect(a.getByLabel("활동 1 장소", { exact: true })).toHaveValue("우리의 작은 산책");
     await expect(a.getByLabel("활동 1 메모")).toHaveValue("물과 우산 준비");
     const date = await a.getByLabel("플랜 날짜", { exact: true }).inputValue();
     await a.getByLabel("활동 1 시간").fill("14:00");

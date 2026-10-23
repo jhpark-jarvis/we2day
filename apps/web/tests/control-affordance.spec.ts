@@ -40,8 +40,10 @@ async function auditControls(page: Page, label: string) {
       const dateCell = control.matches(".calendar-day");
       const underlined = style.textDecorationLine.includes("underline");
       const outline = parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== "none";
-      if (!dateCell && !grouped && !underlined && !outline)
+      const icon = control.matches(".icon-button") && !!control.querySelector("svg");
+      if (!dateCell && !grouped && !underlined && !outline && !icon)
         problems.push(`plain text control: ${name}`);
+      if (icon && parseFloat(style.borderTopWidth) !== 0) problems.push(`outlined icon: ${name}`);
       if (control.tagName !== "A" && !dateCell && bounds.height < 43.5)
         problems.push(`short target: ${name}`);
       if (deep && control.scrollWidth > control.clientWidth + 2)
@@ -119,6 +121,24 @@ async function auditControls(page: Page, label: string) {
     }
     return problems;
   }, mobileDeepAudit);
+  const headingIssues = await page.locator(".app-header").evaluate((header) => {
+    const issues: string[] = [];
+    const word = header.querySelector<HTMLElement>(".wordmark")?.getBoundingClientRect();
+    const titles = [...header.querySelectorAll<HTMLElement>("h1")].filter((h) =>
+      h.checkVisibility(),
+    );
+    if (titles.length !== 1) issues.push("expected one visible page heading in header");
+    for (const title of titles) {
+      const box = title.getBoundingClientRect();
+      if (word && box.left < word.right + 7) issues.push("page heading overlaps wordmark");
+      if (box.right > document.documentElement.clientWidth + 1)
+        issues.push("page heading overflow");
+      if (getComputedStyle(title).textAlign !== "right")
+        issues.push("page heading is not right aligned");
+    }
+    return issues;
+  });
+  issues.push(...headingIssues);
   if (mobileDeepAudit) {
     const reachability = await page.locator("body").evaluate((body) => {
       const problems: string[] = [];
@@ -304,7 +324,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await page.getByLabel("플랜 이름").fill("LongUnbrokenPlanTitle".repeat(4));
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 1 이름").fill("공원 산책");
-  await page.getByLabel("활동 1 장소").fill("직접 적은 예시 공원");
+  await page.getByLabel("활동 1 장소", { exact: true }).fill("직접 적은 예시 공원");
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
   await expect(page.getByRole("button", { name: "확정 내용 확인", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "확정 내용 확인", exact: true }).click();
@@ -312,6 +332,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await expect(
     page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
   ).toBeVisible();
+  await auditControls(page, "long-plan-editor");
   const plans = await (await context.request.get("/api/plans")).json();
   const plan = plans.find(
     (item: { content: { title: string } }) =>
@@ -333,7 +354,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
       {
         routes,
         engine: testInfo.project.use.defaultBrowserType || "chromium",
-        widths: mobileDeepAudit ? [320, 375, 393, 430, 844] : [320, 390, 768, 1280],
+        widths: mobileDeepAudit ? [320, 375, 393, 430, 844] : [320, 390, 768, 844, 1280],
         textScales: mobileDeepAudit ? [1, 2] : [1],
         themes: ["warm", "white"],
       },
@@ -422,6 +443,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
           ["warm", 320, 900, 1],
           ["white", 390, 900, 1],
           ["warm", 768, 900, 1],
+          ["white", 844, 390, 1],
           ["warm", 1280, 900, 1],
           ["white", 1280, 900, 1],
         ] as const);

@@ -35,7 +35,7 @@ test("naver handoff encodes selected place and discards temporary coordinates wi
   const date = await page.getByLabel("플랜 날짜").inputValue();
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 1 이름").fill("공공 장소 예시");
-  await page.getByLabel("활동 1 장소").fill("강남역 & 공공 예시");
+  await page.getByLabel("활동 1 장소", { exact: true }).fill("강남역 & 공공 예시");
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 2 이름").fill("장소 없는 합성 활동");
   await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
