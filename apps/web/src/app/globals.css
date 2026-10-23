@@ -100,7 +100,7 @@ button { appearance: none; color: var(--foreground); }
 .page-title-slot .muted { font-size: 12px; line-height: 1.45; margin-top: 4px; word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty; }
 .eyebrow { font-size: 11px; letter-spacing: 1.8px; color: var(--muted); margin-bottom: 7px; }
 .muted { color: var(--muted); font-size: 13px; }
-.preview-badge { border: 1px solid var(--line); border-radius: 20px; padding: 4px 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.preview-badge { display: inline-block; max-inline-size: 100%; border: 1px solid var(--line); border-radius: 20px; padding: 4px 10px; color: var(--muted); font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
 .calendar-workspace { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 55px; }
 .month-calendar { min-width: 0; align-self: start; }
 .month-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 5px; margin-bottom: 13px; }
