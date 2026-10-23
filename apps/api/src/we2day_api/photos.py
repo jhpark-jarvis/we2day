@@ -272,8 +272,9 @@ def list_photos(
         "order": "id.asc",
         "limit": "51",
     }
-    if not trash:
+    if date is not None:
         params["date"] = f"eq.{date}"
+    if not trash:
         params["purging_at"] = "is.null"
     if after:
         params["id"] = f"gt.{after}"

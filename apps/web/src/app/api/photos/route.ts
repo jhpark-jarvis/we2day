@@ -10,10 +10,13 @@ export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get("date") || "";
   const after = request.nextUrl.searchParams.get("after");
   const trash = request.nextUrl.searchParams.get("trash") === "true";
-  if ((!trash && !/^(20\d{2}|2100)-\d{2}-\d{2}$/.test(date)) || (after && !uuid.test(after)))
+  if (
+    ((!trash || date) && !/^(20\d{2}|2100)-\d{2}-\d{2}$/.test(date)) ||
+    (after && !uuid.test(after))
+  )
     return NextResponse.json({ error: "날짜를 확인해 주세요." }, { status: 422, headers });
   const result = await callApi<PhotoPage>(
-    `/photos?${trash ? "trash=true" : `date=${date}`}${after ? `&after=${after}` : ""}`,
+    `/photos?${trash ? `trash=true${date ? `&date=${date}` : ""}` : `date=${date}`}${after ? `&after=${after}` : ""}`,
   );
   return NextResponse.json(result.error ? { error: result.error } : result.data, {
     status: result.status,

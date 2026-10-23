@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
 from test_calendar_api import CONFIG, SPACE, USER
+
 from we2day_api import auth
 from we2day_api.main import create_app
 from we2day_api.photos import normalized_image
@@ -210,6 +211,12 @@ def test_lifecycle_http_contract_confirmation_and_storage_failure():
     with TestClient(app) as client:
         assert client.get("/photos?trash=true").json()["items"][0]["lifecycle_version"] == 2
         assert calls[-1]["trashed_at"] == "not.is.null" and "date" not in calls[-1]
+        assert client.get("/photos?trash=true&date=2026-10-24").status_code == 200
+        assert calls[-1]["date"] == "eq.2026-10-24"
+        assert calls[-1]["trashed_at"] == "not.is.null"
+        before = len(calls)
+        assert client.get("/photos?trash=true&date=invalid").status_code == 422
+        assert len(calls) == before
         assert client.post(f"/photos/{photo_id}/restore", json=body).status_code == 200
         assert calls[-1][1]["p_action"] == "restore"
         before = len(calls)
