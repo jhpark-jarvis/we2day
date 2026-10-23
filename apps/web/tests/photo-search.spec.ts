@@ -22,6 +22,10 @@ test("photo reference search shares active photos and preserves conditions after
       await view.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
       await view.getByRole("button", { name: "로그인", exact: true }).click();
       await expect(view).toHaveURL(/\/account$/);
+      const name = username === "member" ? "가상 사진 작성자 가" : "가상 사진 작성자 나";
+      await view.getByLabel("사용자 이름", { exact: true }).fill(name);
+      await view.getByRole("button", { name: "이름 저장", exact: true }).click();
+      await expect(view.getByText(`${name}님, 반가워요.`, { exact: true })).toBeVisible();
     }
     await page.goto("/couple");
     await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
@@ -82,6 +86,7 @@ test("photo reference search shares active photos and preserves conditions after
       "합성 산책 100%",
     );
     await page.getByText("휴대폰에서 원본 찾기", { exact: true }).click();
+    await expect(page.locator(".photo-reference")).toContainText("가상 사진 작성자 가");
     await expect(page.locator(".photo-reference")).toContainText("synthetic-search.jpg");
     await expect(page.locator(".photo-reference")).toContainText("제공된 정보 없음");
     await partner.getByLabel("올린 사람", { exact: true }).selectOption("mine");

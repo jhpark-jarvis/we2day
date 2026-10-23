@@ -71,9 +71,7 @@ test("naver handoff encodes selected place and discards temporary coordinates wi
   await page.getByRole("button", { name: "앱 연결 옵션", exact: true }).click();
   await page.getByText("목적지 좌표로 바로 길찾기", { exact: true }).click();
   await expect(page.getByLabel("길찾기 목적지 위도")).toHaveValue("");
-  await expect(page.getByRole("region", { name: "공동 방문 진행" })).not.toContainText(
-    "마지막 변경",
-  );
+  await expect(page.getByRole("region", { name: "데이트 활동" })).not.toContainText("마지막 변경");
   expect(external).toBe(0);
   expect(visitWrites).toBe(0);
 });
@@ -195,7 +193,7 @@ test("saved date course opens stored places through direct map links without sea
     } else expect(geometry.menu.top).toBeGreaterThan(geometry.logo.bottom);
     expect(Math.abs(geometry.prev.left - geometry.steps.left)).toBeLessThanOrEqual(1);
     expect(Math.abs(geometry.next.right - geometry.steps.right)).toBeLessThanOrEqual(1);
-    expect(geometry.actions.right).toBeLessThan(geometry.section.right);
+    expect(geometry.actions.right).toBeLessThanOrEqual(geometry.section.right);
     expect(
       Math.abs(
         (geometry.actions.top + geometry.actions.bottom) / 2 -

@@ -51,6 +51,14 @@ test("two users share appointments through real SQL and preserve edits on failur
       await page.getByRole("button", { name: "로그인", exact: true }).click();
       await expect(page).toHaveURL(/\/account$/);
     }
+    for (const [page, name] of [
+      [a, "가상 별명 가"],
+      [b, "가상 별명 나"],
+    ] as const) {
+      await page.getByLabel("사용자 이름", { exact: true }).fill(name);
+      await page.getByRole("button", { name: "이름 저장", exact: true }).click();
+      await expect(page.getByText(`${name}님, 반가워요.`, { exact: true })).toBeVisible();
+    }
     await a.goto("/couple");
     await a.getByRole("button", { name: "새 공간 만들기" }).click();
     await a.getByRole("button", { name: "초대 코드 만들기", exact: true }).click();
@@ -80,7 +88,12 @@ test("two users share appointments through real SQL and preserve edits on failur
     await expect(b.getByRole("button", { name: /함께 산책/ })).toBeVisible();
     for (const page of [a, b]) {
       await page.getByRole("button", { name: /함께 산책/ }).click();
-      await expect(page.getByText("강변 산책길", { exact: true })).toBeVisible();
+      await expect(
+        page.locator(".appointment-detail").getByText("강변 산책길", { exact: true }),
+      ).toBeVisible();
+      await expect(page.locator(".detail-list")).toContainText("가상 별명 가");
+      await expect(page.locator(".detail-list")).toContainText("가상 별명 나");
+      await expect(page.getByText("나 · 너", { exact: true })).toHaveCount(0);
       await page.getByRole("button", { name: "약속 수정하기" }).click();
     }
     await a.getByLabel("약속 이름").fill("一緒に 산책 · 변경");
@@ -89,7 +102,7 @@ test("two users share appointments through real SQL and preserve edits on failur
     await b.getByLabel("메모 (선택)").fill("상대가 작성 중인 메모");
     await b.getByRole("button", { name: "약속 저장하기" }).click();
     await expect(
-      b.getByRole("alert").filter({ hasText: "다른 곳에서 약속이 바뀌었어요" }),
+      b.getByRole("alert").filter({ hasText: "다른 곳에서 내용이 바뀌었어요" }),
     ).toBeVisible();
     await expect(b.getByLabel("메모 (선택)")).toHaveValue("상대가 작성 중인 메모");
     await b.getByRole("button", { name: /최신 일정 다시 불러오기/ }).click();
@@ -105,7 +118,7 @@ test("two users share appointments through real SQL and preserve edits on failur
     await a.getByRole("button", { name: "약속 수정하기" }).click();
     await a.getByLabel("약속 이름").fill("저장하지 않을 변경");
     await a.getByRole("button", { name: "취소", exact: true }).click();
-    await expect(a.getByRole("heading", { name: "一緒に 산책 · 변경" })).toBeVisible();
+    await expect(a.getByRole("heading", { name: "一緒に 산책 · 변경", level: 1 })).toBeVisible();
     await outsider.goto("/");
     await expect(outsider.getByRole("button", { name: "약속 추가하기" })).toHaveCount(0);
     const hidden = await third.request.get(`/api/appointments?month=${date.slice(0, 7)}`);
@@ -139,7 +152,7 @@ test("two users share appointments through real SQL and preserve edits on failur
     await b.getByLabel("기념일 이름").fill("저장할 수 없는 충돌");
     await b.getByRole("button", { name: "기념일 저장하기" }).click();
     await expect(b.getByRole("main").getByRole("alert")).toContainText(
-      "다른 곳에서 기념일이 바뀌었어요",
+      "다른 곳에서 내용이 바뀌었어요",
     );
     await expect(b.getByLabel("기념일 이름")).toHaveValue("저장할 수 없는 충돌");
     await b.getByRole("button", { name: /최신 기념일 불러오기/ }).click();
@@ -179,7 +192,7 @@ test("two users share appointments through real SQL and preserve edits on failur
     await a.screenshot({ path: testInfo.outputPath("anniversaries-home.png"), fullPage: true });
     await b.goto("/settings");
     await b.getByRole("button", { name: /화이트/ }).click();
-    await expect(b.getByRole("status")).toContainText("1년");
+    await expect(b.getByRole("status").filter({ hasText: "1년" })).toBeVisible();
     await expect(b.locator("html")).toHaveAttribute("data-theme", "white");
     await b.goto("/anniversaries");
     await expect(b.locator("html")).toHaveAttribute("data-theme", "white");

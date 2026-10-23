@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.use({ serviceWorkers: "block" });
 
-test("shared visit progress preserves previous publications and handles conflicts and retries", async ({
+test("activity cards show latest publication and handle shared state conflicts and retries", async ({
   page,
   browser,
 }, testInfo) => {
@@ -50,9 +50,9 @@ test("shared visit progress preserves previous publications and handles conflict
     await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
     await expect(page.getByText("확정됨", { exact: true })).toBeVisible();
     await page.goto(`/today?date=${date}`);
-    const initialProgress = page.getByRole("region", { name: "공동 방문 진행", exact: true });
+    const initialProgress = page.getByRole("region", { name: "데이트 활동", exact: true });
     await expect(initialProgress.getByRole("alert")).toBeVisible();
-    await expect(initialProgress.locator(".plan-card strong").first()).toHaveText("확인 필요");
+    await expect(initialProgress.locator(".visit-state").first()).toHaveText("확인 필요");
     await expect(
       initialProgress.getByRole("button", { name: "방문 완료", exact: true }).first(),
     ).toBeDisabled();
@@ -60,14 +60,14 @@ test("shared visit progress preserves previous publications and handles conflict
     await initialProgress
       .getByRole("button", { name: "최신 방문 진행 불러오기", exact: true })
       .click();
-    await expect(initialProgress.locator(".plan-card strong").first()).toHaveText("예정");
+    await expect(initialProgress.locator(".visit-state").first()).toHaveText("예정");
     for (const view of [page, partner]) {
       await view.goto(`/today?date=${date}`);
       await expect(
         view
           .getByRole("group", { name: "합성 산책 방문 상태" })
-          .getByRole("button", { name: "예정", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
+          .getByRole("button", { name: "건너뜀", exact: true }),
+      ).toHaveAttribute("aria-pressed", "false");
     }
     const a = page.getByRole("group", { name: "합성 산책 방문 상태" });
     const b = partner.getByRole("group", { name: "합성 산책 방문 상태" });
@@ -94,7 +94,7 @@ test("shared visit progress preserves previous publications and handles conflict
       "true",
     );
     await page.context().setOffline(true);
-    await a.getByRole("button", { name: "예정", exact: true }).click();
+    await a.getByRole("button", { name: "건너뜀", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "같은 변경 다시 시도", exact: true }),
     ).toBeVisible();
@@ -104,9 +104,9 @@ test("shared visit progress preserves previous publications and handles conflict
     );
     await page.context().setOffline(false);
     await page.getByRole("button", { name: "같은 변경 다시 시도", exact: true }).click();
-    await expect(a.getByRole("button", { name: "예정", exact: true })).toHaveAttribute(
+    await expect(a.getByRole("button", { name: "건너뜀", exact: true })).toHaveAttribute(
       "aria-pressed",
-      "true",
+      "false",
     );
     await a.getByRole("button", { name: "방문 완료", exact: true }).click();
     await expect(a.getByRole("button", { name: "방문 완료", exact: true })).toHaveAttribute(
@@ -124,9 +124,9 @@ test("shared visit progress preserves previous publications and handles conflict
     await expect(
       page
         .getByRole("group", { name: "변경한 합성 활동 방문 상태" })
-        .getByRole("button", { name: "예정", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await b.getByRole("button", { name: "예정", exact: true }).click();
+        .getByRole("button", { name: "건너뜀", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await b.getByRole("button", { name: "건너뜀", exact: true }).click();
     await expect(
       partner.getByRole("alert").filter({ hasText: "확정 내용이 바뀌었어요" }),
     ).toBeVisible();
@@ -134,8 +134,8 @@ test("shared visit progress preserves previous publications and handles conflict
     await expect(
       partner
         .getByRole("group", { name: "변경한 합성 활동 방문 상태" })
-        .getByRole("button", { name: "예정", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
+        .getByRole("button", { name: "건너뜀", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
     await expect(
       partner
         .getByRole("group", { name: "변경한 합성 활동 방문 상태" })
@@ -144,8 +144,9 @@ test("shared visit progress preserves previous publications and handles conflict
     await expect(
       partner.getByRole("button", { name: "같은 변경 다시 시도", exact: true }),
     ).toHaveCount(0);
-    await page.getByText(`이전 확정안 1 · 합성 방문 플랜 · ${date}`, { exact: true }).click();
-    await expect(page.getByText("합성 산책 · 방문 완료", { exact: true })).toBeVisible();
+    await expect(page.getByText(/이전 확정안/)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "둘의 방문 진행", exact: true })).toHaveCount(0);
+    await expect(page.locator(".activity-card")).toHaveCount(1);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
