@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import sharp from "sharp";
 
 test("compressed photo survives retry and is shared through API, SQL and private Storage contract", async ({
   browser,
@@ -30,12 +31,29 @@ test("compressed photo survives retry and is shared through API, SQL and private
   });
   try {
     for (const size of [180, 192, 512]) {
-      const response = await request.get(`http://127.0.0.1:3100/pwa-icon/${size}?v=brand1`);
+      const response = await request.get(`http://127.0.0.1:3100/pwa-icon/${size}?v=brand2`);
       expect(response.status()).toBe(200);
       expect(response.headers()["content-type"]).toContain("image/png");
       const png = await response.body();
       expect(png.readUInt32BE(16)).toBe(size);
       expect(png.readUInt32BE(20)).toBe(size);
+      const { data, info } = await sharp(png)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // All platform icons must be opaque and dark right up to the square edge.
+      // The supplied pre-rounded artwork's white surround must never survive.
+      let minimumAlpha = 255,
+        maximumEdge = 0;
+      for (let y = 0; y < size; y++)
+        for (let x = 0; x < size; x++) {
+          const offset = (y * size + x) * info.channels;
+          minimumAlpha = Math.min(minimumAlpha, data[offset + 3]);
+          if (x < size * 0.025 || x >= size * 0.975 || y < size * 0.025 || y >= size * 0.975)
+            maximumEdge = Math.max(maximumEdge, data[offset], data[offset + 1], data[offset + 2]);
+        }
+      expect(minimumAlpha).toBe(255);
+      expect(maximumEdge).toBeLessThan(140);
       if (size === 192)
         await import("node:fs/promises").then((fs) =>
           fs.writeFile(testInfo.outputPath("brand-icon-192.png"), png),

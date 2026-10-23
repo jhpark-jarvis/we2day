@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "함께할 약속과 함께한 날을 담는 둘의 일정 공간.",
   applicationName: "WE2DAY",
   appleWebApp: { capable: true, title: "WE2DAY", statusBarStyle: "default" },
-  icons: { icon: "/pwa-icon/192?v=brand1", apple: "/pwa-icon/180?v=brand1" },
+  icons: { icon: "/pwa-icon/192?v=brand2", apple: "/pwa-icon/180?v=brand2" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };

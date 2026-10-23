@@ -37,7 +37,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification("WE2DAY", {
       body: "알림이 도착했어요. 앱에서 확인해 주세요.",
-      icon: "/pwa-icon/192?v=brand1",
+      icon: "/pwa-icon/192?v=brand2",
       tag: "we2day-notice",
       data: { path: "/reminders" },
     }),
