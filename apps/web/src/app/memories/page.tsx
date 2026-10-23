@@ -45,7 +45,7 @@ export default async function MemoriesPage({
         {lastYear ? (
           <>
             <p className="muted">한국 날짜 기준 {lastYear}의 기록을 직접 열어볼 수 있어요.</p>
-            <div className="calendar-toolbar">
+            <div className="calendar-toolbar memory-return-actions">
               <Link className="text-button" href={`/memories?date=${lastYear}`}>
                 작년 오늘의 사진 보기
               </Link>

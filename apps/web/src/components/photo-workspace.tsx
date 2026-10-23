@@ -186,7 +186,9 @@ export function PhotoWorkspace({
       )}
       {canSave && (
         <section
-          className="shared-photo-section"
+          className={
+            browseHref && !trash ? "shared-photo-section record-album" : "shared-photo-section"
+          }
           aria-label={trash ? "둘의 사진 휴지통" : "날짜별 사진 앨범"}
         >
           <div className="calendar-toolbar album-heading">
