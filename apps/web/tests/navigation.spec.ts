@@ -126,8 +126,62 @@ test("saved date course opens stored places through direct map links without sea
     "직접 정한 장소 1 & 예시 주소 1",
   );
   await expect(page.getByLabel("길찾기 목적지 위도")).toHaveCount(0);
-  for (const width of [320, 393]) {
+  await expect(page.locator(".today-workspace")).not.toContainText("0원");
+  await expect(page.locator(".today-workspace")).not.toContainText("비용 미정");
+  await expect(page.getByText("입력한 활동 비용", { exact: false })).toHaveCount(0);
+  const focus = page.getByRole("region", { name: "살펴보는 활동" });
+  await expect(focus).toHaveCSS("border-top-width", "1px");
+  await expect(page.getByRole("button", { name: "이 날짜 보기", exact: true })).toHaveClass(
+    "icon-button",
+  );
+  for (const width of [320, 393, 1024, 1425]) {
     await page.setViewportSize({ width, height: 852 });
+    const geometry = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const el = document.querySelector(selector);
+        if (!el) throw new Error(selector);
+        const r = el.getBoundingClientRect();
+        return {
+          left: r.left,
+          right: r.right,
+          top: r.top,
+          bottom: r.bottom,
+          center: (r.left + r.right) / 2,
+        };
+      };
+      return {
+        shell: box(".app-shell"),
+        menu: box(".app-navigation"),
+        title: box(".page-title-slot"),
+        logo: box(".app-header .wordmark"),
+        prev: box(".timeline-step-navigation button:first-child"),
+        next: box(".timeline-step-navigation button:last-child"),
+        steps: box(".timeline-step-navigation"),
+        actions: box(".section-actions"),
+        section: box(".visit-progress"),
+        heading: box(".section-heading h2"),
+        placeActions: [...document.querySelectorAll(".handoff-actions > *")].map(
+          (el) => el.getBoundingClientRect().top,
+        ),
+      };
+    });
+    if (width > 840) {
+      expect(Math.abs(geometry.menu.center - geometry.shell.center)).toBeLessThanOrEqual(1);
+      expect(geometry.logo.right).toBeLessThan(geometry.menu.left);
+      expect(geometry.title.left).toBeGreaterThanOrEqual(geometry.menu.right);
+    } else expect(geometry.menu.top).toBeGreaterThan(geometry.logo.bottom);
+    expect(Math.abs(geometry.prev.left - geometry.steps.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.next.right - geometry.steps.right)).toBeLessThanOrEqual(1);
+    expect(geometry.actions.right).toBeLessThan(geometry.section.right);
+    expect(
+      Math.abs(
+        (geometry.actions.top + geometry.actions.bottom) / 2 -
+          (geometry.heading.top + geometry.heading.bottom) / 2,
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.max(...geometry.placeActions) - Math.min(...geometry.placeActions),
+    ).toBeLessThanOrEqual(1);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
@@ -155,4 +209,57 @@ test("saved date course opens stored places through direct map links without sea
   );
   expect(visits).toBe(0);
   expect(searches).toBe(0);
+
+  // Optional amounts retain their stored zero/null semantics while read-only zero labels disappear.
+  for (const positive of [false, true]) {
+    await page.goto(`/plans?item=${id}`);
+    await page.waitForLoadState("networkidle");
+    await page.getByLabel("전체 예산 (원, 선택)").fill(positive ? "20000" : "0");
+    await page.getByLabel("활동 1 예상 비용 (원, 선택)", { exact: true }).fill("0");
+    await page
+      .getByLabel("활동 2 예상 비용 (원, 선택)", { exact: true })
+      .fill(positive ? "12000" : "0");
+    await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
+    await page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }).click();
+    await page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }),
+    ).toBeEnabled();
+    await page.goto(`/today?date=${date}`);
+    await expect(page.locator(".day-timeline")).not.toContainText(/(?:^|\D)0원/);
+    if (positive) {
+      await expect(page.locator(".today-workspace > header")).toContainText(
+        "입력한 활동 비용 12,000원",
+      );
+      await expect(page.locator(".today-workspace > header")).toContainText("예산 20,000원");
+    } else {
+      await expect(page.locator(".today-workspace")).not.toContainText("0원");
+      await expect(page.locator(".today-workspace > header")).not.toContainText("예산");
+    }
+  }
+  await page.getByLabel("살펴볼 날짜", { exact: true }).fill("2026-11-10");
+  await page.getByRole("button", { name: "이 날짜 보기", exact: true }).click();
+  await expect(page).toHaveURL(/date=2026-11-10/);
+  await expect(page.getByText("이 날짜에 확정한 플랜이 없어요.", { exact: true })).toBeVisible();
+  for (const route of ["/settings", "/memories/records", "/today"]) {
+    for (const width of [320, 393, 1024, 1425]) {
+      await page.setViewportSize({ width, height: 852 });
+      await page.goto(route);
+      await page.waitForLoadState("networkidle");
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
+      if (width > 840) {
+        const errors = await page.evaluate(() => {
+          const nav = document.querySelector(".app-navigation")?.getBoundingClientRect();
+          const title = document.querySelector(".page-title-slot")?.getBoundingClientRect();
+          if (!nav || !title) throw new Error("Header is missing");
+          return title.left < nav.right;
+        });
+        expect(errors).toBe(false);
+      }
+    }
+  }
 });

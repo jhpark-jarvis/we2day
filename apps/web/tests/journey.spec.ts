@@ -64,9 +64,7 @@ test("wishlist to published day and author-controlled report sharing", async ({
       b.getByRole("heading", { name: "우리의 작은 산책", exact: true }).first(),
     ).toBeVisible();
     await expect(b.getByText("아직 확정하지 않은 변경안", { exact: true })).toHaveCount(0);
-    await expect(
-      b.getByText("입력한 활동 비용 0원 + 비용 미정 1개", { exact: false }),
-    ).toBeVisible();
+    await expect(b.getByText("입력한 활동 비용", { exact: false })).toHaveCount(0);
     await b.screenshot({ path: testInfo.outputPath("today-mobile.png"), fullPage: true });
     expect(await b.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
       true,

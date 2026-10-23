@@ -21,7 +21,7 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 1 이름", { exact: true }).fill("산책");
   await page.getByLabel("활동 1 시간", { exact: true }).fill("14:00");
-  await page.getByLabel("활동 1 예상 비용 (원)", { exact: true }).fill("12000");
+  await page.getByLabel("활동 1 예상 비용 (원, 선택)", { exact: true }).fill("12000");
   await page.getByRole("button", { name: "활동 추가", exact: true }).click();
   await page.getByLabel("활동 2 이름", { exact: true }).fill("카페");
   await page.getByLabel("활동 2 시간", { exact: true }).fill("13:00");
@@ -44,8 +44,8 @@ test("plan review updates on edit and reorder while preserving save and confirm"
   await page.getByLabel("활동 2 시간", { exact: true }).fill("13:00");
   await page.getByRole("button", { name: "활동 2 위로", exact: true }).click();
   await expect(checks).not.toContainText("보다 일러요");
-  await page.getByLabel("활동 1 예상 비용 (원)", { exact: true }).fill("0");
-  await page.getByLabel("활동 2 예상 비용 (원)", { exact: true }).fill("8000");
+  await page.getByLabel("활동 1 예상 비용 (원, 선택)", { exact: true }).fill("0");
+  await page.getByLabel("활동 2 예상 비용 (원, 선택)", { exact: true }).fill("8000");
   await expect(checks).toContainText("예상 비용 합계 8,000원");
   await expect(checks).toContainText("전체 예산 이내예요");
   await expect(checks).not.toContainText("비용 미정");
