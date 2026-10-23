@@ -73,6 +73,10 @@ export function CalendarExport({ month: initialMonth }: { month: string }) {
           <input type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} />
           약속 메모도 파일에 포함
         </label>
+        <p className="settings-hint">
+          일정 이름·장소와 선택한 메모가 파일에 포함돼요. 자동 동기화되지 않으니 저장 위치를 확인해
+          주세요.
+        </p>
         <button className="primary-button" type="submit" aria-busy={pending}>
           {"캘린더 파일 다운로드"}
         </button>

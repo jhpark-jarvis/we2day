@@ -119,23 +119,29 @@ export function RouteHistory({ today, apiKey }: { today: string; apiKey: string 
             </button>
           </fieldset>
         </form>
-        <p className="settings-hint">
-          최대 366일씩 조회해요. GeoJSON 파일에는 선택 기간 전체의 날짜·장소명·정밀 좌표·수정 시각이
-          포함돼요. 실제 주행이나 방문 완료의 증거는 아니에요.
-        </p>
-        <button
-          type="button"
-          className="text-button"
-          disabled={pending || !result || result.signature !== signature}
-          onClick={() => void download()}
-        >
-          이 기간 직선 기록 내보내기
-        </button>
+        <details className="compact-help">
+          <summary>내보내기 안내</summary>
+          <p className="settings-hint">
+            최대 366일씩 조회해요. GeoJSON 파일에는 선택 기간 전체의 날짜·장소명·정밀 좌표·수정
+            시각이 포함돼요. 실제 주행이나 방문 완료의 증거는 아니에요.
+          </p>
+        </details>
+
         {error && <p role="alert">{error}</p>}
         {notice && <p role="status">{notice}</p>}
         {result && (
           <section aria-label="기간별 동선 결과">
-            <h2>저장한 두 점 기록</h2>
+            <div className="section-heading">
+              <h2>저장한 두 점 기록</h2>{" "}
+              <button
+                type="button"
+                className="text-button"
+                disabled={pending || !result || result.signature !== signature}
+                onClick={() => void download()}
+              >
+                이 기간 직선 기록 내보내기
+              </button>
+            </div>
             {result.signature !== signature && (
               <p role="status">기간이 바뀌었어요. 동선 조회를 눌러 주세요.</p>
             )}
@@ -146,7 +152,7 @@ export function RouteHistory({ today, apiKey }: { today: string; apiKey: string 
                 <p>
                   {item.start_name} → {item.end_name}
                 </p>
-                <p className="settings-hint">직접 기록한 두 점 · 버전 {item.version}</p>
+                <p className="settings-hint">직접 기록한 두 점</p>
                 <Link className="text-button" href={`/?date=${item.date}`}>
                   이 날짜의 기록 열기
                 </Link>

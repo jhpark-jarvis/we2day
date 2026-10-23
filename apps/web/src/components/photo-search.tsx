@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 import Image from "next/image";
 import { useState, useTransition } from "react";
 import { searchPhotos } from "@/app/actions/photo-search";
@@ -78,32 +79,35 @@ export function PhotoSearch({
               />
             </div>
           </div>
-          <div className="plan-basics">
-            <div className="auth-field">
-              <label htmlFor="photo-search-field">검색 대상</label>
-              <select
-                id="photo-search-field"
-                value={field}
-                onChange={(e) => setField(e.target.value as PhotoSearchQuery["field"])}
-              >
-                <option value="caption">사진 한마디</option>
-                <option value="filename">원래 파일명</option>
-                <option value="device">기기 정보</option>
-              </select>
+          <details className="optional-fields">
+            <summary>상세 필터</summary>
+            <div className="plan-basics">
+              <div className="auth-field">
+                <label htmlFor="photo-search-field">검색 대상</label>
+                <select
+                  id="photo-search-field"
+                  value={field}
+                  onChange={(e) => setField(e.target.value as PhotoSearchQuery["field"])}
+                >
+                  <option value="caption">사진 한마디</option>
+                  <option value="filename">원래 파일명</option>
+                  <option value="device">기기 정보</option>
+                </select>
+              </div>
+              <div className="auth-field">
+                <label htmlFor="photo-search-uploader">올린 사람</label>
+                <select
+                  id="photo-search-uploader"
+                  value={uploader}
+                  onChange={(e) => setUploader(e.target.value as PhotoSearchQuery["uploader"])}
+                >
+                  <option value="all">둘 다</option>
+                  <option value="mine">내가 올린 사진</option>
+                  <option value="partner">상대가 올린 사진</option>
+                </select>
+              </div>
             </div>
-            <div className="auth-field">
-              <label htmlFor="photo-search-uploader">올린 사람</label>
-              <select
-                id="photo-search-uploader"
-                value={uploader}
-                onChange={(e) => setUploader(e.target.value as PhotoSearchQuery["uploader"])}
-              >
-                <option value="all">둘 다</option>
-                <option value="mine">내가 올린 사진</option>
-                <option value="partner">상대가 올린 사진</option>
-              </select>
-            </div>
-          </div>
+          </details>
           <div className="auth-field">
             <label htmlFor="photo-search-text">
               {field === "caption"
@@ -123,8 +127,14 @@ export function PhotoSearch({
           <p className="settings-hint">
             한 번에 최대 366일을 찾아요. 검색어를 비우면 해당 기간의 사진을 모두 찾아요.
           </p>
-          <button className="primary-button" type="submit" aria-busy={pending}>
-            사진 검색
+          <button
+            className="icon-button search-submit"
+            type="submit"
+            aria-label="사진 검색"
+            title="사진 검색"
+            aria-busy={pending}
+          >
+            <Search size={19} aria-hidden="true" />
           </button>
         </fieldset>
       </form>

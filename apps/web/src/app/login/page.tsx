@@ -4,7 +4,10 @@ import { AuthSubmit } from "@/components/auth-submit";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { UsernameLoginForm } from "@/components/username-login-form";
+import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
+import { createAuthClient } from "@/lib/auth/server";
+import type { ProfileView } from "@/lib/profiles";
 
 export const metadata: Metadata = { title: "로그인" };
 
@@ -21,6 +24,30 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
+  const client = await createAuthClient();
+  const current = client ? await client.auth.getUser() : null;
+  if (current?.data.user && !current.error) {
+    const profile = await callApi<ProfileView>("/profiles");
+    return (
+      <section className="auth-panel">
+        <PageHeading>
+          <h1>로그인</h1>
+        </PageHeading>
+        <p className="note-panel">
+          {profile.data?.mine?.display_name || "사용자"}님으로 로그인했어요.
+        </p>
+        <div className="calendar-toolbar">
+          <Link className="primary-button" href="/">
+            일정
+          </Link>
+          <Link className="text-button" href="/account">
+            계정 관리·전환
+          </Link>
+        </div>
+        <p className="settings-hint">다른 계정으로 사용하려면 계정 관리에서 로그아웃해 주세요.</p>
+      </section>
+    );
+  }
   const config = getAuthConfig();
   const enabled = config?.providers || [];
   const params = await searchParams;

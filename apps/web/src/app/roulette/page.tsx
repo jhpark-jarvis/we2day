@@ -75,8 +75,10 @@ export default async function RoulettePage({
           다음 룰렛 보기
         </Link>
       )}
-      <h2>새 룰렛 만들기</h2>
-      <RouletteEditor wheel={null} draws={[]} />
+      <details className="editor-disclosure">
+        <summary>룰렛 만들기</summary>
+        <RouletteEditor wheel={null} draws={[]} />
+      </details>
       <p className="settings-hint">
         뽑기는 후보 선택만 도와요. 약속·방문·결제나 보상을 자동으로 만들지 않아요.
       </p>

@@ -29,6 +29,7 @@ export default async function RemindersPage({
         </div>
       </PageHeading>
       <div className="calendar-toolbar">
+        <ServerRefresh label="일정 새로고침" />
         <Link
           className="timeline-choice"
           aria-current={days === 7 ? "page" : undefined}
@@ -48,7 +49,11 @@ export default async function RemindersPage({
         </Link>
       </div>
       <p className="settings-hint">
-        앱 안에서 확인하는 일정 목록이에요. 화면을 닫았을 때 보내는 푸시 알림은 아직 준비 중이에요.
+        다가오는 날짜를 모아 봐요. 기기별 알림은{" "}
+        <Link className="inline-link" href="/settings">
+          설정
+        </Link>
+        에서 직접 켤 수 있어요.
       </p>
       <NotificationPreview result={preview} days={days} />
       {result.error && (
@@ -92,7 +97,6 @@ export default async function RemindersPage({
           )}
         </>
       )}
-      <ServerRefresh label="일정 새로고침" />
     </section>
   );
 }

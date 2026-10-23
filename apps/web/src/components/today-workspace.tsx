@@ -92,86 +92,85 @@ export function TodayWorkspace({
           </div>
         )}
       </header>
-      {current && (
-        <section className="timeline-focus" aria-label="살펴보는 활동">
-          <p className="eyebrow">
-            {step + 1} / {content.activities.length} · {current.time || "시간 미정"}
-          </p>
-          <h2>{current.title}</h2>
-          <LocalAppointmentTime date={content.date} time={current.time} zones={zones} />
-          <p className="preserve-lines">{current.place || "장소 없는 활동"}</p>
-          {current.note && <p className="preserve-lines">{current.note}</p>}
-          <NaverAppHandoff
-            key={`${plan.id}:${plan.published_revision}:${step}`}
-            place={current.place}
-            site={site}
-            extraAction={
-              current.place && (
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="이 장소 이름 복사"
-                  title="장소 복사"
-                  onClick={() => copyPlace(current.place)}
-                >
-                  <Copy size={18} aria-hidden="true" />
-                </button>
-              )
-            }
-          />
-          {notice && (
-            <p role="status" className="settings-hint">
-              {notice}
-            </p>
-          )}
-          <nav className="timeline-step-navigation" aria-label="활동 이동">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="이전 활동 보기"
-              title="이전 활동"
-              disabled={step === 0}
-              onClick={() => {
-                setStep(step - 1);
-                setNotice("");
-              }}
-            >
-              <ChevronLeft size={21} aria-hidden="true" />
-            </button>
-            <span className="muted" aria-hidden="true">
-              {step + 1} / {content.activities.length}
-            </span>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="다음 활동 보기"
-              title="다음 활동"
-              disabled={step === content.activities.length - 1}
-              onClick={() => {
-                setStep(step + 1);
-                setNotice("");
-              }}
-            >
-              <ChevronRight size={21} aria-hidden="true" />
-            </button>
-          </nav>
-        </section>
-      )}
-      <p className="settings-hint">
-        활동을 살펴보거나 장소를 복사해도 방문 완료로 기록되지 않아요.
-      </p>
       <VisitProgressPanel
         key={`${plan.id}:${plan.published_revision}`}
         plan={plan}
         today={today}
+        selectedContent={
+          current && (
+            <section className="timeline-focus" aria-label="살펴보는 활동">
+              <p className="eyebrow">
+                {step + 1} / {content.activities.length} · {current.time || "시간 미정"}
+              </p>
+
+              <LocalAppointmentTime date={content.date} time={current.time} zones={zones} />
+
+              {current.note && <p className="preserve-lines">{current.note}</p>}
+              <NaverAppHandoff
+                key={`${plan.id}:${plan.published_revision}:${step}`}
+                place={current.place}
+                site={site}
+                extraAction={
+                  current.place && (
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="이 장소 이름 복사"
+                      title="장소 복사"
+                      onClick={() => copyPlace(current.place)}
+                    >
+                      <Copy size={18} aria-hidden="true" />
+                    </button>
+                  )
+                }
+              />
+              {notice && (
+                <p role="status" className="settings-hint">
+                  {notice}
+                </p>
+              )}
+              <nav className="timeline-step-navigation" aria-label="활동 이동">
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="이전 활동 보기"
+                  title="이전 활동"
+                  disabled={step === 0}
+                  onClick={() => {
+                    setStep(step - 1);
+                    setNotice("");
+                  }}
+                >
+                  <ChevronLeft size={21} aria-hidden="true" />
+                </button>
+                <span className="muted" aria-hidden="true">
+                  {step + 1} / {content.activities.length}
+                </span>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="다음 활동 보기"
+                  title="다음 활동"
+                  disabled={step === content.activities.length - 1}
+                  onClick={() => {
+                    setStep(step + 1);
+                    setNotice("");
+                  }}
+                >
+                  <ChevronRight size={21} aria-hidden="true" />
+                </button>
+              </nav>
+            </section>
+          )
+        }
         selectedActivity={step}
         onSelectActivity={(index) => {
           setStep(index);
           setNotice("");
         }}
       />
-      <section className="plan-review">
-        <h2>준비물</h2>
+      <details className="plan-review">
+        <summary>준비물</summary>
         {content.preparation.length ? (
           <ul>
             {content.preparation.map((item, index) => (
@@ -182,10 +181,10 @@ export function TodayWorkspace({
         ) : (
           <p className="muted">아직 적어둔 준비물이 없어요.</p>
         )}
-      </section>
+      </details>
       <div className="calendar-toolbar">
         <Link className="text-button" href={`/plans/${plan.id}/report`}>
-          이 플랜의 리포트 작성·보기
+          회고
         </Link>
         <Link className="text-button" href={`/memories?date=${date}`}>
           이 날짜의 사진

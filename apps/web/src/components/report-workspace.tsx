@@ -65,13 +65,13 @@ export function ReportWorkspace({
         setReport(result.data);
         setNotice(
           shared
-            ? "이 리포트를 상대와 공유했어요."
+            ? "이 회고를 상대와 공유했어요."
             : "나만 보는 초안으로 저장했어요. 공유 중이었다면 상대에게 더 이상 표시되지 않아요.",
         );
       } else {
         setError(
           result.status === 409
-            ? "다른 화면에서 리포트가 바뀌었어요. 입력을 확인한 뒤 최신 페이지를 불러와 주세요."
+            ? "다른 화면에서 회고가 바뀌었어요. 입력을 확인한 뒤 최신 페이지를 불러와 주세요."
             : result.error,
         );
         setConflict(result.status === 409);
@@ -83,10 +83,11 @@ export function ReportWorkspace({
       <Link className="text-button" href="/plans">
         ← 플랜으로
       </Link>
+      <p className="status-chip">{report?.shared ? "공유 중" : "나만 보기"}</p>
       <PageHeading>
         <div>
           <p className="eyebrow">OUR DATE REPORT</p>
-          <h1>데이트 리포트</h1>
+          <h1>데이트 회고</h1>
           <p className="muted">
             {snapshot?.title || plan.content.title} · {snapshot?.date || plan.content.date}
           </p>
@@ -109,7 +110,7 @@ export function ReportWorkspace({
             ))}
           </ol>
           <p className="settings-hint">
-            처음 리포트를 저장한 확정 내용을 보존해요. 플랜은 실제 방문 기록과 별개예요.
+            처음 회고를 저장한 확정 내용을 보존해요. 플랜은 실제 방문 기록과 별개예요.
           </p>
         </details>
       )}
@@ -127,7 +128,7 @@ export function ReportWorkspace({
         >
           <p className="settings-hint">
             {report?.shared ? "현재 상대와 공유 중이에요." : "기본은 나만 보는 초안이에요."} 각자의
-            리포트는 작성한 사람만 수정할 수 있어요.
+            회고는 작성한 사람만 수정할 수 있어요.
           </p>
           <fieldset
             className="meeting-fields"
@@ -144,33 +145,41 @@ export function ReportWorkspace({
                 onChange={(e) => setContent({ ...content, summary: e.target.value })}
               />
             </div>
-            <div className="auth-field">
-              <label htmlFor="report-visits">직접 확인한 방문 장소 (한 줄에 하나, 최대 20개)</label>
-              <textarea
-                id="report-visits"
-                maxLength={4020}
-                rows={3}
-                value={visits}
-                onChange={(e) => setVisits(e.target.value)}
-              />
-            </div>
-            <div className="auth-field">
-              <label htmlFor="report-cost">기록한 총지출 (원, 모르면 비워두기)</label>
-              <input
-                id="report-cost"
-                type="number"
-                min={0}
-                max={1000000000}
-                step={1}
-                value={content.actual_cost ?? ""}
-                onChange={(e) =>
-                  setContent({
-                    ...content,
-                    actual_cost: e.target.value === "" ? null : Number(e.target.value),
-                  })
-                }
-              />
-            </div>
+            <details className="optional-fields">
+              <summary>방문 장소 (선택)</summary>
+              <div className="auth-field">
+                <label htmlFor="report-visits">
+                  직접 확인한 방문 장소 (한 줄에 하나, 최대 20개)
+                </label>
+                <textarea
+                  id="report-visits"
+                  maxLength={4020}
+                  rows={3}
+                  value={visits}
+                  onChange={(e) => setVisits(e.target.value)}
+                />
+              </div>
+            </details>
+            <details className="optional-fields">
+              <summary>지출 (선택)</summary>
+              <div className="auth-field">
+                <label htmlFor="report-cost">기록한 총지출 (원, 모르면 비워두기)</label>
+                <input
+                  id="report-cost"
+                  type="number"
+                  min={0}
+                  max={1000000000}
+                  step={1}
+                  value={content.actual_cost ?? ""}
+                  onChange={(e) =>
+                    setContent({
+                      ...content,
+                      actual_cost: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+            </details>
             {snapshot?.budget !== null && content.actual_cost !== null && snapshot && (
               <p className="settings-hint">
                 계획 예산 대비 {content.actual_cost - snapshot.budget > 0 ? "+" : ""}
@@ -198,23 +207,26 @@ export function ReportWorkspace({
                 onChange={(e) => setContent({ ...content, next_time: e.target.value })}
               />
             </div>
-            <div className="auth-field">
-              <label htmlFor="report-revisit">다시 가고 싶나요?</label>
-              <select
-                id="report-revisit"
-                value={content.revisit === null ? "" : content.revisit ? "yes" : "no"}
-                onChange={(e) =>
-                  setContent({
-                    ...content,
-                    revisit: e.target.value === "" ? null : e.target.value === "yes",
-                  })
-                }
-              >
-                <option value="">아직 정하지 않았어요</option>
-                <option value="yes">다시 가고 싶어요</option>
-                <option value="no">다른 곳을 가고 싶어요</option>
-              </select>
-            </div>
+            <details className="optional-fields">
+              <summary>재방문 (선택)</summary>
+              <div className="auth-field">
+                <label htmlFor="report-revisit">다시 가고 싶나요?</label>
+                <select
+                  id="report-revisit"
+                  value={content.revisit === null ? "" : content.revisit ? "yes" : "no"}
+                  onChange={(e) =>
+                    setContent({
+                      ...content,
+                      revisit: e.target.value === "" ? null : e.target.value === "yes",
+                    })
+                  }
+                >
+                  <option value="">아직 정하지 않았어요</option>
+                  <option value="yes">다시 가고 싶어요</option>
+                  <option value="no">다른 곳을 가고 싶어요</option>
+                </select>
+              </div>
+            </details>
             <div className="calendar-toolbar">
               <button className="primary-button" type="submit" value="private">
                 {report?.shared ? "공유 철회하고 개인 저장" : "개인 초안 저장"}
@@ -233,7 +245,7 @@ export function ReportWorkspace({
       )}
       {newerOwn && (
         <p role="alert" className="note-panel">
-          다른 화면에서 저장한 최신 리포트가 있어요. 작성 중인 내용은 유지했어요. 필요한 내용을 따로
+          다른 화면에서 저장한 최신 회고가 있어요. 작성 중인 내용은 유지했어요. 필요한 내용을 따로
           보관한 뒤 최신 페이지를 불러와 주세요.
         </p>
       )}
@@ -247,9 +259,9 @@ export function ReportWorkspace({
           {notice}
         </p>
       )}
-      <h2>상대가 공유한 리포트</h2>
+      <h2>상대가 공유한 회고</h2>
       <RefreshButton
-        label="리포트 새로고침"
+        label="회고 새로고침"
         pending={refreshing}
         disabled={pending}
         onClick={() => startRefresh(() => router.refresh())}
@@ -281,7 +293,7 @@ export function ReportWorkspace({
           </article>
         ))}
       {!initialError && !initialReports.some((item) => item.author_id !== userId) && (
-        <p className="muted">상대가 공유한 리포트가 아직 없어요.</p>
+        <p className="muted">상대가 공유한 회고가 아직 없어요.</p>
       )}
       <Link className="text-button" href={`/memories?date=${snapshot?.date || plan.content.date}`}>
         이 날짜의 사진 보기

@@ -139,18 +139,23 @@ export function PlanWorkspace({
         <ArchiveToggle label="플랜 구분" archived={archived} pending={pending} onChange={load} />
         <RefreshButton label="플랜 새로고침" pending={pending} onClick={() => load(archived)} />
       </div>
-      <Link className="text-button" href="/wishlist">
-        위시리스트
-      </Link>
-      <Link className="text-button" href={`/today?date=${today}`}>
-        데이트 코스
-      </Link>
-      <Link className="text-button" href="/checklists">
-        목록
-      </Link>
-      <Link className="text-button" href="/goals">
-        목표
-      </Link>
+      <details className="compact-help">
+        <summary>관련 기능</summary>
+        <nav className="calendar-toolbar">
+          <Link className="text-button" href="/wishlist">
+            위시리스트
+          </Link>
+          <Link className="text-button" href={`/today?date=${today}`}>
+            데이트 코스
+          </Link>
+          <Link className="text-button" href="/checklists">
+            목록
+          </Link>
+          <Link className="text-button" href="/goals">
+            목표
+          </Link>
+        </nav>
+      </details>
       <p className="settings-hint">초안은 달력에 표시되지 않아요. 확정하면 약속 하나로 연결돼요.</p>
       {error && (
         <p role="alert" className="error-message">
@@ -329,7 +334,7 @@ function PlanEditor({
             데이트 코스
           </Link>
           <Link className="text-button" href={`/plans/${plan.id}/report`}>
-            이 플랜의 리포트 작성·보기
+            회고
           </Link>
         </div>
       )}
@@ -359,6 +364,14 @@ function PlanEditor({
         </>
       ) : (
         <form
+          onInvalidCapture={(event) => {
+            let parent: HTMLElement | null =
+              event.target instanceof HTMLElement ? event.target.parentElement : null;
+            while (parent) {
+              if (parent instanceof HTMLDetailsElement) parent.open = true;
+              parent = parent.parentElement;
+            }
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             mutate("save");
@@ -394,154 +407,181 @@ function PlanEditor({
                   }}
                 />
               </div>
+              <details className="optional-fields">
+                <summary>예산 (선택)</summary>
+                <div className="auth-field">
+                  <label htmlFor="plan-budget">전체 예산 (원, 선택)</label>
+                  <input
+                    id="plan-budget"
+                    type="number"
+                    min={0}
+                    max={1000000000}
+                    step={1}
+                    value={content.budget ?? ""}
+                    onChange={(event) =>
+                      setContent({
+                        ...content,
+                        budget: event.target.value === "" ? null : Number(event.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </details>
+            </div>
+            <details className="optional-fields">
+              <summary>교통수단 (선택)</summary>
               <div className="auth-field">
-                <label htmlFor="plan-budget">전체 예산 (원, 선택)</label>
+                <label htmlFor="plan-transport">교통수단 (선택)</label>
                 <input
-                  id="plan-budget"
-                  type="number"
-                  min={0}
-                  max={1000000000}
-                  step={1}
-                  value={content.budget ?? ""}
-                  onChange={(event) =>
-                    setContent({
-                      ...content,
-                      budget: event.target.value === "" ? null : Number(event.target.value),
-                    })
-                  }
+                  id="plan-transport"
+                  maxLength={40}
+                  value={content.transport}
+                  placeholder="예: 자동차, 대중교통, 도보"
+                  onChange={(event) => setContent({ ...content, transport: event.target.value })}
                 />
               </div>
-            </div>
-            <div className="auth-field">
-              <label htmlFor="plan-transport">교통수단 (선택)</label>
-              <input
-                id="plan-transport"
-                maxLength={40}
-                value={content.transport}
-                placeholder="예: 자동차, 대중교통, 도보"
-                onChange={(event) => setContent({ ...content, transport: event.target.value })}
-              />
-            </div>
+            </details>
+            <p className="status-chip" role="status">
+              {dirty
+                ? "작성 중 · 저장 필요"
+                : plan?.published_content &&
+                    JSON.stringify(plan.content) !== JSON.stringify(plan.published_content)
+                  ? "저장됨 · 코스 반영 필요"
+                  : "저장 후 확정하면 코스에 반영돼요"}
+            </p>
             <h2>활동 순서</h2>
             <p className="settings-hint">
               방문할 장소명이나 주소를 순서대로 적어 주세요. 데이트 코스에서 네이버 지도 앱으로 바로
               열 수 있어요. 첫 활동의 시간·장소가 달력 약속에 반영돼요.
             </p>
             {content.activities.map((item, index) => (
-              <fieldset key={activityKeys.current[index]} className="plan-activity">
-                <legend>활동 {index + 1}</legend>
-                <div className="auth-field">
-                  <label htmlFor={`activity-${index}-title`}>활동 {index + 1} 이름</label>
-                  <input
-                    id={`activity-${index}-title`}
-                    value={item.title}
-                    required
-                    maxLength={100}
-                    onChange={(event) => activity(index, { title: event.target.value })}
-                  />
-                </div>
-                <div className="plan-basics">
+              <details
+                key={activityKeys.current[index]}
+                className="activity-editor-disclosure"
+                open={index === 0 || !plan || index >= plan.content.activities.length}
+              >
+                <summary>
+                  활동 {index + 1} · {item.time || "시간 미정"} · {item.title || "이름 입력"}
+                  {item.place ? ` · ${item.place}` : ""}
+                </summary>
+                <fieldset className="plan-activity">
+                  <legend>활동 {index + 1}</legend>
                   <div className="auth-field">
-                    <label htmlFor={`activity-${index}-time`}>활동 {index + 1} 시간</label>
+                    <label htmlFor={`activity-${index}-title`}>활동 {index + 1} 이름</label>
                     <input
-                      id={`activity-${index}-time`}
-                      type="time"
-                      value={item.time || ""}
-                      onChange={(event) => activity(index, { time: event.target.value || null })}
+                      id={`activity-${index}-title`}
+                      value={item.title}
+                      required
+                      maxLength={100}
+                      onChange={(event) => activity(index, { title: event.target.value })}
                     />
                   </div>
+                  <div className="plan-basics">
+                    <div className="auth-field">
+                      <label htmlFor={`activity-${index}-time`}>활동 {index + 1} 시간</label>
+                      <input
+                        id={`activity-${index}-time`}
+                        type="time"
+                        value={item.time || ""}
+                        onChange={(event) => activity(index, { time: event.target.value || null })}
+                      />
+                    </div>
+                    <details className="optional-fields">
+                      <summary>비용 (선택)</summary>
+                      <div className="auth-field">
+                        <label htmlFor={`activity-${index}-cost`}>
+                          활동 {index + 1} 예상 비용 (원, 선택)
+                        </label>
+                        <input
+                          id={`activity-${index}-cost`}
+                          type="number"
+                          min={0}
+                          max={1000000000}
+                          step={1}
+                          value={item.cost ?? ""}
+                          onChange={(event) =>
+                            activity(index, {
+                              cost: event.target.value === "" ? null : Number(event.target.value),
+                            })
+                          }
+                        />
+                      </div>
+                    </details>
+                  </div>
                   <div className="auth-field">
-                    <label htmlFor={`activity-${index}-cost`}>
-                      활동 {index + 1} 예상 비용 (원, 선택)
-                    </label>
+                    <label htmlFor={`activity-${index}-place`}>활동 {index + 1} 장소</label>
                     <input
-                      id={`activity-${index}-cost`}
-                      type="number"
-                      min={0}
-                      max={1000000000}
-                      step={1}
-                      value={item.cost ?? ""}
-                      onChange={(event) =>
-                        activity(index, {
-                          cost: event.target.value === "" ? null : Number(event.target.value),
-                        })
-                      }
+                      id={`activity-${index}-place`}
+                      value={item.place}
+                      maxLength={200}
+                      placeholder="장소명 또는 주소"
+                      onChange={(event) => activity(index, { place: event.target.value })}
                     />
                   </div>
-                </div>
-                <div className="auth-field">
-                  <label htmlFor={`activity-${index}-place`}>활동 {index + 1} 장소</label>
-                  <input
-                    id={`activity-${index}-place`}
-                    value={item.place}
-                    maxLength={200}
-                    placeholder="장소명 또는 주소"
-                    onChange={(event) => activity(index, { place: event.target.value })}
+                  <PlaceSearch
+                    initialQuery={item.place}
+                    label={`활동 ${index + 1} 장소 검색`}
+                    onSelect={(place) => {
+                      activity(index, { place });
+                      document.getElementById(`activity-${index}-place`)?.focus();
+                    }}
                   />
-                </div>
-                <PlaceSearch
-                  initialQuery={item.place}
-                  label={`활동 ${index + 1} 장소 검색`}
-                  onSelect={(place) => {
-                    activity(index, { place });
-                    document.getElementById(`activity-${index}-place`)?.focus();
-                  }}
-                />
-                <NaverAppHandoff place={item.place} site={site} compact />
-                <div className="auth-field">
-                  <div className="activity-note-heading">
-                    <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>
-                    <fieldset
-                      className="activity-actions"
-                      aria-label={`활동 ${index + 1} 순서와 삭제`}
-                    >
-                      <button
-                        type="button"
-                        className="icon-button"
-                        disabled={index === 0}
-                        onClick={() => move(index, -1)}
-                        aria-label={`활동 ${index + 1} 위로`}
-                        title="위로"
+                  <NaverAppHandoff place={item.place} site={site} compact />
+                  <div className="auth-field">
+                    <div className="activity-note-heading">
+                      <label htmlFor={`activity-${index}-note`}>활동 {index + 1} 메모</label>
+                      <fieldset
+                        className="activity-actions"
+                        aria-label={`활동 ${index + 1} 순서와 삭제`}
                       >
-                        <ArrowUp size={18} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        disabled={index === content.activities.length - 1}
-                        onClick={() => move(index, 1)}
-                        aria-label={`활동 ${index + 1} 아래로`}
-                        title="아래로"
-                      >
-                        <ArrowDown size={18} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={`활동 ${index + 1} 빼기`}
-                        title="활동 빼기"
-                        onClick={() => {
-                          activityKeys.current.splice(index, 1);
-                          setContent({
-                            ...content,
-                            activities: content.activities.filter((_, i) => i !== index),
-                          });
-                          setReview(false);
-                        }}
-                      >
-                        <X size={18} aria-hidden="true" />
-                      </button>
-                    </fieldset>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          disabled={index === 0}
+                          onClick={() => move(index, -1)}
+                          aria-label={`활동 ${index + 1} 위로`}
+                          title="위로"
+                        >
+                          <ArrowUp size={18} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          disabled={index === content.activities.length - 1}
+                          onClick={() => move(index, 1)}
+                          aria-label={`활동 ${index + 1} 아래로`}
+                          title="아래로"
+                        >
+                          <ArrowDown size={18} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={`활동 ${index + 1} 빼기`}
+                          title="활동 빼기"
+                          onClick={() => {
+                            activityKeys.current.splice(index, 1);
+                            setContent({
+                              ...content,
+                              activities: content.activities.filter((_, i) => i !== index),
+                            });
+                            setReview(false);
+                          }}
+                        >
+                          <X size={18} aria-hidden="true" />
+                        </button>
+                      </fieldset>
+                    </div>
+                    <textarea
+                      id={`activity-${index}-note`}
+                      rows={2}
+                      maxLength={1000}
+                      value={item.note}
+                      onChange={(event) => activity(index, { note: event.target.value })}
+                    />
                   </div>
-                  <textarea
-                    id={`activity-${index}-note`}
-                    rows={2}
-                    maxLength={1000}
-                    value={item.note}
-                    onChange={(event) => activity(index, { note: event.target.value })}
-                  />
-                </div>
-              </fieldset>
+                </fieldset>
+              </details>
             ))}
             <button
               type="button"
@@ -562,16 +602,19 @@ function PlanEditor({
               활동 추가
             </button>
             <PlanChecks content={content} />
-            <div className="auth-field">
-              <label htmlFor="plan-preparation">준비물 (한 줄에 하나, 최대 30개)</label>
-              <textarea
-                id="plan-preparation"
-                rows={4}
-                maxLength={6030}
-                value={preparation}
-                onChange={(event) => setPreparation(event.target.value)}
-              />
-            </div>
+            <details className="optional-fields">
+              <summary>준비물 (선택)</summary>
+              <div className="auth-field">
+                <label htmlFor="plan-preparation">준비물 (한 줄에 하나, 최대 30개)</label>
+                <textarea
+                  id="plan-preparation"
+                  rows={4}
+                  maxLength={6030}
+                  value={preparation}
+                  onChange={(event) => setPreparation(event.target.value)}
+                />
+              </div>
+            </details>
             <button type="submit" className="primary-button plan-save" aria-busy={pending}>
               {"플랜 저장"}
             </button>

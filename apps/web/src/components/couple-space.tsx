@@ -7,7 +7,7 @@ import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import type { Couple } from "@/lib/shared-calendar";
 
-export function CoupleSpace({ couple }: { couple: Couple | null }) {
+export function CoupleSpace({ couple, names = [] }: { couple: Couple | null; names?: string[] }) {
   const [created, createAction] = useActionState(createCouple, { error: "" });
   const [invited, inviteAction] = useActionState(createInvite, { error: "" });
   const [accepted, acceptAction] = useActionState(acceptInvite, { error: "" });
@@ -25,6 +25,7 @@ export function CoupleSpace({ couple }: { couple: Couple | null }) {
               ? "두 사람이 연결되었어요. 이제 같은 약속을 함께 볼 수 있어요."
               : "내 공간이 준비되었어요. 초대 코드를 상대에게 전달해 주세요."}
           </p>
+          {names.length > 0 && <p className="space-names">{names.join(" · ")}</p>}
           {couple.member_count === 1 && (
             <>
               <form action={inviteAction} className="auth-options">

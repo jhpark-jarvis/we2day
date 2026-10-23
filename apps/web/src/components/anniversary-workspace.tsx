@@ -1,4 +1,5 @@
 "use client";
+import { Pencil } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
@@ -96,21 +97,25 @@ export function AnniversaryWorkspace({
                 <div className="anniversary-count">
                   <strong>{countdown(item.days_until)}</strong>
                   <button
-                    className="text-button"
+                    className="icon-button"
                     type="button"
                     aria-label={`${item.title} 수정`}
                     onClick={() =>
                       setEditing({ anniversary: item, requestId: crypto.randomUUID() })
                     }
                   >
-                    수정
+                    <Pencil size={18} aria-hidden="true" />
                   </button>
                 </div>
               </li>
             ))}
           </ul>
           <p className="settings-hint">
-            다가오는 날을 화면에서 확인할 수 있어요. 푸시 알림은 아직 제공하지 않아요.
+            기기 알림과 자동 기념일 알림은{" "}
+            <Link className="inline-link" href="/settings">
+              설정
+            </Link>
+            에서 직접 켤 수 있어요.
           </p>
         </>
       )}

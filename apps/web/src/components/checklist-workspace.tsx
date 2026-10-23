@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { Pencil, RefreshCw } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { saveChecklist } from "@/app/actions/checklists";
 import { PageHeading } from "@/components/page-heading";
@@ -150,14 +150,16 @@ export function ChecklistWorkspace({
               ))}
             </ul>
             <button
-              className="text-button"
+              className="icon-button card-edit"
+              aria-label={`목록 열기 · ${list.title}`}
+              title="목록 수정"
               type="button"
               onClick={() => {
                 setSelected(list);
                 setId(list.id);
               }}
             >
-              목록 열기 · {list.title}
+              <Pencil size={18} aria-hidden="true" />
             </button>
           </article>
         ))}
@@ -279,16 +281,19 @@ function ChecklistEditor({
               onChange={(e) => setContent({ ...content, title: e.target.value })}
             />
           </div>
-          <div className="auth-field">
-            <label htmlFor="checklist-note">목록 메모</label>
-            <textarea
-              id="checklist-note"
-              rows={3}
-              maxLength={1000}
-              value={content.note}
-              onChange={(e) => setContent({ ...content, note: e.target.value })}
-            />
-          </div>
+          <details className="optional-fields">
+            <summary>목록 메모 (선택)</summary>
+            <div className="auth-field">
+              <label htmlFor="checklist-note">목록 메모</label>
+              <textarea
+                id="checklist-note"
+                rows={3}
+                maxLength={1000}
+                value={content.note}
+                onChange={(e) => setContent({ ...content, note: e.target.value })}
+              />
+            </div>
+          </details>
           <h2>함께 챙길 항목</h2>
           {content.items.map((item, index) => (
             <fieldset key={item.id} className="checklist-item">
@@ -370,7 +375,14 @@ function ChecklistEditor({
         </p>
       )}
       {conflict && (
-        <button type="button" className="text-button" disabled={pending} onClick={reloadLatest}>
+        <button
+          type="button"
+          className="text-button"
+          disabled={pending}
+          onClick={() => {
+            if (window.confirm("작성 중인 내용을 버리고 최신 저장본을 불러올까요?")) reloadLatest();
+          }}
+        >
           작성 내용을 버리고 최신본 불러오기
         </button>
       )}

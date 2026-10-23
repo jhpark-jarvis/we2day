@@ -61,7 +61,7 @@ export default async function AccountPage({
           <dd>연결됨</dd>
         </div>
         <div>
-          <dt>서버 연결</dt>
+          <dt>계정 상태</dt>
           <dd>{apiReady ? "계정 확인 완료" : "확인하지 못했어요. 잠시 후 다시 확인해 주세요."}</dd>
         </div>
       </dl>
@@ -83,11 +83,17 @@ export default async function AccountPage({
           로그아웃하지 못했어요. 다시 시도해 주세요.
         </p>
       )}
-      <div className="auth-options">
-        <form action={signOut}>
-          <AuthSubmit>로그아웃</AuthSubmit>
-        </form>
-      </div>
+      <section className="settings-section">
+        <h2>로그아웃</h2>
+        <p className="settings-hint">
+          이 계정의 기기 알림도 해지돼요. 다시 사용하려면 각 기기에서 켜 주세요.
+        </p>
+        <div className="auth-options">
+          <form action={signOut}>
+            <AuthSubmit>로그아웃</AuthSubmit>
+          </form>
+        </div>
+      </section>
       <Link href="/settings" className="text-button">
         설정으로 돌아가기
       </Link>

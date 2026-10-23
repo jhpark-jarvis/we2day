@@ -188,9 +188,12 @@ export function PushSettings() {
       <p className="muted">
         내가 직접 켠 기기에만 알림을 보내요. 이름·일정 내용은 잠금화면에 표시하지 않아요.
       </p>
-      <p className="settings-hint">
-        iPhone: HTTPS 주소를 Safari에서 열고 홈 화면에 추가한 뒤, 홈 화면 앱에서 켜 주세요.
-      </p>
+      <details className="compact-help">
+        <summary>iPhone 알림 이용 조건</summary>
+        <p className="settings-hint">
+          iPhone: HTTPS 주소를 Safari에서 열고 홈 화면에 추가한 뒤, 홈 화면 앱에서 켜 주세요.
+        </p>
+      </details>
       <LoadingRegion busy={pending} label="기기 알림 상태를 확인하는 중">
         <p className="settings-hint push-capability-note">
           {config === null
@@ -240,10 +243,13 @@ export function PushSettings() {
             <span className="notification-switch-track" aria-hidden="true" />
             <span>{automatic ? "켜짐" : "꺼짐"}</span>
           </button>
-          <p className="settings-hint">
-            지난 예약은 몰아서 보내지 않아요. 발송은 오전 10시까지 시도하며, 기기와 통신 상태에 따라
-            도착이 늦거나 전달되지 않을 수 있어요.
-          </p>
+          <details className="compact-help">
+            <summary>발송·도착 안내</summary>
+            <p className="settings-hint">
+              지난 예약은 몰아서 보내지 않아요. 발송은 오전 10시까지 시도하며, 기기와 통신 상태에
+              따라 도착이 늦거나 전달되지 않을 수 있어요.
+            </p>
+          </details>
         </div>
         <div className="calendar-toolbar">
           <button
@@ -264,10 +270,13 @@ export function PushSettings() {
           {notice}
         </p>
       )}
-      <p className="settings-hint">
-        등록은 30일간 유효해요. 로그아웃하면 이 계정의 모든 기기 알림이 해지되어 다시 켜야 해요.
-        테스트는 1분에 한 번 보낼 수 있어요.
-      </p>
+      <details className="compact-help">
+        <summary>유효기간·로그아웃 안내</summary>
+        <p className="settings-hint">
+          등록은 30일간 유효해요. 로그아웃하면 이 계정의 모든 기기 알림이 해지되어 다시 켜야 해요.
+          테스트는 1분에 한 번 보낼 수 있어요.
+        </p>
+      </details>
     </section>
   );
 }

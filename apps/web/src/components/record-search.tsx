@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 
 import { useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
@@ -83,16 +84,18 @@ export function RecordSearch({ today }: { today: string }) {
           }}
         >
           <fieldset className="record-search-fields" disabled={pending}>
-            <label>
-              기록 종류
-              <select value={kind} onChange={(event) => setKind(event.target.value as RecordKind)}>
-                {Object.entries(recordKinds).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <fieldset className="list-view-toggle" aria-label="기록 종류">
+              {Object.entries(recordKinds).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={kind === value}
+                  onClick={() => setKind(value as RecordKind)}
+                >
+                  {label}
+                </button>
+              ))}
+            </fieldset>
             <label>
               검색 시작일
               <input
@@ -133,14 +136,29 @@ export function RecordSearch({ today }: { today: string }) {
                 보관한 기록 포함
               </label>
             )}
-            <button className="primary-button" type="submit" aria-busy={pending}>
-              {"기록 검색"}
+            <button
+              className="icon-button search-submit"
+              type="submit"
+              aria-label="기록 검색"
+              title="기록 검색"
+              aria-busy={pending}
+            >
+              <Search size={19} aria-hidden="true" />
             </button>
           </fieldset>
         </form>
         <p className="settings-hint">
-          날짜 기준: 약속 날짜 · 플랜의 현재 초안 날짜 · 회고에 보존된 확정 날짜 · 위시를 만든 한국
-          날짜. 플랜의 미확정 변경은 달력에 반영되기 전 내용이에요.
+          {
+            (
+              {
+                appointment: "약속 날짜",
+                plan: "현재 초안 날짜 · 미확정 변경은 코스에 반영되지 않아요",
+                report: "회고에 보존한 확정 날짜",
+                wish: "위시를 만든 한국 날짜",
+              } as const
+            )[kind]
+          }{" "}
+          기준으로 찾아요.
         </p>
         {error && <p role="alert">{error}</p>}
         {result && (

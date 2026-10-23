@@ -1,4 +1,5 @@
 "use client";
+import { Pencil } from "lucide-react";
 
 import { useRef, useState, useTransition } from "react";
 import { saveWish } from "@/app/actions/wishlist";
@@ -105,13 +106,15 @@ export function WishWorkspace({
             <p className="preserve-lines">{wish.note}</p>
             <button
               type="button"
-              className="text-button"
+              className="icon-button card-edit"
+              aria-label={`위시 수정 · ${wish.title}`}
+              title="위시 수정"
               onClick={() => {
                 setSelected(wish);
                 setId(wish.id);
               }}
             >
-              위시 수정 · {wish.title}
+              <Pencil size={18} aria-hidden="true" />
             </button>
             {!wish.archived && (
               <Link className="text-button" href={`/plans?wish=${wish.id}`}>

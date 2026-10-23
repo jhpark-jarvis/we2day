@@ -101,6 +101,14 @@ function RouteEditor({ date, apiKey }: { date: string; apiKey: string }) {
   return (
     <LoadingRegion busy={loading} label="동선을 불러오는 중">
       <form
+        onInvalidCapture={(event) => {
+          let parent: HTMLElement | null =
+            event.target instanceof HTMLElement ? event.target.parentElement : null;
+          while (parent) {
+            if (parent instanceof HTMLDetailsElement) parent.open = true;
+            parent = parent.parentElement;
+          }
+        }}
         className="route-form"
         onSubmit={(event) => {
           event.preventDefault();
@@ -185,25 +193,28 @@ function RouteEditor({ date, apiKey }: { date: string; apiKey: string }) {
                   onChange={(event) => change({ [`${side}_name`]: event.target.value })}
                 />
               </div>
-              <div className="coordinate-fields">
-                {(["lat", "lng"] as const).map((axis) => (
-                  <div className="auth-field" key={axis}>
-                    <label htmlFor={`${side}-${axis}`}>
-                      {side === "start" ? "출발" : "도착"} {axis === "lat" ? "위도" : "경도"}
-                    </label>
-                    <input
-                      id={`${side}-${axis}`}
-                      type="number"
-                      min={axis === "lat" ? -90 : -180}
-                      max={axis === "lat" ? 90 : 180}
-                      step="any"
-                      value={fields[`${side}_${axis}`]}
-                      required
-                      onChange={(event) => change({ [`${side}_${axis}`]: event.target.value })}
-                    />
-                  </div>
-                ))}
-              </div>
+              <details className="optional-fields">
+                <summary>좌표 직접 입력</summary>
+                <div className="coordinate-fields">
+                  {(["lat", "lng"] as const).map((axis) => (
+                    <div className="auth-field" key={axis}>
+                      <label htmlFor={`${side}-${axis}`}>
+                        {side === "start" ? "출발" : "도착"} {axis === "lat" ? "위도" : "경도"}
+                      </label>
+                      <input
+                        id={`${side}-${axis}`}
+                        type="number"
+                        min={axis === "lat" ? -90 : -180}
+                        max={axis === "lat" ? 90 : 180}
+                        step="any"
+                        value={fields[`${side}_${axis}`]}
+                        required
+                        onChange={(event) => change({ [`${side}_${axis}`]: event.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </details>
             </fieldset>
           ))}
           <p className="settings-hint">

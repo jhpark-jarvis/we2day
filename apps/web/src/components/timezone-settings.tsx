@@ -11,6 +11,7 @@ export function TimezoneSettings({
   options: string[];
   error: string;
 }) {
+  const [query, setQuery] = useState("");
   const [mine, setMine] = useState(initial?.mine || null);
   const [timezone, setTimezone] = useState(mine?.timezone || "");
   const [error, setError] = useState(initialError);
@@ -38,13 +39,25 @@ export function TimezoneSettings({
       <fieldset className="meeting-fields" disabled={pending}>
         <div className="auth-field">
           <label htmlFor="my-timezone">나의 시간대</label>
+          <input
+            aria-label="도시·시간대 검색"
+            placeholder="서울, 도쿄, 뉴욕 또는 시간대 이름"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
           <select id="my-timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
             <option value="">선택하지 않음</option>
-            {options.map((zone) => (
-              <option key={zone} value={zone}>
-                {zone}
-              </option>
-            ))}
+            {options
+              .filter(
+                (zone) =>
+                  zone === timezone ||
+                  `${zone} ${zoneLabel(zone)}`.toLowerCase().includes(query.trim().toLowerCase()),
+              )
+              .map((zone) => (
+                <option key={zone} value={zone}>
+                  {zoneLabel(zone)} · {zone}
+                </option>
+              ))}
           </select>
         </div>
         <button className="primary-button" type="submit">
@@ -68,4 +81,20 @@ export function TimezoneSettings({
       )}
     </form>
   );
+}
+
+function zoneLabel(zone: string) {
+  const names: Record<string, string> = {
+    "Asia/Seoul": "서울",
+    "Asia/Tokyo": "도쿄",
+    "America/New_York": "뉴욕",
+    "Europe/London": "런던",
+    "Europe/Paris": "파리",
+    "America/Los_Angeles": "로스앤젤레스",
+    "Australia/Sydney": "시드니",
+    "Asia/Shanghai": "상하이",
+    "Asia/Singapore": "싱가포르",
+    UTC: "세계 표준시",
+  };
+  return names[zone] || zone.split("/").at(-1)?.replaceAll("_", " ") || zone;
 }

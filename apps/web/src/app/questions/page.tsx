@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { QuestionForm } from "@/components/question-forms";
@@ -55,8 +56,8 @@ export default async function QuestionsPage({
             defaultValue={date}
           />
         </div>
-        <button type="submit" className="text-button">
-          이 날짜 보기
+        <button type="submit" className="icon-button" aria-label="이 날짜 보기" title="날짜 조회">
+          <Search size={19} aria-hidden="true" />
         </button>
       </form>
       {result.error && (
@@ -85,8 +86,10 @@ export default async function QuestionsPage({
           다음 질문 보기
         </Link>
       )}
-      <h2>질문 직접 추가하기</h2>
-      <QuestionForm key={date} date={date} />
+      <details className="editor-disclosure">
+        <summary>질문 추가</summary>
+        <QuestionForm key={date} date={date} />
+      </details>
     </section>
   );
 }

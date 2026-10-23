@@ -27,10 +27,17 @@ export default async function TimezonesPage() {
         <h1>각자의 시간대</h1>
         <p className="muted">일정은 한국 시간으로 유지하고 현지 시각을 함께 봐요.</p>
       </PageHeading>
-      {result.data && (
-        <NextAppointment data={next?.data || null} error={next?.error || ""} zones={result.data} />
-      )}
       <TimezoneSettings initial={result.data} error={result.error} options={options} />
+      <details className="compact-help">
+        <summary>약속 시간 미리보기</summary>{" "}
+        {result.data && (
+          <NextAppointment
+            data={next?.data || null}
+            error={next?.error || ""}
+            zones={result.data}
+          />
+        )}
+      </details>
       <p className="settings-hint">
         시간 있는 약속·투데이 활동에만 현지 시각을 보조 표시해요. 종일 일정·날짜별 기록·달력 묶음은
         한국 기준이며 자동으로 바꾸지 않아요.

@@ -71,41 +71,42 @@ export default async function MonthlyPage({
               <dd>{result.data.route_count}일</dd>
             </div>
           </dl>
-          <p className="settings-hint">
-            만난 날은 직접 체크한 날짜만 세어요. 사진·약속·동선만으로 만남이나 실제 방문을 추정하지
-            않아요. 휴지통·저장 미완료 사진은 제외해요.
-          </p>
-          <div className="monthly-photo-grid">
-            {result.data.photos.map((photo) => (
-              <Link key={photo.id} href={`/memories?date=${photo.date}`} className="monthly-photo">
-                <figure>
-                  <Image
-                    src={`/api/photos/${photo.id}/image`}
-                    alt={photo.caption || `${photo.date}에 남긴 사진`}
-                    width={1200}
-                    height={900}
-                    unoptimized
-                  />
-                  <figcaption>
-                    <small>{photo.date}</small>
-                    <p>{photo.caption || "함께 남긴 순간"}</p>
-                  </figcaption>
-                </figure>
-                <span className="card-action-hint" aria-hidden="true">
-                  이 날짜의 기록 ↗
-                </span>
-              </Link>
-            ))}
-          </div>
+          <details className="compact-help">
+            <summary>집계 기준</summary>
+            <p className="settings-hint">
+              만난 날은 직접 체크한 날짜만 세어요. 사진·약속·동선만으로 만남이나 실제 방문을
+              추정하지 않아요. 휴지통·저장 미완료 사진은 제외해요.
+            </p>
+          </details>
           {result.data.photo_count > 6 && (
             <p className="settings-hint">
-              최근 날짜의 사진 6장을 보여드려요. 아래 날짜에서 나머지 사진도 볼 수 있어요.
+              날짜별 카드에 최근 사진 6장을 나눠 보여요. 해당 날짜의 앨범에서 나머지도 볼 수 있어요.
             </p>
           )}
           <ul className="memory-day-list">
             {result.data.days.map((day) => (
               <li key={day.date}>
                 <strong>{day.date}</strong>
+                <div className="monthly-day-photos">
+                  {(result.data?.photos || [])
+                    .filter((photo) => photo.date === day.date)
+                    .map((photo) => (
+                      <Link
+                        className="monthly-photo"
+                        aria-label={`${day.date}의 사진 보기`}
+                        key={photo.id}
+                        href={`/memories?date=${day.date}`}
+                      >
+                        <Image
+                          src={`/api/photos/${photo.id}/image`}
+                          alt={photo.caption || `${photo.date}에 남긴 사진`}
+                          width={600}
+                          height={450}
+                          unoptimized
+                        />
+                      </Link>
+                    ))}
+                </div>
                 <p>
                   {day.met ? "만난 날" : "만남 표시 없음"} · 사진 {day.photo_count}장
                   {day.route_recorded ? " · 직선 기록 있음" : ""}

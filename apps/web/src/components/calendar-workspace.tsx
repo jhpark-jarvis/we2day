@@ -485,9 +485,7 @@ export function CalendarWorkspace({
               })}
             </div>
             <p className="calendar-caption">
-              {preview || status !== "ready"
-                ? "둘의 시간을 한곳에"
-                : "작은 점은 약속 · 밑줄은 만난 날"}
+              {preview || status !== "ready" ? "함께할 날들" : "작은 점은 약속 · 밑줄은 만난 날"}
             </p>
           </section>
           <div className="day-workspace">
@@ -502,9 +500,6 @@ export function CalendarWorkspace({
                 <div className="calendar-toolbar agenda-actions">
                   <Link className="text-button" href={`/today?date=${selected}`}>
                     {selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
-                  </Link>
-                  <Link className="text-button" href={`/plans?date=${selected}&new=1`}>
-                    코스 등록
                   </Link>
                 </div>
               )}
@@ -584,7 +579,7 @@ export function CalendarWorkspace({
       </LoadingRegion>
       {preview && (
         <p className="preview-label">
-          화면 미리보기 · 저장되지 않는 예시 일정 · <Link href="/">빈 일정 화면으로</Link>
+          화면 미리보기 · 저장되지 않는 예시 일정 · <Link href="/">내 일정으로</Link>
         </p>
       )}
     </>

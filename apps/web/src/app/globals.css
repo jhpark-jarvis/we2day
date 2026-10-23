@@ -566,3 +566,35 @@ html[data-theme="white"] :is(.auth-field, .record-search-fields) select { border
 .photo-viewer-close { position: absolute; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right)); color: white; background: #171717; }
 .trash-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-block: 18px; }
 .trash-filters > .auth-field:has(select), .trash-filters > p { grid-column: 1 / -1; }
+
+/* Keep contextual editing focused, with summaries reserved for the calendar. */
+main:has(.appointment-detail, .appointment-editor) > .anniversary-summary,
+main:has(.appointment-detail, .appointment-editor) > .next-appointment { display: none; }
+.next-appointment { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; padding: 12px 16px; }
+.next-appointment > .next-appointment-header { grid-column: 1 / -1; margin: 0; }
+.next-appointment > h3, .next-appointment > p, .next-appointment > .compact-help { grid-column: 1; margin: 0; }
+.next-appointment > a { justify-self: end; align-self: center; }
+.compact-help { margin-block: 10px; font-size: 12px; }
+.compact-help > summary { width: fit-content; min-height: 44px; padding: 9px 12px; border: 1px solid var(--line); color: var(--muted); background: transparent; }
+.optional-fields, .editor-disclosure, .activity-editor-disclosure { min-width: 0; margin-block: 12px; }
+.optional-fields > :not(summary), .editor-disclosure > :not(summary), .activity-editor-disclosure > :not(summary) { margin-top: 14px; }
+.status-chip { display: inline-block; padding: 3px 8px; border-radius: 6px; background: var(--soft); font-size: 12px; font-weight: 400; }
+.album-date { max-width: 300px; margin-block: 12px; }
+.activity-card .timeline-focus { border: 0; border-radius: 0; background: transparent; padding: 4px 14px 14px; }
+.activity-card .timeline-focus > .eyebrow { display: none; }
+.checklist-item { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(80px, .55fr); gap: 10px; align-items: end; }
+.checklist-item > legend { grid-column: 1 / -1; }
+.checklist-item > .check-field { max-width: 110px; }
+.plan-card { position: relative; }
+.card-edit { position: absolute; right: 10px; top: 10px; }
+.plan-card:has(.card-edit) h2 { padding-right: 40px; }
+.space-names { margin-block: 14px; font-size: 18px; }
+@media (max-width: 840px) { .page-title-slot h1, .page-title-slot .page-heading h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 18px; word-break: keep-all; } .page-title-slot .muted { display: none; } .next-appointment-calendar { display: none; } }
+@media (max-width: 420px) { .checklist-item { grid-template-columns: auto minmax(0, 1fr); } .checklist-item > .auth-field:last-of-type { grid-column: 2; } }
+
+.monthly-day-photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-block: 12px; }
+.monthly-day-photos img { width: 100%; height: auto; max-height: 230px; object-fit: cover; border-radius: 8px; }
+.route-point .optional-fields { grid-column: 1 / -1; }
+.goal-editor .checklist-item { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 12px; }
+
+.search-submit { justify-self: end; }

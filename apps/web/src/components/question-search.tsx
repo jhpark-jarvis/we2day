@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 import { useState, useTransition } from "react";
 import { searchQuestions } from "@/app/actions/question-search";
 import { LoadingRegion } from "@/components/loading-region";
@@ -78,8 +79,14 @@ export function QuestionSearch({ start, end }: { start: string; end: string }) {
           <p className="settings-hint">
             최대 366일을 찾아요. 검색어를 비우면 해당 기간의 질문을 모두 찾아요.
           </p>
-          <button className="primary-button" type="submit" aria-busy={pending}>
-            질문 검색
+          <button
+            className="icon-button search-submit"
+            type="submit"
+            aria-label="질문 검색"
+            title="질문 검색"
+            aria-busy={pending}
+          >
+            <Search size={19} aria-hidden="true" />
           </button>
         </fieldset>
       </form>

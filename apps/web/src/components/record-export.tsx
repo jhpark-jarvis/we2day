@@ -21,7 +21,7 @@ const kinds = {
   timezone_preferences: "시간대",
   roulette_wheels: "룰렛 후보",
   roulette_draws: "룰렛 결과",
-  plan_visit_progress: "확정안별 방문 진행",
+  plan_visit_progress: "방문 기록",
 } as const;
 const globalKinds = new Set([
   "anniversaries",
@@ -65,8 +65,8 @@ export function RecordExport({ today }: { today: string }) {
   }
   return (
     <section className="today-workspace">
-      <Link className="text-button" href="/settings">
-        ← 설정으로
+      <Link className="text-button" href="/memories">
+        ← 기록으로
       </Link>
       <PageHeading>
         <p className="eyebrow">KEEP A COPY</p>
@@ -94,10 +94,35 @@ export function RecordExport({ today }: { today: string }) {
                 setNotice("");
               }}
             >
-              {Object.entries(kinds).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {value}
-                </option>
+              {Object.entries({
+                일정·기록: [
+                  "appointments",
+                  "anniversaries",
+                  "meeting_days",
+                  "meeting_routes",
+                  "date_plans",
+                  "date_reports",
+                  "plan_visit_progress",
+                ],
+                사진: ["photos"],
+                함께: [
+                  "wishes",
+                  "shared_checklists",
+                  "shared_goals",
+                  "couple_questions",
+                  "question_answers",
+                  "roulette_wheels",
+                  "roulette_draws",
+                ],
+                설정: ["timezone_preferences"],
+              }).map(([group, keys]) => (
+                <optgroup key={group} label={group}>
+                  {keys.map((key) => (
+                    <option key={key} value={key}>
+                      {kinds[key as keyof typeof kinds]}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>

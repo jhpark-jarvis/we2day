@@ -1,4 +1,5 @@
 "use client";
+import { Pencil } from "lucide-react";
 
 import { useRef, useState, useTransition } from "react";
 import { saveGoal } from "@/app/actions/goals";
@@ -116,22 +117,39 @@ export function GoalWorkspace({
             <p className="muted">희망 날짜 · {goal.target_date || "미정"}</p>
             <GoalProgress steps={goal.steps} />
             <ul className="checklist-preview">
-              {goal.steps.slice(0, 3).map((step) => (
-                <li key={step.id}>
-                  {step.done ? "✓ " : "○ "}
-                  {step.title}
-                </li>
-              ))}
+              {goal.steps
+                .filter((step) => !step.done)
+                .slice(0, 3)
+                .map((step) => (
+                  <li key={step.id}>
+                    {step.done ? "✓ " : "○ "}
+                    {step.title}
+                  </li>
+                ))}
             </ul>
+            {goal.steps.some((step) => step.done) && (
+              <details className="compact-help">
+                <summary>완료한 단계 {goal.steps.filter((step) => step.done).length}개</summary>
+                <ul>
+                  {goal.steps
+                    .filter((step) => step.done)
+                    .map((step) => (
+                      <li key={step.id}>{step.title}</li>
+                    ))}
+                </ul>
+              </details>
+            )}
             <button
-              className="text-button"
+              className="icon-button card-edit"
+              aria-label={`목표 열기 · ${goal.title}`}
+              title="목표 수정"
               type="button"
               onClick={() => {
                 setSelected(goal);
                 setId(goal.id);
               }}
             >
-              목표 열기 · {goal.title}
+              <Pencil size={18} aria-hidden="true" />
             </button>
           </article>
         ))}
@@ -227,7 +245,7 @@ function GoalEditor({
     });
   }
   return (
-    <section className="plan-editor">
+    <section className="plan-editor goal-editor">
       <button className="text-button" type="button" disabled={pending} onClick={onClose}>
         작성 취소·목표 목록으로
       </button>
@@ -344,7 +362,14 @@ function GoalEditor({
         </p>
       )}
       {conflict && (
-        <button type="button" className="text-button" disabled={pending} onClick={reloadLatest}>
+        <button
+          type="button"
+          className="text-button"
+          disabled={pending}
+          onClick={() => {
+            if (window.confirm("작성 중인 내용을 버리고 최신 저장본을 불러올까요?")) reloadLatest();
+          }}
+        >
           작성 내용을 버리고 최신본 불러오기
         </button>
       )}

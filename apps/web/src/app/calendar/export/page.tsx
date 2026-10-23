@@ -16,10 +16,13 @@ export default function CalendarExportPage() {
         </div>
       </PageHeading>
       <CalendarExport month={seoulToday().slice(0, 7)} />
-      <p className="settings-hint">
-        가져오기를 지원하는 캘린더에서 .ics 파일을 열어 사용해요. 휴대폰·캘린더 앱에 따라 가져오기
-        방법이 달라요.
-      </p>
+      <details className="compact-help">
+        <summary>캘린더에서 파일 열기</summary>
+        <p className="settings-hint">
+          가져오기를 지원하는 캘린더에서 .ics 파일을 열어 사용해요. 휴대폰·캘린더 앱에 따라 가져오기
+          방법이 달라요.
+        </p>
+      </details>
       <p className="settings-hint">
         내보낸 파일에는 선택한 일정의 이름·장소가 포함돼요. 이후 WE2DAY의 수정·공유 변경은 파일에
         자동 반영되지 않아요. 자동 동기화와 알림 발송은 포함하지 않아요.

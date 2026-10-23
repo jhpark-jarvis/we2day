@@ -1,7 +1,7 @@
 "use client";
 import { Check, ListRestart, SkipForward } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { type ReactNode, useEffect, useState, useTransition } from "react";
 import { LoadingRegion } from "@/components/loading-region";
 import { RefreshButton } from "@/components/workspace-controls";
 import type { DatePlan } from "@/lib/plans";
@@ -13,11 +13,13 @@ export function VisitProgressPanel({
   today,
   selectedActivity,
   onSelectActivity,
+  selectedContent,
 }: {
   plan: DatePlan;
   today: string;
   selectedActivity: number;
   onSelectActivity: (index: number) => void;
+  selectedContent?: ReactNode;
 }) {
   const router = useRouter();
   const [current, setCurrent] = useState<VisitProgress | null>(null);
@@ -164,6 +166,7 @@ export function VisitProgressPanel({
                   {!!activity.cost && ` · ${activity.cost.toLocaleString()}원`}
                 </small>
               </button>
+              {selectedActivity === index && selectedContent}
               <div className="activity-progress">
                 <span className="visit-state">
                   {loaded ? visitLabels[states[index]] : error ? "확인 필요" : "확인 중"}
