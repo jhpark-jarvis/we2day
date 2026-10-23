@@ -61,3 +61,6 @@
 
 !/apps/web/src/app/settings/export/
 !/apps/web/src/app/settings/export/page.tsx
+
+!/apps/web/src/app/settings/places/
+!/apps/web/src/app/settings/places/page.tsx

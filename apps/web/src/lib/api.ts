@@ -2,6 +2,8 @@ import "server-only";
 import { createAuthClient } from "@/lib/auth/server";
 
 const errors: Record<string, string> = {
+  invalid_favorite_place: "별칭은 100자, 장소명·주소는 200자 이내로 입력해 주세요.",
+  favorite_place_not_found: "이 공간의 장소를 찾지 못했어요. 목록을 새로고침해 주세요.",
   invalid_profile: "이름은 앞뒤 공백과 줄바꿈 없이 1~40자로 입력해 주세요.",
   invalid_push_subscription: "기기 알림 정보를 확인하지 못했어요. 다시 등록해 주세요.",
   push_device_limit: "등록 가능한 기기는 계정당 5개예요. 다른 기기의 알림을 꺼 주세요.",

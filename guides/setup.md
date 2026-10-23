@@ -180,7 +180,7 @@ docker compose up --detach --wait
 
 로그인 설정을 마친 뒤 같은 Supabase 프로젝트의 SQL Editor에서 마이그레이션 파일을 적용합니다.
 
-- **처음 설치:** 아래 파일을 001부터 025까지 순서대로 열어 각각 전체 내용을 실행합니다. 매번 `Success`를 확인하고 다음 파일로 넘어갑니다.
+- **처음 설치:** 아래 파일을 001부터 026까지 순서대로 열어 각각 전체 내용을 실행합니다. 매번 `Success`를 확인하고 다음 파일로 넘어갑니다.
 - **기존 설치 업데이트:** 적용 이력을 확인하고 아직 실행하지 않은 파일만 순서대로 적용합니다. 이미 적용한 파일은 다시 실행하지 않습니다.
 
 | 순서 | 실행할 파일 | 추가되는 기능 |
@@ -210,6 +210,7 @@ docker compose up --detach --wait
 | 023 | [`202610210023_device_push.sql`](../supabase/migrations/202610210023_device_push.sql) | 기기별 푸시 알림 등록·해제 |
 | 024 | [`202610220024_scheduled_anniversary_push.sql`](../supabase/migrations/202610220024_scheduled_anniversary_push.sql) | 기념일 자동 알림을 위한 발송 상태와 전용 DB 역할 |
 | 025 | [`202610220025_user_profiles.sql`](../supabase/migrations/202610220025_user_profiles.sql) | 로그인 아이디와 별도로 사용하는 사용자 이름 |
+| 026 | [`202610230026_favorite_places.sql`](../supabase/migrations/202610230026_favorite_places.sql) | 커플 공유 자주 가는 곳, 수정 충돌 확인과 보관·복원 |
 
 024를 적용해도 자동 알림이 바로 켜지지는 않습니다. 새 예약 역할은 로그인할 수 없는 상태로 생성됩니다. 자동 알림을 사용하려면 [배포 가이드](deployment.md)의 worker 설정과 기기별 동의 절차도 완료해야 합니다.
 

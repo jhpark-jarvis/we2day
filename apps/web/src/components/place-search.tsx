@@ -2,6 +2,7 @@
 
 import { Search, X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { FavoritePlaces } from "@/components/favorite-places";
 import { LoadingRegion } from "@/components/loading-region";
 import { type PlaceResults, placeText, safePlaceLink, selectedPlaceText } from "@/lib/places";
 
@@ -11,19 +12,33 @@ export function PlaceSearch({
   onSelect,
   children,
   compact = false,
+  showFavorites = true,
 }: {
   initialQuery?: string;
   label?: string;
   onSelect?: (place: string) => void;
   children?: ReactNode;
   compact?: boolean;
+  showFavorites?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [panel, setPanel] = useState<"search" | "favorites" | null>(null);
+  const open = panel === "search";
   const id = useId();
   return (
     <section className={`place-search${compact ? " place-search-inline" : ""}`} aria-label={label}>
       <div className="place-search-actions">
         {children && <div className="place-search-context">{children}</div>}
+        {showFavorites && onSelect && (
+          <button
+            type="button"
+            className="text-button favorite-places-trigger"
+            aria-expanded={panel === "favorites"}
+            aria-controls={id}
+            onClick={() => setPanel(panel === "favorites" ? null : "favorites")}
+          >
+            자주 가는 곳
+          </button>
+        )}
         <button
           type="button"
           className={compact ? "icon-button" : "text-button"}
@@ -31,7 +46,7 @@ export function PlaceSearch({
           title={open ? "검색 닫기" : "장소 검색"}
           aria-expanded={open}
           aria-controls={id}
-          onClick={() => setOpen(!open)}
+          onClick={() => setPanel(open ? null : "search")}
         >
           {compact ? (
             open ? (
@@ -47,6 +62,14 @@ export function PlaceSearch({
         </button>
       </div>
       <div id={id}>
+        {panel === "favorites" && onSelect && (
+          <FavoritePlaces
+            onSelect={(place) => {
+              onSelect(place);
+              setPanel(null);
+            }}
+          />
+        )}
         {open && (
           <SearchPanel
             initialQuery={initialQuery}
@@ -54,7 +77,7 @@ export function PlaceSearch({
               onSelect &&
               ((place) => {
                 onSelect(place);
-                setOpen(false);
+                setPanel(null);
               })
             }
           />

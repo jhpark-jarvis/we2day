@@ -63,6 +63,12 @@ export default async function SettingsPage() {
         </Link>
         <p className="settings-hint">날짜와 사진 기록을 찾아 복구하거나 영구 삭제를 확인해요.</p>
       </section>
+      <section className="settings-section">
+        <h2>장소</h2>
+        <Link className="text-button" href="/settings/places">
+          자주 가는 곳
+        </Link>
+      </section>
       <PwaSettings />
       <PushSettings />
       <section className="settings-section account-settings">
