@@ -53,9 +53,19 @@ export function naverAppLinks(site: string, name: string, destination?: Destinat
     params.set("dlng", String(lng));
     params.set("dname", title);
     path = destination.mode === "navigation" ? "navigation" : `route/${destination.mode}`;
-  } else params.set("query", title);
+  } else {
+    // A selected place is stored as "name (address)" for display, not as one search phrase.
+    // Keep meaningful parentheses and directly entered addresses intact.
+    const selected = /^(.*\S)\s+\(([^()]*)\)$/.exec(title);
+    const address = selected?.[2] || "";
+    const koreanAddress =
+      /^(?:서울(?:특별시)?|부산(?:광역시)?|대구(?:광역시)?|인천(?:광역시)?|광주(?:광역시)?|대전(?:광역시)?|울산(?:광역시)?|세종(?:특별자치시)?|경기(?:도)?|강원(?:특별자치도|도)?|충청[남북]도|충[남북]|전라[남북]도|전북특별자치도|전[남북]|경상[남북]도|경[남북]|제주(?:특별자치도|도)?)\s+.+\d/;
+    params.set("query", selected && koreanAddress.test(address) ? selected[1].trim() : title);
+  }
+  // Native URI decoders need percent-encoded spaces, not HTML form '+' encoding.
+  const query = params.toString().replace(/\+/g, "%20");
   return {
-    ios: `nmap://${path}?${params}`,
-    android: `intent://${path}?${params}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`,
+    ios: `nmap://${path}?${query}`,
+    android: `intent://${path}?${query}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`,
   };
 }

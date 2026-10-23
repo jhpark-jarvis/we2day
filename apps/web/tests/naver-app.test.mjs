@@ -35,3 +35,48 @@ test("routes use only supplied destination, supported modes and documented coord
       null,
     );
 });
+
+test("native URI decoding preserves spaces and literal plus without form decoding", () => {
+  const name = "예시 카페 A+B & #1 (본점)";
+  const links = naverAppLinks("https://we2day.example/", name);
+  for (const href of [links.ios, links.android.split("#Intent;")[0]]) {
+    const raw = href
+      .split("?")[1]
+      .split("&")
+      .find((entry) => entry.startsWith("query="))
+      .slice(6);
+    assert.equal(raw.includes("+"), false);
+    assert.equal(raw.includes("%20"), true);
+    assert.equal(raw.includes("%2B"), true);
+    assert.equal(decodeURIComponent(raw), name);
+  }
+});
+
+test("selected place display address is excluded only from the search keyword", () => {
+  for (const address of [
+    "경기도 예시시 평화로 220 상가",
+    "서울특별시 예시구 예시로 12",
+    "전북특별자치도 예시시 예시로 3",
+  ]) {
+    const title = `예시치킨 예시1점 (${address})`;
+    const links = naverAppLinks("https://we2day.example/", title);
+    assert.equal(new URL(links.ios).searchParams.get("query"), "예시치킨 예시1점");
+    const route = naverAppLinks("https://we2day.example/", title, {
+      lat: "37.5",
+      lng: "127",
+      mode: "car",
+    });
+    assert.equal(new URL(route.ios).searchParams.get("dname"), title);
+  }
+  for (const title of [
+    "예시 카페 (본점)",
+    "예시 카페 (서울역 1층)",
+    "경기도 예시시 평화로 220",
+    "예시 카페 (본점) (서울특별시 예시구 예시로 1)",
+  ]) {
+    const query = new URL(naverAppLinks("https://we2day.example/", title).ios).searchParams.get(
+      "query",
+    );
+    assert.equal(query, title.endsWith("예시로 1)") ? "예시 카페 (본점)" : title);
+  }
+});
