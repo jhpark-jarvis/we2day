@@ -598,3 +598,6 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 .goal-editor .checklist-item { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 12px; }
 
 .search-submit { justify-self: end; }
+
+.wordmark { font-family: "Arial Black", Arial, sans-serif; font-weight: 900; letter-spacing: -.07em; color: #422b21; }
+.wordmark-accent { color: #f0a57e; }
