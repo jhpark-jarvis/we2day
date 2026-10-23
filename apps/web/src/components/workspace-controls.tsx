@@ -42,11 +42,15 @@ export function ArchiveToggle({
   pending = false,
   onChange,
   label,
+  currentLabel = "현재",
+  archivedLabel = "보관함",
 }: {
   archived: boolean;
   pending?: boolean;
   onChange: (archived: boolean) => void;
   label: string;
+  currentLabel?: string;
+  archivedLabel?: string;
 }) {
   return (
     <fieldset className="list-view-toggle" aria-label={label}>
@@ -56,7 +60,7 @@ export function ArchiveToggle({
         disabled={pending}
         onClick={() => onChange(false)}
       >
-        현재
+        {currentLabel}
       </button>
       <button
         type="button"
@@ -64,7 +68,7 @@ export function ArchiveToggle({
         disabled={pending}
         onClick={() => onChange(true)}
       >
-        보관함
+        {archivedLabel}
       </button>
     </fieldset>
   );

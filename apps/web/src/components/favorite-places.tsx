@@ -1,8 +1,9 @@
 "use client";
-import { Archive, ArchiveRestore, Pencil, Plus, X } from "lucide-react";
+import { ArchiveRestore, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import { saveFavoritePlace } from "@/app/actions/favorite-places";
 import { LoadingRegion } from "@/components/loading-region";
+import { PlaceSearchPanel } from "@/components/place-search-panel";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { FavoritePage, FavoritePlace } from "@/lib/favorite-places";
 
@@ -90,7 +91,9 @@ export function FavoritePlaces({
           return;
         }
         retry.current = null;
-        setNotice(place.archived ? "장소를 복원했어요." : "장소를 보관했어요.");
+        setNotice(
+          place.archived ? "장소를 복원했어요." : "장소를 삭제했어요. 휴지통에서 복원할 수 있어요.",
+        );
         void load();
       } catch {
         setError("연결을 확인하고 다시 시도해 주세요. 목록은 유지했어요.");
@@ -106,6 +109,8 @@ export function FavoritePlaces({
         {manage ? (
           <ArchiveToggle
             label="장소 목록 범위"
+            currentLabel="장소"
+            archivedLabel="휴지통"
             archived={archived}
             pending={pending}
             onChange={(value) => {
@@ -139,6 +144,11 @@ export function FavoritePlaces({
           />
         </div>
       </div>
+      {manage && (
+        <p className="settings-hint">
+          삭제한 장소는 휴지통에서 복원할 수 있어요. 이미 저장한 약속·코스는 바뀌지 않아요.
+        </p>
+      )}
       {notice && <p role="status">{notice}</p>}
       {error && (
         <p role="alert" className="error-message">
@@ -155,7 +165,7 @@ export function FavoritePlaces({
           {page && page.items.length === 0 && (
             <p className="muted">
               {archived
-                ? "보관한 장소가 없어요."
+                ? "휴지통이 비어 있어요."
                 : manage
                   ? "자주 쓰는 장소명이나 주소를 추가해 보세요."
                   : "설정의 ‘자주 가는 곳’에서 장소를 추가해 주세요."}
@@ -196,14 +206,14 @@ export function FavoritePlaces({
                       <button
                         type="button"
                         className="icon-button"
-                        aria-label={`${place.label} ${archived ? "복원" : "보관"}`}
-                        title={archived ? "복원" : "보관"}
+                        aria-label={`${place.label} ${archived ? "복원" : "삭제"}`}
+                        title={archived ? "복원" : "삭제"}
                         onClick={() => archive(place)}
                       >
                         {archived ? (
                           <ArchiveRestore size={18} aria-hidden="true" />
                         ) : (
-                          <Archive size={18} aria-hidden="true" />
+                          <Trash2 size={18} aria-hidden="true" />
                         )}
                       </button>
                     </>
@@ -263,6 +273,8 @@ function FavoritePlaceEditor({
   const [error, setError] = useState(""),
     [conflict, setConflict] = useState(false);
   const request = useRef("");
+  const destinationInput = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -329,15 +341,45 @@ function FavoritePlaceEditor({
             />
           </div>
           <div className="auth-field">
-            <label htmlFor={`${identity}-destination`}>장소명·주소</label>
+            <div className="favorite-place-destination-heading">
+              <label htmlFor={`${identity}-destination`}>장소명·주소</label>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={searchOpen ? "검색 닫기" : "장소 검색"}
+                title={searchOpen ? "검색 닫기" : "장소 검색"}
+                aria-expanded={searchOpen}
+                aria-controls={`${identity}-search`}
+                onClick={() => setSearchOpen(!searchOpen)}
+              >
+                {searchOpen ? (
+                  <X size={18} aria-hidden="true" />
+                ) : (
+                  <Search size={18} aria-hidden="true" />
+                )}
+              </button>
+            </div>
             <input
               id={`${identity}-destination`}
+              ref={destinationInput}
               maxLength={200}
               value={destination}
               required
               onChange={(event) => change(() => setDestination(event.target.value))}
               placeholder="지도에서 찾을 장소명이나 주소"
             />
+          </div>
+          <div id={`${identity}-search`}>
+            {searchOpen && (
+              <PlaceSearchPanel
+                initialQuery={destination}
+                onSelect={(value) => {
+                  change(() => setDestination(value));
+                  setSearchOpen(false);
+                  destinationInput.current?.focus();
+                }}
+              />
+            )}
           </div>
           <p className="settings-hint">
             둘이 함께 쓰는 목록이에요. 저장한 장소를 골라도 코스 저장·확정은 별도로 진행해요.

@@ -710,3 +710,6 @@ body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidd
 body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 .favorite-places-trigger { flex-shrink: 0; }
 .favorite-place-fields .editor-actions { display: flex; justify-content: flex-end; }
+.favorite-place-destination-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.favorite-place-destination-heading label { margin: 0; }
+.favorite-place-fields > div:empty { display: none; }
