@@ -559,9 +559,10 @@ html[data-theme="white"] :is(.auth-field, .record-search-fields) select { border
 .photo-image-frame > img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
 .photo-image-actions { border: 0; margin: 0; position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 10px; background: var(--surface); z-index: 1; }
 .photo-image-actions .photo-action-icon { display: block; margin: 0; }
-.photo-viewer { width: min(1100px, 94vw); max-width: 94vw; max-height: 94svh; padding: 56px 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--foreground); }
-.photo-viewer::backdrop { background: rgb(0 0 0 / 65%); }
-.photo-viewer img { display: block; width: 100%; height: auto; max-height: calc(94svh - 80px); object-fit: contain; }
-.photo-viewer-close { position: absolute; top: 6px; right: 6px; }
+.photo-viewer { position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: max(56px, env(safe-area-inset-top), env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left), env(safe-area-inset-right)); border: 0; border-radius: 0; background: #171717; color: white; overflow: hidden; }
+.photo-viewer[open] { display: grid; place-items: center; }
+.photo-viewer::backdrop { background: #171717; }
+.photo-viewer img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
+.photo-viewer-close { position: absolute; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right)); color: white; background: #171717; }
 .trash-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-block: 18px; }
 .trash-filters > .auth-field:has(select), .trash-filters > p { grid-column: 1 / -1; }

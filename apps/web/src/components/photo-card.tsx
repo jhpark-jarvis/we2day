@@ -2,7 +2,7 @@
 
 import { Download, Maximize2, Trash2, X } from "lucide-react";
 import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { createPortal, useFormStatus } from "react-dom";
 import { changePhoto } from "@/app/actions/photos";
 import { koreanTimestamp, type SharedPhoto } from "@/lib/photos";
 
@@ -123,7 +123,14 @@ export function PhotoCard({
   const opener = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (expanded && !viewer.current?.open) viewer.current?.showModal();
-    else if (!expanded && viewer.current?.open) viewer.current.close();
+    if (expanded)
+      return () => {
+        const button = opener.current;
+        requestAnimationFrame(() => {
+          if (button?.isConnected) button.focus({ preventScroll: true });
+        });
+      };
+    if (viewer.current?.open) viewer.current.close();
   }, [expanded]);
   useEffect(() => {
     setNow(Date.now());
@@ -201,35 +208,42 @@ export function PhotoCard({
           </figcaption>
         </figure>
       )}
-      <dialog
-        ref={viewer}
-        className="photo-viewer"
-        aria-label="사진 크게 보기"
-        onCancel={() => setExpanded(false)}
-        onClose={() => {
-          setExpanded(false);
-          opener.current?.focus({ preventScroll: true });
-        }}
-      >
-        <button
-          className="icon-button photo-viewer-close"
-          type="button"
-          aria-label="사진 크게 보기 닫기"
-          title="닫기"
-          onClick={() => setExpanded(false)}
-        >
-          <X size={22} aria-hidden="true" />
-        </button>
-        {expanded && (
-          // biome-ignore lint/performance/noImgElement: same private authenticated image, no public proxy
-          <img
-            src={imagePath}
-            alt={photo.caption || `${photo.date} 함께한 날의 사진`}
-            width={photo.width}
-            height={photo.height}
-          />
+      {expanded &&
+        createPortal(
+          <dialog
+            ref={viewer}
+            className="photo-viewer"
+            aria-label="사진 크게 보기"
+            onCancel={() => setExpanded(false)}
+            onClose={() => {
+              setExpanded(false);
+              opener.current?.focus({ preventScroll: true });
+            }}
+          >
+            <button
+              className="icon-button photo-viewer-close"
+              type="button"
+              aria-label="사진 크게 보기 닫기"
+              title="닫기"
+              onClick={() => {
+                setExpanded(false);
+                requestAnimationFrame(() => opener.current?.focus({ preventScroll: true }));
+              }}
+            >
+              <X size={22} aria-hidden="true" />
+            </button>
+            {
+              // biome-ignore lint/performance/noImgElement: same private authenticated image, no public proxy
+              <img
+                src={imagePath}
+                alt={photo.caption || `${photo.date} 함께한 날의 사진`}
+                width={photo.width}
+                height={photo.height}
+              />
+            }
+          </dialog>,
+          document.body,
         )}
-      </dialog>
       {actionError && (
         <p className="error-message" role="alert">
           {actionError}
