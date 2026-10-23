@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.use({ serviceWorkers: "block" });
+
 test("last-year links change album dates on the same route and survive reload", async ({
   page,
 }, testInfo) => {
@@ -21,19 +23,37 @@ test("last-year links change album dates on the same route and survive reload", 
   await page.goto("/memories");
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const lastYear = `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`;
-  await expect(page.getByText(`${today}의 사진`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`${today.slice(0, 4)}년 ${today.slice(5, 7)}월 ${today.slice(8, 10)}일`, {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "작년 오늘의 사진 보기", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`date=${lastYear}$`));
-  await expect(page.getByText(`${lastYear}의 사진`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      `${lastYear.slice(0, 4)}년 ${lastYear.slice(5, 7)}월 ${lastYear.slice(8, 10)}일`,
+      { exact: true },
+    ),
+  ).toBeVisible();
   await expect.poll(() => dates.at(-1)).toBe(lastYear);
   await page.reload();
-  await expect(page.getByText(`${lastYear}의 사진`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      `${lastYear.slice(0, 4)}년 ${lastYear.slice(5, 7)}월 ${lastYear.slice(8, 10)}일`,
+      { exact: true },
+    ),
+  ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("last-year-memory-mobile.png"),
     fullPage: true,
   });
   await page.getByRole("link", { name: "오늘의 사진으로 돌아오기", exact: true }).click();
-  await expect(page.getByText(`${today}의 사진`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`${today.slice(0, 4)}년 ${today.slice(5, 7)}월 ${today.slice(8, 10)}일`, {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect.poll(() => dates.at(-1)).toBe(today);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

@@ -8,6 +8,7 @@ test("compressed photo survives retry and is shared through API, SQL and private
   test.setTimeout(180_000);
   const first = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
+    serviceWorkers: "block",
     viewport: { width: 390, height: 844 },
   });
   if (process.env.WE2DAY_TEST_WEBP_FALLBACK === "1") {
@@ -20,9 +21,13 @@ test("compressed photo survives retry and is shared through API, SQL and private
   }
   const second = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
+    serviceWorkers: "block",
     viewport: { width: 390, height: 844 },
   });
-  const third = await browser.newContext({ baseURL: "http://127.0.0.1:3100" });
+  const third = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+    serviceWorkers: "block",
+  });
   try {
     const a = await first.newPage(),
       b = await second.newPage(),
@@ -74,7 +79,7 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await a.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
     await expect(a.getByRole("main").getByRole("alert")).toContainText("연결하지 못했어요");
     await expect(a.getByLabel("이 사진의 한마디")).toHaveValue("가을날의 작은 산책");
-    await b.goto("/memories");
+    await b.goto("/memories?date=2026-10-24");
     await b.getByLabel("만난 날짜").fill("2026-10-24");
     await expect(b.getByText("아직 이 날의 사진이 없어요. 첫 장면을 남겨보세요.")).toBeVisible();
     await a.getByRole("button", { name: "같은 사진 다시 저장", exact: true }).click();
@@ -95,7 +100,7 @@ test("compressed photo survives retry and is shared through API, SQL and private
       )
       .toBe(true);
     await card.getByText("휴대폰에서 원본 찾기", { exact: true }).click();
-    await expect(card.getByText("상대방", { exact: true })).toBeVisible();
+    await expect(card.getByText("이름 미설정", { exact: true })).toBeVisible();
     await expect(card.getByText("camera-day.jpg", { exact: true })).toBeVisible();
     const imageUrl = await card.getByRole("img").getAttribute("src");
     const canonical = await second.request.get(imageUrl || "");
@@ -103,6 +108,60 @@ test("compressed photo survives retry and is shared through API, SQL and private
     const canonicalBytes = await canonical.body();
     expect(canonicalBytes.toString("ascii", 0, 4)).toBe("RIFF");
     expect(canonicalBytes.toString("ascii", 8, 12)).toBe("WEBP");
+
+    // A second view-only fixture isolates swipe/dialog layout from the real Storage lifecycle below.
+    const album = await (await b.request.get("/api/photos?date=2026-10-24")).json();
+    const secondId = "77777777-7777-4777-8777-777777777777";
+    await b.route("**/api/photos?date=2026-10-24", (route) =>
+      route.fulfill({
+        json: {
+          items: [...album.items, { ...album.items[0], id: secondId, caption: "가로 탐색 예시" }],
+          next_after: null,
+        },
+      }),
+    );
+    await b.route(`**/api/photos/${secondId}/image*`, (route) =>
+      route.fulfill({ body: canonicalBytes, contentType: "image/webp" }),
+    );
+    await b.getByRole("button", { name: "사진 새로고침", exact: true }).click();
+    await expect(b.locator(".shared-photo-card")).toHaveCount(2);
+    await expect(b.getByRole("button", { name: "앨범", exact: true })).toHaveCount(0);
+    await expect(b.getByRole("button", { name: "휴지통", exact: true })).toHaveCount(0);
+    await expect(b.getByRole("heading", { name: "2026년 10월 24일", exact: true })).toBeVisible();
+    for (const width of [320, 393, 1425]) {
+      await b.setViewportSize({ width, height: 852 });
+      await b.getByRole("button", { name: "다음 사진", exact: true }).click();
+      await expect(b.locator(".photo-slide-navigation")).toContainText("2 / 2");
+      expect(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const active = b.locator('.photo-slide[aria-hidden="false"]');
+      for (const name of ["사진 크게 보기", "사진 휴지통으로 이동"])
+        await expect(active.getByRole("button", { name, exact: true })).toHaveCSS(
+          "border-top-width",
+          "0px",
+        );
+      await active.getByRole("button", { name: "사진 크게 보기", exact: true }).click();
+      await expect(b.getByRole("dialog", { name: "사진 크게 보기", exact: true })).toBeVisible();
+      await b.getByRole("button", { name: "사진 크게 보기 닫기", exact: true }).press("Escape");
+      await expect(b.getByRole("dialog")).toHaveCount(0);
+      await expect(
+        active.getByRole("button", { name: "사진 크게 보기", exact: true }),
+      ).toBeFocused();
+      if (width === 393) {
+        const download = b.waitForEvent("download");
+        await active.getByRole("link", { name: "저장된 압축본 내려받기", exact: true }).click();
+        expect((await download).suggestedFilename()).toBe("we2day-2026-10-24.webp");
+      }
+      await b.getByRole("button", { name: "이전 사진", exact: true }).click();
+      await expect(b.locator(".photo-slide-navigation")).toContainText("1 / 2");
+    }
+    await b.setViewportSize({ width: 393, height: 852 });
+    await b
+      .locator('.photo-slide[aria-hidden="false"] .photo-image-actions')
+      .screenshot({ path: testInfo.outputPath("photo-icons.png") });
+    await b.unroute("**/api/photos?date=2026-10-24");
+    await b.unroute(`**/api/photos/${secondId}/image*`);
+    await b.getByRole("button", { name: "사진 새로고침", exact: true }).click();
+    await expect(b.locator(".shared-photo-card")).toHaveCount(1);
     const hidden = await third.request.get("/api/photos?date=2026-10-24");
     expect((await hidden.json()).items).toEqual([]);
     expect((await third.request.get(imageUrl as string)).status()).toBe(404);
@@ -137,9 +196,17 @@ test("compressed photo survives retry and is shared through API, SQL and private
     expect((await first.request.get(imageUrl as string)).status()).toBe(404);
     await b.getByRole("button", { name: "사진 새로고침" }).click();
     await expect(b.locator(".shared-photo-card")).toHaveCount(0);
-    await b.getByRole("button", { name: "휴지통", exact: true }).click();
+    await b.goto("/settings/trash");
     await expect(b.locator(".shared-photo-card")).toHaveCount(1);
     await expect(b.getByText(/휴지통 이동:/)).toBeVisible();
+    await b.getByLabel("기록 날짜 (선택)").fill("2026-10-25");
+    await expect(b.locator(".shared-photo-card")).toHaveCount(0);
+    await b.getByLabel("기록 날짜 (선택)").fill("2026-10-24");
+    await expect(b.locator(".shared-photo-card")).toHaveCount(1);
+    const recordId = (await (await b.request.get("/api/photos?trash=true&date=2026-10-24")).json())
+      .items[0].id;
+    await b.getByLabel("사진 기록", { exact: true }).selectOption(recordId);
+    await expect(b.locator(".shared-photo-card")).toHaveCount(1);
     await b.locator(".shared-photo-card").scrollIntoViewIfNeeded();
     await expect
       .poll(() =>
@@ -155,14 +222,14 @@ test("compressed photo survives retry and is shared through API, SQL and private
       b.getByText("사진을 원래 날짜의 앨범으로 복구했어요.", { exact: true }),
     ).toBeVisible();
     await expect(b.locator(".shared-photo-card")).toHaveCount(0);
-    await b.getByRole("button", { name: "앨범", exact: true }).click();
+    await b.goto("/memories?date=2026-10-24");
     await expect(b.locator(".shared-photo-card")).toHaveCount(1);
     await a.getByRole("button", { name: "사진 새로고침" }).click();
     await expect(a.locator(".shared-photo-card")).toHaveCount(1);
     await a.getByRole("button", { name: "사진 휴지통으로 이동", exact: true }).click();
     await expect(a.getByText("사진을 휴지통으로 옮겼어요.", { exact: true })).toBeVisible();
     await expect(a.locator(".shared-photo-card")).toHaveCount(0);
-    await a.getByRole("button", { name: "휴지통", exact: true }).click();
+    await a.goto("/settings/trash");
     expect((await request.post("http://127.0.0.1:54329/__age-photo-trash")).ok()).toBe(true);
     await a.getByRole("button", { name: "사진 새로고침" }).click();
     await a.getByText("영구 삭제 확인 열기", { exact: true }).click();
