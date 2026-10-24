@@ -37,6 +37,7 @@
 !/assets/screenshots/plan-desktop.png
 !/assets/screenshots/memories-mobile.png
 !/assets/screenshots/white-mobile.png
+!/assets/screenshots/day-course-mobile.png
 
 # Local credentials, dependencies, and generated output are never published.
 **/.env*

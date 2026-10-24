@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { confirmPlanAndReopen } from "./plan-confirmation";
 
 const output = path.resolve("../../assets/screenshots");
 const date = "2026-10-24";
@@ -129,6 +130,20 @@ test("generate public screenshots using disposable synthetic records only", asyn
       page.getByRole("button", { name: "이 내용으로 확정하기", exact: true }),
     ).toBeVisible();
     await capture(page, "plan-desktop.png", page.getByRole("region", { name: "플랜 확정 내용" }));
+    await confirmPlanAndReopen(page);
+    const coursePage = await context.newPage();
+    await coursePage.setViewportSize({ width: 390, height: 1100 });
+    await coursePage.goto(`/memories/search?type=routes&date=${date}`);
+    await expect(
+      coursePage.getByRole("heading", { name: "가을, 느긋한 하루", exact: true }),
+    ).toBeVisible();
+    await expect(coursePage.getByRole("link", { name: "WE2DAY 홈", exact: true })).toBeVisible();
+    await expect(
+      coursePage.getByRole("navigation", { name: "주요 메뉴", exact: true }),
+    ).toBeVisible();
+    await expect(coursePage.locator(".day-course-stops li")).toHaveCount(3);
+    await capture(coursePage, "day-course-mobile.png", coursePage.locator(".app-shell"));
+    await coursePage.close();
     console.log("Public capture: photo upload");
 
     await page.goto("/memories?date=2026-10-10");
