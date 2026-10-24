@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from we2day_api.agents import router as agents_router
 from we2day_api.anniversaries import router as anniversaries_router
 from we2day_api.auth import CurrentUser, require_user
 from we2day_api.calendar import router as calendar_router
@@ -63,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application = FastAPI(title="WE2DAY API", version="0.1.0", lifespan=lifespan)
     application.state.settings = config
+    application.include_router(agents_router)
     application.include_router(push_router)
     application.include_router(upcoming_router)
     application.include_router(calendar_router)

@@ -41,6 +41,9 @@ class DataAPI:
                 "Data service failure: status=%s category=%s", response.status_code, category
             )
         safe_errors = {
+            "invalid_agent_connection",
+            "agent_connection_limit",
+            "agent_connection_not_found",
             "invalid_push_subscription",
             "push_device_limit",
             "push_test_limited",

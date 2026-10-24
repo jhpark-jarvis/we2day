@@ -24,7 +24,7 @@ def require_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> CurrentUser:
     response.headers["Cache-Control"] = "private, no-store"
-    if not credentials:
+    if not credentials or credentials.credentials.startswith("w2d_agent_"):
         raise unauthenticated()
     config = request.app.state.settings
     if not config.supabase_url or not config.supabase_publishable_key:
