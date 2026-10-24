@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,10 +33,11 @@ def test_monitor_collects_failures_without_printing_exception_or_skipping_other_
     backup.write_text(json.dumps({"last_success": now.isoformat(), "state": "completed"}))
     photo = tmp_path / "photo.json"
     photo.write_text('{"status":"ok"}')
+    os.utime(photo, (now.timestamp(), now.timestamp()))
     config = {
         "containers": ["web"],
-        "timers": ["timer"],
-        "services": ["service"],
+        "timers": ["timer", "we2day-audit.timer"],
+        "services": ["service", "we2day-audit.service"],
         "disk": str(tmp_path),
         "backup_status": str(backup),
         "domain": "fixture.invalid",
@@ -60,6 +62,10 @@ def test_monitor_collects_failures_without_printing_exception_or_skipping_other_
     assert result["status"] == "attention"
     assert not result["checks"]["web"] and not result["checks"]["disk"]
     assert result["checks"]["daily_backup"] and result["checks"]["web_response"]
+    # Fresh reports must not hide a disabled audit timer or failed audit service.
+    assert result["checks"]["photo_audit"] and result["checks"]["integrity_audit"]
+    assert not result["checks"]["we2day-audit.timer"]
+    assert not result["checks"]["we2day-audit.service"]
     assert "secret" not in json.dumps(result) and "private" not in json.dumps(result)
     monitor.write_report(tmp_path / "report.json", result)
     assert json.loads((tmp_path / "report.json").read_text()) == result
