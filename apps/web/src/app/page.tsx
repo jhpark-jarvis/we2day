@@ -52,11 +52,6 @@ export default async function HomePage({
         today={today}
         initialDate={selectedDate}
         zones={zones}
-        mapsKey={
-          /^[a-zA-Z0-9_-]{3,128}$/.test(process.env.WE2DAY_NAVER_MAPS_CLIENT_ID || "")
-            ? process.env.WE2DAY_NAVER_MAPS_CLIENT_ID || ""
-            : ""
-        }
         status={status}
         memberCount={couple.data?.member_count}
         participantNames={

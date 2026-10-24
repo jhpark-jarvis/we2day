@@ -271,29 +271,11 @@ docker compose up --detach --build --wait api
 
 [공식 지역 검색 명세](https://api.ncloud-docs.com/docs/naver-api-hub-search-local) · [지도 앱 연결](https://guide.ncloud-docs.com/docs/maps-url-scheme). 검색 API HUB 키와 Dynamic Map Client ID의 용도·설정을 구분하세요.
 
-## NAVER 지도 표시 설정 (선택)
+## NAVER 지도 표시 설정
 
-**NAVER Cloud Platform Maps → Dynamic Map**을 사용합니다. 장소 검색의 API HUB 키와 별개로 지도 표시용 Client ID가 필요합니다. 지도 없이도 수동 플랜과 직접 좌표 기록은 사용할 수 있습니다.
-
-1. [네이버 클라우드 콘솔](https://console.ncloud.com/)의 **Application Services → Maps → Application**에서 이용 신청/애플리케이션 등록을 진행합니다. 해당 계정의 적용 약관·대표 계정 무료 혜택/호출량을 확인한 뒤 신청합니다.
-2. API는 **Dynamic Map**만 선택합니다. 이 구현에는 Directions 5·Geocoding·Reverse Geocoding이 필요하지 않습니다.
-3. **Web 서비스 URL**에 `http://127.0.0.1:3000`을 등록합니다. localhost도 사용한다면 `http://localhost:3000`을 별도로 등록하고, 운영 도메인이 생기면 HTTPS 주소를 추가합니다. 로그인 사이트 URL과 같은 주소로 접속하세요.
-4. 등록한 Maps 애플리케이션의 **Client ID**를 `apps/web/.env`에 추가합니다. 지도 앱 검색 링크에는 이 키를 사용하지 않습니다.
-
-```dotenv
-WE2DAY_NAVER_MAPS_CLIENT_ID=YOUR_MAPS_CLIENT_ID
-```
-
-5. 브라우저용 Client ID는 공개 식별자입니다. **Maps Client Secret은 웹/API `.env`에 추가하지 않습니다.** 대표 계정의 여러 애플리케이션 사용량 합계가 무료 이용량 안에 들도록 일/월 한도를 설정하고 **한도 초과 사용은 허용하지 않음**으로 둡니다. 사용량 알림/호출량도 확인합니다.
-6. Docker는 웹 서버가 실행 시 `.env`를 읽도록 `docker compose up --detach --wait web`로 다시 반영합니다. 직접 개발 서버를 사용한다면 웹 프로세스를 재시작합니다.
-7. 로그인 후 달력의 오늘/지난 날짜 → **동선 기록 열기 → 지도에서 두 점 지정하기**에서 확인합니다. 출발/도착을 선택해 점을 찍고 직접 정한 장소 이름을 입력한 뒤 **동선 저장**을 누릅니다. SQL006이 필요하며 지도에서 점을 고르기만 해서는 저장되지 않습니다.
-
-SDK는 현재 `ncpKeyId` 매개변수를 사용합니다. `ncpClientId` 기반의 예전 예제와 혼동하지 마세요. 지도 인증 오류는 Dynamic Map 선택·Client ID·허용 Web 서비스 URL을 확인합니다. 지도 로드/인증에 실패해도 작성한 이름·좌표는 유지하며, 지도를 닫았다 열어 다시 시도할 수 있습니다. [SDK 시작 안내](https://navermaps.github.io/maps.js.ncp/docs/tutorial-2-Getting-Started.html), [Maps 신청 안내](https://guide.ncloud-docs.com/docs/application-maps-app-vpc), [공식 무료 혜택 FAQ](https://www.ncloud.com/support/faq/prod/2828).
-
-Dynamic Map의 무료 제공·대표 계정 조건·호출 한도를 확인해야 합니다. 장소 목록은 검색 제출 시 FastAPI에서 API HUB를 호출하며, 지도 앱 연결은 별도 버튼으로 실행합니다. 사용 시점의 콘솔 조건을 확인하세요. 지도 SDK는 브라우저에서 NAVER 서비스로 직접 연결하며, 직접 지정한 두 점을 지도 위에 표시합니다. 검색·지도 결과를 저장하거나 다른 용도로 사용할 때는 해당 서비스의 이용 조건을 별도로 확인해야 합니다.
+출발·도착 두 점을 찍는 지도 입력 기능은 제거했습니다. 새 설치에는 웹 Dynamic Map Client ID 설정이 필요하지 않습니다. 장소 검색과 저장한 코스의 네이버 지도 앱 연결은 위 절차대로 사용합니다. 기존 DB 마이그레이션은 과거 자료와 API 호환을 위해 유지합니다.
 
 <a id="checks"></a>
-
 ## 검사
 
 ```sh
@@ -334,7 +316,7 @@ npm run test:pwa
 | `test:photos` | 테스트 이미지/EXIF로 압축·다운로드·메타데이터 제외·파일 거부/취소·모바일 검사 |
 | `test:photo-sharing` | 테스트 계정 두 개의 저장/공유·휴지통 이동·상대 계정에서 복구·30일/삭제 재시도·ZIP 다운로드·만남 메모/충돌. 실제 SQL + 사진 저장소를 대신하는 HTTP 테스트 서버 |
 | `test:map-loader` | 외부 호출 없이 SDK 준비 콜백/로드 이벤트·실패 후 재시도 검사. 브라우저·Docker 불필요 |
-| `test:plans` | 일회용 DB/테스트 계정 두 개의 동선 저장·공유, SDK 대역의 지연 로드/두 점·직선, 플랜 저장→확정→충돌→재확정→보관/복원. 실제 Maps API 호출 없음 |
+| `test:plans` | 일회용 DB/테스트 계정 두 개의 플랜 저장→확정→충돌→재확정→보관/복원. 실제 Maps API 호출 없음 |
 | `test:journey` | 테스트 계정 두 개의 위시→플랜 확정→투데이·미확정 변경 제외→개인 회고 차단/공유/철회→복제 시 달력 보존 |
 | `test:organizer` | 테스트 계정의 다가오는 약속/기념일·날짜 직접 이동·ICS 실제 다운로드/메모 선택·월간 집계와 빈 월 |
 | `test:timeline` | 미정 비용(null)과 입력한 0원, 일부 비용의 합계 구분. Docker 불필요 |

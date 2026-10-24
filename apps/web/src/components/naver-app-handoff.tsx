@@ -96,8 +96,7 @@ export function NaverAppHandoff({
           <details>
             <summary>목적지 좌표로 바로 길찾기</summary>
             <p className="settings-hint">
-              직접 확인한 목적지의 위도·경도를 입력하세요. 만난 날의 출발·도착 동선과 별개이며
-              활동을 바꾸면 입력을 지워요.
+              직접 확인한 목적지의 위도·경도를 입력하세요. 활동을 바꾸면 입력을 지워요.
             </p>
             <div className="plan-basics">
               <div className="auth-field">

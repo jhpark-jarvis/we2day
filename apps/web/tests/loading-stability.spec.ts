@@ -182,24 +182,6 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
       await retry.remove();
     }
 
-    const route = await pause(page, "**/api/routes?*");
-    let initialForm: Awaited<ReturnType<typeof geometry>>;
-    try {
-      await page.getByRole("button", { name: "동선 기록 열기", exact: true }).click();
-      await route.started;
-      initialForm = await geometry(page.locator(".route-form"));
-      expect(await page.locator(".route-form").evaluate((node) => !!node.closest("[inert]"))).toBe(
-        true,
-      );
-    } finally {
-      route.release();
-    }
-    await expect(
-      page.locator(".route-form").getByRole("button", { name: "동선 저장", exact: true }),
-    ).toBeEnabled();
-    unchanged(await geometry(page.locator(".route-form")), initialForm);
-    await route.remove();
-
     await open(page, "/memories");
     const album = page.getByRole("region", { name: "날짜별 사진 앨범" });
     await expect(album.locator(".shared-photo-carousel article")).toHaveCount(1);
@@ -268,7 +250,6 @@ test("slow reads preserve content geometry, block stale edits and recover in bot
       ["/questions/search", "질문 검색", "**/questions/search*"],
       ["/memories/search", "사진 검색", "**/memories/search*"],
       ["/memories/records", "기록 검색", "**/api/records/search"],
-      ["/memories/routes", "동선 조회", "**/api/routes/history"],
     ]) {
       await open(page, url);
       const selectStyles = await page.locator("main select").evaluateAll((nodes) =>

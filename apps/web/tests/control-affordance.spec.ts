@@ -577,20 +577,6 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
         });
       }
       await open(current, "/");
-      await current.getByRole("button", { name: "동선 기록 열기", exact: true }).click();
-      await expect(current.getByLabel("직접 정한 출발 장소 이름")).toBeVisible();
-      await current
-        .locator(".route-point")
-        .filter({ hasText: "출발점" })
-        .getByText("좌표 직접 입력", { exact: true })
-        .click();
-      await current.getByLabel("출발 경도", { exact: true }).fill("127.0276368");
-      await auditControls(current, `${theme}/${width}/route-editor`);
-      await current.screenshot({
-        path: testInfo.outputPath(`${theme}-${width}-route-editor.png`),
-        fullPage: true,
-        scale: "css",
-      });
       await open(current, "/account");
       const profile = current.getByLabel("사용자 이름", { exact: true });
       await profile.fill("예시 이름");

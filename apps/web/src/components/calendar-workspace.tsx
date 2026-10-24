@@ -20,7 +20,6 @@ import { PageHeading } from "@/components/page-heading";
 import { PhotoStory } from "@/components/photo-story";
 import { PlaceSearch } from "@/components/place-search";
 import Link from "@/components/progress-link";
-import { RouteWorkspace } from "@/components/route-workspace";
 import { calendarDate, daysInMonth, parseDate } from "@/lib/calendar";
 import type { MeetingDay } from "@/lib/meetings";
 import type { Appointment } from "@/lib/shared-calendar";
@@ -70,7 +69,6 @@ export function CalendarWorkspace({
   memberCount,
   initialEvents = [],
   initialError = "",
-  mapsKey = "",
   initialDate,
   zones = null,
   participantNames = [],
@@ -81,7 +79,6 @@ export function CalendarWorkspace({
   memberCount?: number;
   initialEvents?: Appointment[];
   initialError?: string;
-  mapsKey?: string;
   initialDate?: string;
   zones?: TimezoneView | null;
   participantNames?: string[];
@@ -555,7 +552,6 @@ export function CalendarWorkspace({
                     onReload={() => setRefresh((value) => value + 1)}
                   />
                 </LoadingRegion>
-                <RouteWorkspace key={selected} date={selected} today={today} apiKey={mapsKey} />
                 {meetingNotice && (
                   <p className="settings-hint" role="status">
                     {meetingNotice}

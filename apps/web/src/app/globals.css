@@ -212,20 +212,6 @@ button { appearance: none; color: var(--foreground); }
 .swatch-white i:nth-child(2) { background: #87503e; }
 .theme-swatch:has(.theme-character-preview) { display: flex; align-items: center; justify-content: center; padding: 8px; border-color: var(--line); background: var(--background); }
 .theme-character-preview { display: block; width: 96px; height: 96px; object-fit: contain; }
-.route-playback { margin-block: 16px; }
-.route-playback-diagram { display: block; width: 100%; max-height: 260px; border-radius: 10px; background: var(--panel); }
-.route-playback-grid { stroke: var(--line); fill: none; stroke-width: 1; }
-.route-playback-line { stroke: var(--accent); stroke-width: 3; }
-.route-playback-start { fill: var(--surface); stroke: var(--accent); stroke-width: 3; }
-.route-playback-end { fill: var(--accent); }
-.route-playback-caption { height: 144px; padding-block: 12px; overflow-wrap: anywhere; overflow-y: auto; }
-.route-playback-caption p { margin-block: 8px; }
-.route-playback-caption span { color: var(--muted); margin-right: 8px; }
-.route-playback-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border: 0; padding: 0; margin: 0; min-width: 0; }
-.route-playback-speed { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.route-playback-speed select { width: auto; min-height: 44px; }
-.route-playback-scrubber { display: flex; flex-direction: column; gap: 4px; margin-block: 10px; }
-.route-playback-scrubber input { width: 100%; min-width: 0; min-height: 44px; padding: 0; accent-color: var(--accent); }
 .theme-option-copy { display: block; padding: 15px 1px 3px; }
 .theme-option-copy strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 500; }
 .theme-option-copy small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; word-break: keep-all; }
@@ -327,14 +313,11 @@ button { appearance: none; color: var(--foreground); }
 }
 
 .route-workspace { padding: 24px 0; border-top: 1px solid var(--line); }
-.route-form,.plan-editor form { display: grid; gap: 16px; }
-.route-point,.plan-activity,.plan-review { border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 12px 0; min-width: 0; }
-.route-point legend,.plan-activity legend { padding: 0 6px; font-weight: 600; }
+.plan-editor form { display: grid; gap: 16px; }
+.plan-activity,.plan-review { border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 12px 0; min-width: 0; }
+.plan-activity legend { padding: 0 6px; font-weight: 600; }
 .coordinate-fields,.plan-basics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
-.route-form input,.plan-editor input,.plan-editor textarea { width: 100%; min-width: 0; }
-.route-map-frame { position: relative; width: 100%; min-width: 0; height: clamp(260px, 48vw, 360px); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.route-map-canvas { width: 100%; height: 100%; }
-.route-map-canvas img { max-width: none; }
+.plan-editor input,.plan-editor textarea { width: 100%; min-width: 0; }
 .map-role { border: 0; padding: 0; display: flex; gap: 20px; }
 .map-role label { display: flex; align-items: center; gap: 6px; }
 .map-role input { width: auto; }
@@ -348,7 +331,7 @@ button.plan-card { border-color: var(--control-border); }
 .plan-editor .meeting-fields { display: grid; gap: 16px; }
 .plan-review { background: var(--surface); }
 .plan-review p { line-height: 1.8; overflow-wrap: anywhere; }
-@media(max-width:380px) { .plan-basics { grid-template-columns: 1fr; } .route-point,.plan-activity { padding: 12px; } }
+@media(max-width:380px) { .plan-basics { grid-template-columns: 1fr; } .plan-activity { padding: 12px; } }
 @media(max-width:760px) {
   .app-header { gap: 14px; min-height: 104px; }
   .page-title-slot h1 { font-size: 20px; }
@@ -536,7 +519,7 @@ html { scroll-padding-bottom: 100px; }
   .calendar-toolbar > .workspace-refresh, .calendar-toolbar > .checklist-refresh { margin-inline-start: auto; }
   .anniversary-list li { align-items: flex-start; flex-wrap: wrap; }
   .anniversary-count { margin-inline-start: auto; }
-  .route-point, .plan-activity { padding: 12px; }
+   .plan-activity { padding: 12px; }
 }
 
 .calendar-toolbar:has(.auth-field) { align-items: flex-end; }
@@ -627,7 +610,6 @@ main:has(.appointment-detail, .appointment-editor) > .next-appointment { display
 
 .monthly-day-photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-block: 12px; }
 .monthly-day-photos img { width: 100%; height: auto; max-height: 230px; object-fit: cover; border-radius: 8px; }
-.route-point .optional-fields { grid-column: 1 / -1; }
 .goal-editor .checklist-item { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 12px; }
 
 .search-submit { justify-self: end; }

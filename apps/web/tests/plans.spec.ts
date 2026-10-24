@@ -1,9 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { confirmPlanAndReopen } from "./plan-confirmation";
 
-test("shared routes and plan confirmation preserve calendar and actual records", async ({
-  browser,
-}, testInfo) => {
+test("plan confirmation preserve calendar and actual records", async ({ browser }, testInfo) => {
   test.setTimeout(180_000);
   const first = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
@@ -36,62 +34,8 @@ test("shared routes and plan confirmation preserve calendar and actual records",
     await b.getByLabel("받은 초대 코드").fill(code);
     await b.getByRole("button", { name: "초대 수락하기" }).click();
     await expect(b.getByRole("status")).toContainText("두 사람이 연결되었어요");
-    let scripts = 0;
-    await a.route("https://oapi.map.naver.com/openapi/v3/maps.js?**", async (route) => {
-      scripts++;
-      expect(route.request().headers().referer).toBe("http://127.0.0.1:3100/");
-      expect(route.request().url()).toContain("ncpKeyId=synthetic-maps-key");
-      await route.fulfill({
-        contentType: "application/javascript",
-        body: `
-        const coordinates = class { constructor(lat,lng){this.y=lat;this.x=lng} lat(){return this.y} lng(){return this.x} };
-        window.naver={maps:{LatLng:coordinates,LatLngBounds:class {},Map:class {constructor(el){this.el=el;el.textContent='합성 지도';}setSize(size){this.el.style.width=size.width+'px';this.el.style.height=size.height+'px';}fitBounds(){}destroy(){this.el.textContent='';}},Marker:class{setMap(){}},Polyline:class{constructor(o){this.el=document.createElement('span');this.el.className='fixture-straight-line';o.map.el.append(this.el);}setMap(){this.el.remove();}},Event:{addListener(map,name,fn){map.el.onclick=()=>fn({coord:new coordinates(37.55,127.05)});return map;},removeListener(map){map.el.onclick=null;}}}};/* SDK load event must also work without a repeated global callback. */
-      `,
-      });
-    });
     await a.goto("/");
-    expect(scripts).toBe(0);
-    await a.getByRole("button", { name: "동선 기록 열기" }).click();
-    await a.getByLabel("직접 정한 출발 장소 이름").fill("직접 지정한 출발");
-    await a
-      .locator(".route-point")
-      .filter({ hasText: "출발점" })
-      .getByText("좌표 직접 입력", { exact: true })
-      .click();
-    await a.getByLabel("출발 위도").fill("37.5");
-    await a.getByLabel("출발 경도").fill("127");
-    await a.getByLabel("직접 정한 도착 장소 이름").fill("직접 지정한 도착");
-    await a
-      .locator(".route-point")
-      .filter({ hasText: "도착점" })
-      .getByText("좌표 직접 입력", { exact: true })
-      .click();
-    await a.getByLabel("도착 위도").fill("37.6");
-    await a.getByLabel("도착 경도").fill("127.1");
-    await a.getByRole("button", { name: "지도에서 두 점 지정하기" }).click();
-    await expect(a.locator(".fixture-straight-line")).toHaveCount(1);
-    expect(scripts).toBe(1);
-    const frame = a.locator(".route-map-frame");
-    const canvas = a.locator(".route-map-canvas");
-    for (const width of [320, 1024, 390]) {
-      await a.setViewportSize({ width, height: 844 });
-      await expect
-        .poll(async () => {
-          const f = await frame.boundingBox(),
-            c = await canvas.boundingBox();
-          return f && c ? Math.abs(f.width - 2 - c.width) : 100;
-        })
-        .toBeLessThan(1);
-    }
-
-    await a.getByRole("region", { name: "출발점과 도착점을 지정하는 네이버 지도" }).click();
-    await expect(a.getByLabel("출발 위도")).toHaveValue("37.5500000");
-    await a.getByRole("button", { name: "동선 저장", exact: true }).click();
-    await expect(a.getByRole("status").filter({ hasText: "동선을 저장했어요" })).toBeVisible();
-    await a.screenshot({ path: testInfo.outputPath("route-mobile.png"), fullPage: true });
-    await b.goto("/");
-    await b.getByRole("button", { name: "동선 기록 열기" }).click();
-    await expect(b.getByLabel("출발 위도")).toHaveValue("37.55");
+    await expect(a.getByRole("heading", { name: "함께한 동선" })).toHaveCount(0);
     await a.goto("/plans");
     await a.getByRole("button", { name: "플랜 만들기" }).click();
     await a.getByLabel("플랜 이름", { exact: true }).fill("함께하는 주말");
@@ -166,9 +110,7 @@ test("shared routes and plan confirmation preserve calendar and actual records",
       true,
     );
     await b.goto("/");
-    await b.getByRole("button", { name: "동선 기록 열기" }).click();
-    await expect(b.getByLabel("직접 정한 출발 장소 이름")).toHaveValue("직접 지정한 출발");
-    expect(scripts).toBe(1);
+    await expect(b.getByRole("button", { name: "동선 기록 열기" })).toHaveCount(0);
   } finally {
     await first.close();
     await second.close();

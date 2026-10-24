@@ -71,12 +71,12 @@ test("upcoming dates, selected-day links, calendar download and monthly original
   const totals = page.getByLabel("선택한 달의 기록 합계");
   await expect(totals).toContainText("만난 날1일");
   await expect(totals).toContainText("남긴 사진0장");
-  await expect(totals).toContainText("직선 동선0일");
+  await expect(totals).not.toContainText("직선 동선");
   await page.screenshot({ path: testInfo.outputPath("monthly-mobile.png"), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await page.getByRole("link", { name: "일정·동선 보기", exact: true }).click();
+  await page.getByRole("link", { name: "일정 보기", exact: true }).click();
   await expect(page.getByLabel("이 날 만났어요", { exact: true })).toBeChecked();
   await page.goto("/memories/month?month=2000-01");
   await expect(page.getByText("이 달에는 아직 남긴 기록이 없어요.")).toBeVisible();

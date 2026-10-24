@@ -695,7 +695,7 @@ function PlanEditor({
                       </p>
                     )}
                     <p className="settings-hint">
-                      실제 만남·동선 기록은 생성되지 않아요. 보관해도 이 약속은 남아요.
+                      실제 만남 기록은 생성되지 않아요. 보관해도 이 약속은 남아요.
                     </p>
                     <button
                       type="button"

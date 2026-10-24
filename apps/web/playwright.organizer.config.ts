@@ -4,7 +4,7 @@ export default defineConfig({
   ...journey,
   testMatch: [
     "agent-gateway.spec.ts",
-    "route-playback.spec.ts",
+    "route-retirement.spec.ts",
     "character-themes.spec.ts",
     "favorite-places.spec.ts",
     "organizer.spec.ts",

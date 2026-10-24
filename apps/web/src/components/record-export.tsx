@@ -8,7 +8,7 @@ const kinds = {
   appointments: "약속",
   anniversaries: "기념일",
   meeting_days: "만난 날·메모",
-  meeting_routes: "직선 동선",
+  meeting_routes: "출발·도착 기록 (기존 자료)",
   date_plans: "데이트 플랜",
   date_reports: "데이트 회고",
   photos: "사진 참고 정보",

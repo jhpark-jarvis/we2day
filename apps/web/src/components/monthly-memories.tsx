@@ -94,16 +94,12 @@ export function MonthlyMemories({ initialMonth }: { initialMonth: string }) {
                 <dt>남긴 사진</dt>
                 <dd>{data.photo_count}장</dd>
               </div>
-              <div>
-                <dt>직선 동선</dt>
-                <dd>{data.route_count}일</dd>
-              </div>
             </dl>
             <details className="compact-help">
               <summary>집계 기준</summary>
               <p className="settings-hint">
-                만난 날은 직접 체크한 날짜만 세어요. 사진·약속·동선만으로 만남이나 실제 방문을
-                추정하지 않아요. 휴지통·저장 미완료 사진은 제외해요.
+                만난 날은 직접 체크한 날짜만 세어요. 사진·약속만으로 만남이나 실제 방문을 추정하지
+                않아요. 휴지통·저장 미완료 사진은 제외해요.
               </p>
             </details>
             {data.photo_count > 6 && (
@@ -113,45 +109,48 @@ export function MonthlyMemories({ initialMonth }: { initialMonth: string }) {
               </p>
             )}
             <ul className="memory-day-list">
-              {data.days.map((day) => (
-                <li key={day.date}>
-                  <strong>{day.date}</strong>
-                  <div className="monthly-day-photos">
-                    {(data?.photos || [])
-                      .filter((photo) => photo.date === day.date)
-                      .map((photo) => (
-                        <Link
-                          className="monthly-photo"
-                          aria-label={`${day.date}의 사진 보기`}
-                          key={photo.id}
-                          href={`/memories?date=${day.date}`}
-                        >
-                          <Image
-                            src={`/api/photos/${photo.id}/image`}
-                            alt={photo.caption || `${photo.date}에 남긴 사진`}
-                            width={600}
-                            height={450}
-                            unoptimized
-                          />
-                        </Link>
-                      ))}
-                  </div>
-                  <p>
-                    {day.met ? "만난 날" : "만남 표시 없음"} · 사진 {day.photo_count}장
-                    {day.route_recorded ? " · 직선 기록 있음" : ""}
-                  </p>
-                  <div className="calendar-toolbar">
-                    <Link className="text-button" href={`/?date=${day.date}`}>
-                      일정·동선 보기
-                    </Link>
-                    <Link className="text-button" href={`/memories?date=${day.date}`}>
-                      이 날짜의 사진
-                    </Link>
-                  </div>
-                </li>
-              ))}
+              {data.days
+                .filter((day) => day.met || day.photo_count > 0)
+                .map((day) => (
+                  <li key={day.date}>
+                    <strong>{day.date}</strong>
+                    <div className="monthly-day-photos">
+                      {(data?.photos || [])
+                        .filter((photo) => photo.date === day.date)
+                        .map((photo) => (
+                          <Link
+                            className="monthly-photo"
+                            aria-label={`${day.date}의 사진 보기`}
+                            key={photo.id}
+                            href={`/memories?date=${day.date}`}
+                          >
+                            <Image
+                              src={`/api/photos/${photo.id}/image`}
+                              alt={photo.caption || `${photo.date}에 남긴 사진`}
+                              width={600}
+                              height={450}
+                              unoptimized
+                            />
+                          </Link>
+                        ))}
+                    </div>
+                    <p>
+                      {day.met ? "만난 날" : "만남 표시 없음"} · 사진 {day.photo_count}장
+                    </p>
+                    <div className="calendar-toolbar">
+                      <Link className="text-button" href={`/?date=${day.date}`}>
+                        일정 보기
+                      </Link>
+                      <Link className="text-button" href={`/memories?date=${day.date}`}>
+                        이 날짜의 사진
+                      </Link>
+                    </div>
+                  </li>
+                ))}
             </ul>
-            {!data.days.length && <p className="empty-state">이 달에는 아직 남긴 기록이 없어요.</p>}
+            {!data.days.some((day) => day.met || day.photo_count > 0) && (
+              <p className="empty-state">이 달에는 아직 남긴 기록이 없어요.</p>
+            )}
           </>
         )}
       </LoadingRegion>
