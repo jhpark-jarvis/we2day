@@ -69,6 +69,12 @@ export default async function SettingsPage() {
           자주 가는 곳
         </Link>
       </section>
+      <section className="settings-section">
+        <h2>외부 연결</h2>
+        <Link className="text-button" href="/settings/agents">
+          에이전트 연결
+        </Link>
+      </section>
       <PwaSettings />
       <PushSettings />
       <section className="settings-section account-settings">

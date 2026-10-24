@@ -138,7 +138,15 @@ createServer(async (request, response) => {
   }
   if (url.pathname.startsWith("/rest/v1/") && process.env.WE2DAY_TEST_REST_URL) {
     const token = request.headers.authorization?.replace(/^Bearer /, "");
-    if (!users.has(token)) return send(401, { error: "invalid fixture token" });
+    const anonymousAgent =
+      !token &&
+      request.headers.apikey === "synthetic-publishable-key" &&
+      [
+        "/rest/v1/rpc/agent_calendar",
+        "/rest/v1/rpc/agent_plan",
+        "/rest/v1/rpc/agent_create_draft",
+      ].includes(url.pathname);
+    if (!users.has(token) && !anonymousAgent) return send(401, { error: "invalid fixture token" });
     let body = "";
     for await (const chunk of request) body += chunk;
     try {
@@ -147,7 +155,7 @@ createServer(async (request, response) => {
         {
           method: request.method,
           headers: {
-            Authorization: request.headers.authorization,
+            ...(token ? { Authorization: request.headers.authorization } : {}),
             "Content-Type": "application/json",
           },
           body: request.method === "GET" ? undefined : body,

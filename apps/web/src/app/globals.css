@@ -728,3 +728,5 @@ body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 .map-share-input { display: flex; align-items: end; gap: 12px; min-width: 0; }
 .map-share-input > .auth-field { flex: 1; min-width: 0; margin: 0; }
 .map-share-input input { width: 100%; min-width: 0; }
+
+.agent-endpoint { display: block; overflow-wrap: anywhere; }

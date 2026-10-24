@@ -4,7 +4,7 @@ import { authCookieOptions, authFetch, getAuthConfig } from "@/lib/auth/config";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const settings = getAuthConfig();
+  const settings = request.nextUrl.pathname.startsWith("/api/agent/v1/") ? null : getAuthConfig();
   if (settings) {
     const client = createServerClient(settings.url, settings.key, {
       global: { fetch: authFetch },
@@ -34,7 +34,7 @@ export const config = {
   matcher: [
     "/",
     "/login",
-    "/settings",
+    "/settings/:path*",
     "/together",
     "/account/:path*",
     "/auth/:path*",

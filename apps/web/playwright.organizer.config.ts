@@ -3,6 +3,7 @@ import journey from "./playwright.journey.config";
 export default defineConfig({
   ...journey,
   testMatch: [
+    "agent-gateway.spec.ts",
     "route-playback.spec.ts",
     "character-themes.spec.ts",
     "favorite-places.spec.ts",
