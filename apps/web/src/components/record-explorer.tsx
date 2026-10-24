@@ -1,20 +1,25 @@
 "use client";
 import { useState } from "react";
+import { DayCourseHistory } from "@/components/day-course-history";
 import { MonthlyMemories } from "@/components/monthly-memories";
 import { PhotoSearch } from "@/components/photo-search";
 import { RecordSearch } from "@/components/record-search";
 
-const kinds = { photos: "사진", records: "기록", monthly: "월간 추억" } as const;
+const kinds = { photos: "사진", records: "기록", routes: "동선", monthly: "월간 추억" } as const;
 type Kind = keyof typeof kinds;
 export function RecordExplorer({
   today,
   initialType,
   initialMonth,
+  initialDate,
+  site,
   names,
 }: {
   today: string;
   initialType: Kind;
   initialMonth: string;
+  initialDate: string;
+  site: string;
   names: { mine: string; partner: string };
 }) {
   const [kind, setKind] = useState(initialType);
@@ -51,6 +56,8 @@ export function RecordExplorer({
             <PhotoSearch start={`${today.slice(0, 8)}01`} end={today} names={names} />
           ) : type === "records" ? (
             <RecordSearch today={today} />
+          ) : type === "routes" ? (
+            <DayCourseHistory initialDate={initialDate} site={site} />
           ) : (
             <MonthlyMemories initialMonth={initialMonth} />
           )}

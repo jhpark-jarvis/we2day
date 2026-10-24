@@ -712,3 +712,10 @@ body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 .map-share-input input { width: 100%; min-width: 0; }
 
 .agent-endpoint { display: block; overflow-wrap: anywhere; }
+
+.day-course-results { min-height: 200px; }
+.day-course-stops { list-style: none; padding: 0; margin: 0; }
+.day-course-stops li { min-width: 0; padding-block: 16px; overflow-wrap: anywhere; }
+.day-course-stops li + li { border-top: 1px solid var(--line); }
+.day-course-stops time { margin-left: 12px; color: var(--muted); }
+.day-course-stops p { margin-block: 8px; }

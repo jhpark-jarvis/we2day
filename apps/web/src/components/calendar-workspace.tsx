@@ -559,6 +559,17 @@ export function CalendarWorkspace({
                 )}
               </>
             )}
+            {!preview && status === "ready" && (
+              <section className="memory-section" aria-label="하루 동선">
+                <h2>하루 동선</h2>
+                <Link
+                  className="text-button"
+                  href={`/memories/search?type=routes&date=${selected}`}
+                >
+                  동선 보기
+                </Link>
+              </section>
+            )}
             {preview ? (
               <section className="memory-section" aria-label="지난 기록">
                 <h2>지난 기록</h2>

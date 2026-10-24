@@ -2,14 +2,15 @@ import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RecordExplorer } from "@/components/record-explorer";
 import { callApi } from "@/lib/api";
-import { seoulToday } from "@/lib/calendar";
+import { getAuthConfig } from "@/lib/auth/config";
+import { isSupportedDate, seoulToday } from "@/lib/calendar";
 import type { ProfileView } from "@/lib/profiles";
 import type { Couple } from "@/lib/shared-calendar";
 
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; month?: string }>;
+  searchParams: Promise<{ type?: string; month?: string; date?: string }>;
 }) {
   const [query, couple, profiles] = await Promise.all([
     searchParams,
@@ -17,7 +18,10 @@ export default async function SearchPage({
     callApi<ProfileView>("/profiles"),
   ]);
   const today = seoulToday();
-  const type = query.type === "records" || query.type === "monthly" ? query.type : "photos";
+  const type =
+    query.type === "records" || query.type === "routes" || query.type === "monthly"
+      ? query.type
+      : "photos";
   const month =
     typeof query.month === "string" && /^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(query.month)
       ? query.month
@@ -34,6 +38,8 @@ export default async function SearchPage({
           today={today}
           initialType={type}
           initialMonth={month}
+          initialDate={query.date && isSupportedDate(query.date) ? query.date : today}
+          site={getAuthConfig()?.site || ""}
           names={{
             mine: profiles.data?.mine?.display_name || "",
             partner: profiles.data?.partner?.display_name || "",

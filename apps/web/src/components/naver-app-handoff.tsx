@@ -29,7 +29,7 @@ export function NaverAppHandoff({
   const search = naverAppLinks(site, place);
   const route = naverAppLinks(site, place, { lat, lng, mode });
   if (compact)
-    return search ? (
+    return shared || search ? (
       <a
         className="text-button"
         href={shared || search?.[platform]}

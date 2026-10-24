@@ -239,6 +239,8 @@ function PlanEditor({
   const activityKeys = useRef(
     (plan?.content.activities || seed?.activities || []).map(() => crypto.randomUUID()),
   );
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [preparation, setPreparation] = useState(
     (plan?.content.preparation || seed?.preparation || []).join("\n"),
   );
@@ -374,7 +376,7 @@ function PlanEditor({
             mutate("save");
           }}
         >
-          <fieldset className="meeting-fields" disabled={pending || conflict}>
+          <fieldset className="meeting-fields" disabled={!ready || pending || conflict}>
             <div className="auth-field">
               <label htmlFor="plan-title">플랜 이름</label>
               <input
