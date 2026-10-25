@@ -32,12 +32,21 @@ def clock_functions(database_url):
           language sql stable set search_path='' as $$
             select value from we2day_reminders.test_clock;
           $$; revoke all on function we2day_reminders.test_now() from public;""")
+        # Queue defaults must use the same frozen clock as claim/authorization.
+        # Otherwise tests stop claiming jobs once the real date passes the fixture date.
+        c.execute(
+            "alter table we2day_reminders.deliveries alter column not_before "
+            "set default we2day_reminders.test_now()"
+        )
         for sql in originals:
             c.execute(sql.replace("now()", "we2day_reminders.test_now()"))
     yield
     with psycopg.connect(database_url) as c:
         for sql in originals:
             c.execute(sql)
+        c.execute(
+            "alter table we2day_reminders.deliveries alter column not_before set default now()"
+        )
         c.execute("drop function we2day_reminders.test_now()")
         c.execute("drop table we2day_reminders.test_clock")
 

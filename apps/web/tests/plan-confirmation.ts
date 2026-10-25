@@ -18,6 +18,7 @@ export async function confirmPlanAndReopen(page: Page) {
   await expect(page.getByRole("region", { name: "선택한 날짜의 약속", exact: true })).toContainText(
     title,
   );
+  await page.waitForLoadState("networkidle");
   await page.goto(`/plans?item=${matching[0].id}`);
   await expect(page.getByLabel("플랜 이름", { exact: true })).toHaveValue(title);
 }
