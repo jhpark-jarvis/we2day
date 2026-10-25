@@ -10,7 +10,8 @@ from we2day_api.backup_collect import configuration, connection_options
 
 QUERY = """
 with p as (
-  select *, couple_id::text || '/' || id::text || '.webp' as object_name
+  select *, couple_id::text || '/' || id::text || '.webp' as object_name,
+    couple_id::text || '/' || id::text || '.preview.webp' as preview_name
   from public.photos
 ), o as (
   select name, created_at, metadata from storage.objects where bucket_id='we2day-photos'
@@ -23,7 +24,8 @@ select
   (select count(*) from p where uploaded_at is not null
     and not exists(select 1 from o where o.name=p.object_name)) as missing_objects,
   (select count(*) from o where created_at < now()-interval '24 hours'
-    and not exists(select 1 from p where p.object_name=o.name)) as unreferenced_objects,
+    and not exists(select 1 from p where o.name in (p.object_name,p.preview_name)))
+    as unreferenced_objects,
   (select count(*) from p where purging_at < now()-interval '24 hours') as stalled_purges,
   (select count(*) from p where purge_after < now() and purging_at is null) as expired_trash,
   (select pg_database_size(current_database())) as database_bytes,

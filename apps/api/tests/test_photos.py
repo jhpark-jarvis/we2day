@@ -67,6 +67,11 @@ def upstream(monkeypatch):
             "created_by": USER,
             "uploaded_at": None,
             "sha256": state.get("sha256"),
+            **{
+                k: state[k]
+                for k in ["preview_sha256", "preview_bytes", "preview_width", "preview_height"]
+                if k in state
+            },
         }
         if state["stage"] == "ready":
             row["uploaded_at"] = "2026-10-19T01:00:00Z"
@@ -75,18 +80,39 @@ def upstream(monkeypatch):
 
             state["sha256"] = json.loads(request.content)["p_sha256"]
             return httpx.Response(200, json=[row])
+        if "complete_photo_preview" in request.url.path:
+            import json
+
+            fields = json.loads(request.content)
+            state.update(
+                {key.removeprefix("p_"): value for key, value in fields.items() if key != "p_id"}
+            )
+            # Keep canonical original hash separate from the derived hash.
+            state["preview_sha256"] = state.pop("sha256")
+            state["sha256"] = hashlib.sha256(state["content"]).hexdigest()
+            state["preview_bytes"] = fields["p_bytes"]
+            state["preview_width"] = fields["p_width"]
+            state["preview_height"] = fields["p_height"]
+            return httpx.Response(200, json={"id": photo_id})
         if "complete_photo" in request.url.path:
             state["stage"] = "ready"
             return httpx.Response(200, json=[{**row, "uploaded_at": "2026-10-19T01:00:00Z"}])
         if request.url.path == "/rest/v1/photos":
             return httpx.Response(200, json=[] if state["deny"] else [row])
+        if request.url.path.endswith(".preview.webp") and state.get("preview_failed"):
+            return httpx.Response(503, json={"error": "synthetic preview unavailable"})
         if request.method == "POST":
-            if state["duplicate"]:
+            if state["duplicate"] and not request.url.path.endswith(".preview.webp"):
                 return httpx.Response(409, json={"error": "Duplicate"})
             assert request.headers["x-upsert"] == "false"
-            state["content"] = request.content
+            state["preview" if request.url.path.endswith(".preview.webp") else "content"] = (
+                request.content
+            )
             return httpx.Response(200, json={"Key": "unused"})
-        return httpx.Response(200, content=state["content"])
+        return httpx.Response(
+            200,
+            content=state["preview" if request.url.path.endswith(".preview.webp") else "content"],
+        )
 
     monkeypatch.setattr(
         auth.httpx,
@@ -279,7 +305,15 @@ def test_thumbnail_keeps_full_download_integrity_and_permissions(upstream):
     assert len(thumbnail.content) < len(full.content)
     assert state["content"] == stored
     assert "no-store" in thumbnail.headers["cache-control"]
+    # An immutable valid preview no longer downloads the original or reencodes it.
+    before = len(calls)
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 200
+    assert [c.url.path.rsplit("/", 1)[-1] for c in calls[before:]] == [
+        "photos",
+        f"{photo_id}.preview.webp",
+    ]
     state["content"] = b"corrupted"
+    state["preview"] = b"corrupted"
     assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 409
     state["deny"] = True
     before = len(calls)
@@ -297,3 +331,27 @@ def test_thumbnail_strips_metadata_and_keeps_decode_limits():
     for invalid in (b"bad", b"x" * 1_048_577, image_bytes((1601, 1))):
         with pytest.raises(HTTPException):
             normalized_image(invalid, thumbnail=True)
+
+
+def test_preview_failure_keeps_saved_original_and_lazy_read_recovers(upstream):
+    client, _, state, body, photo_id = upstream
+    state["preview_failed"] = True
+    assert client.post("/photos", json=body).status_code == 201
+    assert "preview_sha256" not in state
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 200
+    state["preview_failed"] = False
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 200
+    assert "preview_sha256" in state
+
+
+def test_valid_preview_skips_full_image_normalization(upstream, monkeypatch):
+    from we2day_api import photos
+
+    client, _, _, body, photo_id = upstream
+    assert client.post("/photos", json=body).status_code == 201
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Cached thumbnail must not normalize the original")
+
+    monkeypatch.setattr(photos, "normalized_image", forbidden)
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 200

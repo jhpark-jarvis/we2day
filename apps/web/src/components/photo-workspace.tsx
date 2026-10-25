@@ -10,6 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   Children,
   type KeyboardEvent,
@@ -22,11 +23,22 @@ import {
 } from "react";
 import { LoadingRegion } from "@/components/loading-region";
 import { PhotoCard } from "@/components/photo-card";
-import { PhotoPreparation } from "@/components/photo-preparation";
+
 import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import { calendarDate, daysInMonth, isSupportedDate, parseDate } from "@/lib/calendar";
 import type { PhotoPage, SharedPhoto } from "@/lib/photos";
+
+const PhotoPreparation = dynamic(
+  () => import("@/components/photo-preparation").then((m) => m.PhotoPreparation),
+  {
+    loading: () => (
+      <div className="empty-state" role="status">
+        사진 업로드 준비 중…
+      </div>
+    ),
+  },
+);
 
 export function PhotoWorkspace({
   today,
@@ -516,6 +528,7 @@ function PhotoUploadDialog({
   canSave: boolean;
   onSaved: (date: string) => void;
 }) {
+  const [opened, setOpened] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -527,7 +540,10 @@ function PhotoUploadDialog({
         aria-label="사진 업로드"
         title="사진 업로드"
         aria-haspopup="dialog"
-        onClick={() => dialog.current?.showModal()}
+        onClick={() => {
+          setOpened(true);
+          dialog.current?.showModal();
+        }}
       >
         <ImageUp size={21} aria-hidden="true" />
       </button>
@@ -549,7 +565,7 @@ function PhotoUploadDialog({
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        <PhotoPreparation today={today} canSave={canSave} onSaved={onSaved} />
+        {opened && <PhotoPreparation today={today} canSave={canSave} onSaved={onSaved} />}
       </dialog>
     </>
   );

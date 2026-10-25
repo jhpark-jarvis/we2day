@@ -151,7 +151,7 @@ def normalized_image(
 ) -> tuple[bytes, int, int]:
     # Decoding multiple 1600px photos can exceed a small server's memory limit.
     # Reuse one worker so per-thread pixel allocators cannot accumulate either.
-    # Upload, display and export share this process-owned worker; no file cache.
+    # Upload, display and export share this process-owned worker; no local file cache.
     return _image_processing.submit(
         _normalized_image, content, allow_jpeg=allow_jpeg, thumbnail=thumbnail
     ).result()
@@ -190,6 +190,79 @@ def _normalized_image(
     if len(result) > MAX_BYTES:
         raise HTTPException(422, "invalid_photo")
     return result, width, height
+
+
+def _checked_preview(content: bytes) -> tuple[int, int]:
+    # Only canonical single-image WebP chunks; no EXIF/XMP/ICC, trailing bytes or animation.
+    if (
+        len(content) < 20
+        or len(content) > MAX_BYTES
+        or content[:4] != b"RIFF"
+        or content[8:12] != b"WEBP"
+    ):
+        raise HTTPException(422, "invalid_photo")
+    if int.from_bytes(content[4:8], "little") + 8 != len(content):
+        raise HTTPException(422, "invalid_photo")
+    offset = 12
+    while offset < len(content):
+        if offset + 8 > len(content) or content[offset : offset + 4] not in {
+            b"VP8 ",
+            b"VP8L",
+            b"VP8X",
+            b"ALPH",
+        }:
+            raise HTTPException(422, "invalid_photo")
+        length = int.from_bytes(content[offset + 4 : offset + 8], "little")
+        offset += 8 + length + (length % 2)
+    if offset != len(content):
+        raise HTTPException(422, "invalid_photo")
+    try:
+        with Image.open(io.BytesIO(content), formats=["WEBP"]) as image:
+            if (
+                not (1 <= image.width <= 640 and 1 <= image.height <= 640)
+                or image.n_frames != 1
+                or any(k in image.info for k in ["exif", "xmp", "icc_profile"])
+            ):
+                raise HTTPException(422, "invalid_photo")
+            image.load()
+            return image.size
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as error:
+        raise HTTPException(422, "invalid_photo") from error
+
+
+@timed("image")
+def checked_preview(content: bytes) -> tuple[int, int]:
+    return _image_processing.submit(_checked_preview, content).result()
+
+
+def remember_preview(
+    row: dict, content: bytes, width: int, height: int, store: DataAPI, files: "PhotoStorage"
+) -> None:
+    path = f"{UUID(row['couple_id'])}/{UUID(row['id'])}.preview.webp"
+    if not files.upload(path, content):
+        # Validate the actual immutable object after a concurrent or direct upload.
+        content = files.download(path)
+        width, height = checked_preview(content)
+    store.rpc(
+        "complete_photo_preview",
+        {
+            "p_id": str(row["id"]),
+            "p_sha256": hashlib.sha256(content).hexdigest(),
+            "p_bytes": len(content),
+            "p_width": width,
+            "p_height": height,
+        },
+    )
+
+
+def optional_preview(row: dict, content: bytes, store: DataAPI, files: "PhotoStorage") -> None:
+    try:
+        preview, width, height = normalized_image(content, thumbnail=True)
+        remember_preview(row, preview, width, height, store, files)
+    except HTTPException as error:
+        if error.status_code == 401:
+            raise
+        # The durable original remains saved even if optional preview creation fails.
 
 
 class PhotoStorage:
@@ -304,7 +377,9 @@ def save_photo(body: PhotoInput, store: DataAPI, files: PhotoStorage) -> dict:
         existing = files.download(path)
         if hashlib.sha256(existing).hexdigest() != digest:
             raise HTTPException(409, "request_conflict")
-    return store.rpc("complete_photo", {"p_id": row["id"]})[0]
+    completed = store.rpc("complete_photo", {"p_id": row["id"]})[0]
+    optional_preview(row, content, store, files)
+    return completed
 
 
 @router.post("/photos", response_model=Photo, status_code=201)
@@ -355,7 +430,9 @@ def photo_image(
         "GET",
         "photos",
         params={
-            "select": "id,couple_id,sha256",
+            "select": (
+                "id,couple_id,sha256,preview_sha256,preview_bytes,preview_width,preview_height"
+            ),
             "id": f"eq.{photo_id}",
             "uploaded_at": "not.is.null",
             "trashed_at": "not.is.null" if trash else "is.null",
@@ -366,10 +443,31 @@ def photo_image(
     if not rows:
         raise HTTPException(404, "photo_not_found")
     row = rows[0]
-    content = files.download(f"{UUID(row['couple_id'])}/{photo_id}.webp")
-    if hashlib.sha256(content).hexdigest() != row["sha256"]:
-        raise HTTPException(409, "photo_upload_incomplete")
-    clean, _, _ = normalized_image(content, thumbnail=thumbnail)
+    clean = None
+    if thumbnail and row.get("preview_sha256"):
+        try:
+            preview = files.download(f"{UUID(row['couple_id'])}/{photo_id}.preview.webp")
+            if hashlib.sha256(preview).hexdigest() == row["preview_sha256"]:
+                dimensions = checked_preview(preview)
+                if (
+                    dimensions == (row["preview_width"], row["preview_height"])
+                    and len(preview) == row["preview_bytes"]
+                ):
+                    clean = preview
+        except HTTPException as error:
+            if error.status_code == 401:
+                raise
+    if clean is None:
+        content = files.download(f"{UUID(row['couple_id'])}/{photo_id}.webp")
+        if hashlib.sha256(content).hexdigest() != row["sha256"]:
+            raise HTTPException(409, "photo_upload_incomplete")
+        clean, width, height = normalized_image(content, thumbnail=thumbnail)
+        if thumbnail and not trash:
+            try:
+                remember_preview(row, clean, width, height, store, files)
+            except HTTPException as error:
+                if error.status_code == 401:
+                    raise
     return Response(
         clean,
         media_type="image/webp",
@@ -415,6 +513,7 @@ def purge_photo(photo_id: UUID, body: PhotoAction, store: Store, files: Files):
             return Response(status_code=204)
         raise
     files.remove(f"{UUID(row['couple_id'])}/{UUID(row['id'])}.webp")
+    files.remove(f"{UUID(row['couple_id'])}/{UUID(row['id'])}.preview.webp")
     try:
         store.rpc("finish_photo_purge", {"p_id": str(photo_id)})
     except HTTPException as error:

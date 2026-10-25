@@ -269,3 +269,24 @@ def test_cli_errors_do_not_disclose_paths_or_object_names(tmp_path):
     assert result.returncode == 1
     assert "private-user" not in result.stdout + result.stderr
     assert "Traceback" not in result.stderr
+
+
+def test_original_and_preview_share_inventory_and_restore(export, tmp_path):
+    preview = export / "storage/couple/photo.preview.webp"
+    preview.write_bytes(b"synthetic-private-preview")
+    inventory = json.loads((export / backup.INVENTORY).read_text())
+    inventory["objects"].append(
+        {"name": "couple/photo.preview.webp", "size": preview.stat().st_size}
+    )
+    (export / backup.INVENTORY).write_text(json.dumps(inventory))
+    (tmp_path / "keys").mkdir()
+    key = tmp_path / "keys/key.bin"
+    create_key(key)
+    archive = tmp_path / "both.enc"
+    expected = files(export)
+    result = backup.encrypted("snapshot", export, key, archive)
+    assert result["photos"] == 2
+    assert backup.encrypted("verify-encrypted", archive, key, None) == result
+    recovered = tmp_path / "recovered"
+    backup.encrypted("restore", archive, key, recovered)
+    assert files(recovered) == expected
