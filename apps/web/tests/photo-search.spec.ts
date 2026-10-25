@@ -39,26 +39,31 @@ test("photo reference search shares active photos and preserves conditions after
     await page.getByRole("button", { name: "사진 업로드", exact: true }).click();
     const image = await page.evaluate(() => {
       const canvas = document.createElement("canvas");
-      canvas.width = 320;
-      canvas.height = 240;
+      canvas.width = 1600;
+      canvas.height = 1600;
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Canvas unavailable");
       context.fillStyle = "#c9b095";
-      context.fillRect(0, 0, 320, 240);
+      context.fillRect(0, 0, 1600, 1600);
       context.fillStyle = "#a4553f";
       context.fillRect(80, 90, 160, 150);
       return canvas.toDataURL("image/jpeg").split(",")[1];
     });
     await page.getByLabel("만난 날짜").fill("2026-10-24");
-    await page.getByLabel("사진 선택").setInputFiles({
-      name: "synthetic-search.jpg",
-      mimeType: "image/jpeg",
-      buffer: Buffer.from(image, "base64"),
-    });
-    await page.getByLabel("이 사진의 한마디").fill("합성 산책 100%");
-    await page.getByRole("button", { name: "둘의 사진으로 저장", exact: true }).click();
+    await page.getByLabel("사진 선택").setInputFiles(
+      Array.from({ length: 6 }, (_, index) => ({
+        name: index === 0 ? "synthetic-search.jpg" : `synthetic-extra-${index}.jpg`,
+        mimeType: "image/jpeg",
+        buffer: Buffer.from(image, "base64"),
+      })),
+    );
+    for (let index = 1; index <= 6; index++)
+      await page
+        .getByLabel(`${index}번째 사진의 한마디`)
+        .fill(index === 1 ? "합성 산책 100%" : `추억 예시 ${index}`);
+    await page.getByRole("button", { name: "6장 함께 저장", exact: true }).click();
     await expect(
-      page.getByText("둘의 사진으로 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
+      page.getByText("6장을 저장했어요. 창을 닫으면 앨범에서 확인할 수 있어요."),
     ).toBeVisible({ timeout: 30_000 });
     for (const view of [page, partner]) {
       await open(view, "/memories/search");
@@ -129,9 +134,51 @@ test("photo reference search shares active photos and preserves conditions after
       fullPage: true,
       caret: "initial",
     });
-    await page.getByRole("link", { name: "2026-10-24 앨범 보기", exact: true }).click();
+    await page.getByLabel("사진 한마디 검색어 (선택)").fill("");
+    await page.getByRole("button", { name: "사진 검색", exact: true }).click();
+    await expect(page.locator(".photo-search-card img")).toHaveCount(6);
+    for (const image of await page.locator(".photo-search-card img").all())
+      await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        page
+          .locator(".photo-search-card img")
+          .evaluateAll((images: HTMLImageElement[]) =>
+            images.every((img) => img.complete && img.naturalWidth === 640),
+          ),
+      )
+      .toBe(true);
+    await page.getByLabel("검색 대상", { exact: true }).selectOption("monthly");
+    await expect(page.locator(".monthly-day-photos img")).toHaveCount(6);
+    for (const image of await page.locator(".monthly-day-photos img").all())
+      await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        page
+          .locator(".monthly-day-photos img")
+          .evaluateAll((images: HTMLImageElement[]) =>
+            images.every((img) => img.complete && img.naturalWidth === 640),
+          ),
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("monthly-thumbnails-mobile.png"),
+      fullPage: true,
+    });
+    await page.getByLabel("검색 대상", { exact: true }).selectOption("photos");
+    await page.getByRole("link", { name: "2026-10-24 앨범 보기", exact: true }).first().click();
     await expect(page).toHaveURL(/\/memories\?date=2026-10-24$/);
-    await expect(page.locator(".shared-photo-card")).toContainText("합성 산책 100%");
+    await expect(
+      page.getByRole("heading", { name: "2026년 10월 24일", exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page
+          .locator(".shared-photo-card .photo-image-frame img")
+          .first()
+          .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth === 640),
+      )
+      .toBe(true);
     expect(errors).toEqual([]);
   } finally {
     await page.context().setOffline(false);

@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date as Date
 from datetime import datetime
 from typing import Annotated
@@ -100,7 +101,23 @@ class PhotoPage(BaseModel):
     next_after: UUID | None
 
 
-def normalized_image(content: bytes, *, allow_jpeg: bool = False) -> tuple[bytes, int, int]:
+_image_processing = ThreadPoolExecutor(max_workers=1, thread_name_prefix="photo-processing")
+
+
+def normalized_image(
+    content: bytes, *, allow_jpeg: bool = False, thumbnail: bool = False
+) -> tuple[bytes, int, int]:
+    # Decoding multiple 1600px photos can exceed a small server's memory limit.
+    # Reuse one worker so per-thread pixel allocators cannot accumulate either.
+    # Upload, display and export share this process-owned worker; no file cache.
+    return _image_processing.submit(
+        _normalized_image, content, allow_jpeg=allow_jpeg, thumbnail=thumbnail
+    ).result()
+
+
+def _normalized_image(
+    content: bytes, *, allow_jpeg: bool, thumbnail: bool
+) -> tuple[bytes, int, int]:
     """Bound decoding before loading pixels; never retain uploaded EXIF/ICC/XMP."""
     if not content or len(content) > MAX_BYTES:
         raise HTTPException(422, "invalid_photo")
@@ -118,8 +135,11 @@ def normalized_image(content: bytes, *, allow_jpeg: bool = False) -> tuple[bytes
             image.load()
             # A fresh image strips metadata, including decoded image.info inherited by convert().
             mode = "RGBA" if "A" in image.getbands() else "RGB"
-            with image.convert(mode) as converted, Image.new(mode, image.size) as clean:
-                clean.paste(converted)
+            if thumbnail:
+                image.thumbnail((640, 640), Image.Resampling.LANCZOS)
+            width, height = image.size
+            with Image.new(mode, image.size) as clean:
+                clean.paste(image)
                 output = io.BytesIO()
                 clean.save(output, format="WEBP", quality=82, method=4)
                 result = output.getvalue()
@@ -283,7 +303,9 @@ def list_photos(
 
 
 @router.get("/photos/{photo_id}/image")
-def photo_image(photo_id: UUID, store: Store, files: Files, trash: bool = False):
+def photo_image(
+    photo_id: UUID, store: Store, files: Files, trash: bool = False, thumbnail: bool = False
+):
     rows = store.call(
         "GET",
         "photos",
@@ -302,7 +324,7 @@ def photo_image(photo_id: UUID, store: Store, files: Files, trash: bool = False)
     content = files.download(f"{UUID(row['couple_id'])}/{photo_id}.webp")
     if hashlib.sha256(content).hexdigest() != row["sha256"]:
         raise HTTPException(409, "photo_upload_incomplete")
-    clean, _, _ = normalized_image(content)
+    clean, _, _ = normalized_image(content, thumbnail=thumbnail)
     return Response(
         clean,
         media_type="image/webp",

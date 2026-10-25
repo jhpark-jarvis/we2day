@@ -189,7 +189,7 @@ export function PhotoCard({
             </fieldset>
             {/* biome-ignore lint/performance/noImgElement: private authenticated image, no public proxy */}
             <img
-              src={imagePath}
+              src={`${imagePath}${trash ? "&" : "?"}thumbnail=true`}
               alt={photo.caption || `${photo.date} 함께한 날의 사진`}
               width={photo.width}
               height={photo.height}

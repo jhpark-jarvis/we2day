@@ -125,7 +125,7 @@ export function MonthlyMemories({ initialMonth }: { initialMonth: string }) {
                             href={`/memories?date=${day.date}`}
                           >
                             <Image
-                              src={`/api/photos/${photo.id}/image`}
+                              src={`/api/photos/${photo.id}/image?thumbnail=true`}
                               alt={photo.caption || `${photo.date}에 남긴 사진`}
                               width={600}
                               height={450}

@@ -178,7 +178,7 @@ export function PhotoSearch({
             {result.items.map((photo) => (
               <article className="photo-search-card" key={photo.id}>
                 <Image
-                  src={`/api/photos/${photo.id}/image`}
+                  src={`/api/photos/${photo.id}/image?thumbnail=true`}
                   alt={photo.caption || "함께한 날의 사진"}
                   width={400}
                   height={300}

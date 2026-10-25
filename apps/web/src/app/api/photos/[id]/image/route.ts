@@ -9,8 +9,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   };
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
     return new Response(null, { status: 404, headers });
-  const trash = new URL(request.url).searchParams.get("trash") === "true";
-  const result = await callImageApi(`/photos/${id}/image${trash ? "?trash=true" : ""}`);
+  const query = new URL(request.url).searchParams;
+  const trash = query.get("trash") === "true";
+  const thumbnail = query.get("thumbnail") === "true";
+  const conditions = new URLSearchParams();
+  if (trash) conditions.set("trash", "true");
+  if (thumbnail) conditions.set("thumbnail", "true");
+  const result = await callImageApi(
+    `/photos/${id}/image${conditions.size ? `?${conditions}` : ""}`,
+  );
   return new Response(result.body, {
     status: result.status,
     headers: { ...headers, ...(result.ok ? { "Content-Type": "image/webp" } : {}) },

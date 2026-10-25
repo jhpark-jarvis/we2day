@@ -264,3 +264,36 @@ def test_jpeg_upload_and_retry_keep_canonical_storage(upstream):
     assert client.post("/photos", json=body).status_code == 201
     assert len(calls) == count + 1
     assert client.get(f"/photos/{photo_id}/image").headers["content-type"] == "image/webp"
+
+
+def test_thumbnail_keeps_full_download_integrity_and_permissions(upstream):
+    client, calls, state, body, photo_id = upstream
+    body["image"] = base64.b64encode(image_bytes((1600, 1200))).decode()
+    assert client.post("/photos", json=body).status_code == 201
+    stored = state["content"]
+    thumbnail = client.get(f"/photos/{photo_id}/image?thumbnail=true")
+    full = client.get(f"/photos/{photo_id}/image")
+    assert thumbnail.status_code == full.status_code == 200
+    assert Image.open(io.BytesIO(thumbnail.content)).size == (640, 480)
+    assert Image.open(io.BytesIO(full.content)).size == (1600, 1200)
+    assert len(thumbnail.content) < len(full.content)
+    assert state["content"] == stored
+    assert "no-store" in thumbnail.headers["cache-control"]
+    state["content"] = b"corrupted"
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 409
+    state["deny"] = True
+    before = len(calls)
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 404
+    assert len(calls) == before + 1
+    client.headers.pop("Authorization")
+    assert client.get(f"/photos/{photo_id}/image?thumbnail=true").status_code == 401
+
+
+def test_thumbnail_strips_metadata_and_keeps_decode_limits():
+    source = image_bytes((1200, 1600), exif=b"Exif\x00\x00private-gps", xmp=b"private-note")
+    thumbnail, width, height = normalized_image(source, thumbnail=True)
+    assert (width, height) == (480, 640)
+    assert b"EXIF" not in thumbnail and b"XMP " not in thumbnail and b"private" not in thumbnail
+    for invalid in (b"bad", b"x" * 1_048_577, image_bytes((1601, 1))):
+        with pytest.raises(HTTPException):
+            normalized_image(invalid, thumbnail=True)
