@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
 from we2day_api.auth import CurrentUser, bearer, require_user, unauthenticated
+from we2day_api.timing import timed
 from we2day_api.upstream import upstream_transport
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ class DataAPI:
     def __init__(self, transport: httpx.Client):
         self.transport = transport
 
+    @timed("data")
     def call(self, method: str, path: str, **kwargs: Any) -> Any:
         try:
             response = self.transport.request(method, path, **kwargs)

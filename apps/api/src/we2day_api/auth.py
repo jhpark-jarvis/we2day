@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 from supabase import ClientOptions, create_client
 from supabase_auth.errors import AuthApiError, AuthRetryableError
 
+from we2day_api.timing import timed
 from we2day_api.upstream import upstream_transport
 
 bearer = HTTPBearer(auto_error=False)
@@ -18,6 +19,7 @@ class CurrentUser(BaseModel):
     email: str | None = None
 
 
+@timed("auth")
 def require_user(
     request: Request,
     response: Response,

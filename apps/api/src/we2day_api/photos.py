@@ -19,6 +19,7 @@ from starlette.concurrency import run_in_threadpool
 
 from we2day_api.auth import CurrentUser, bearer, require_user, unauthenticated
 from we2day_api.data import DataAPI, require_data
+from we2day_api.timing import timed
 from we2day_api.upstream import upstream_transport
 
 router = APIRouter(tags=["photos"])
@@ -104,6 +105,7 @@ class PhotoPage(BaseModel):
 _image_processing = ThreadPoolExecutor(max_workers=1, thread_name_prefix="photo-processing")
 
 
+@timed("image")
 def normalized_image(
     content: bytes, *, allow_jpeg: bool = False, thumbnail: bool = False
 ) -> tuple[bytes, int, int]:
@@ -154,6 +156,7 @@ class PhotoStorage:
     def __init__(self, transport: httpx.Client):
         self.transport = transport
 
+    @timed("storage")
     def upload(self, path: str, content: bytes) -> bool:
         try:
             response = self.transport.post(
@@ -180,6 +183,7 @@ class PhotoStorage:
             raise unauthenticated()
         raise HTTPException(503, "Photo service unavailable")
 
+    @timed("storage")
     def download(self, path: str) -> bytes:
         try:
             with self.transport.stream("GET", f"object/authenticated/{BUCKET}/{path}") as response:
@@ -196,6 +200,7 @@ class PhotoStorage:
         except httpx.HTTPError as error:
             raise HTTPException(503, "Photo service unavailable") from error
 
+    @timed("storage")
     def remove(self, path: str) -> None:
         try:
             response = self.transport.request(

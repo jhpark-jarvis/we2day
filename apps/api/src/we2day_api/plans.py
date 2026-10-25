@@ -81,6 +81,37 @@ SELECT = (
 )
 
 
+class PlanSummary(BaseModel):
+    id: UUID
+    title: str
+    date: str
+    transport: str
+    activity_count: int
+    status: Literal["draft", "confirmed", "changed", "archived"]
+    archived: bool
+
+
+def summarize(row: dict) -> dict:
+    content = row["content"]
+    return {
+        "id": row["id"],
+        "title": content["title"],
+        "date": content["date"],
+        "transport": content.get("transport", ""),
+        "activity_count": len(content.get("activities", [])),
+        "archived": row["archived"],
+        "status": (
+            "archived"
+            if row["archived"]
+            else "draft"
+            if row.get("published_content") is None
+            else "confirmed"
+            if content == row["published_content"]
+            else "changed"
+        ),
+    }
+
+
 @router.get("/timeline", response_model=list[Plan])
 def read_timeline(store: Store, date: Date, offset: int = Query(default=0, ge=0, le=100000)):
     if not 2000 <= date.year <= 2100:
@@ -99,21 +130,25 @@ def read_timeline(store: Store, date: Date, offset: int = Query(default=0, ge=0,
     )
 
 
-@router.get("/plans", response_model=list[Plan])
+@router.get("/plans", response_model=list[PlanSummary] | list[Plan])
 def list_plans(
-    store: Store, archived: bool = False, offset: int = Query(default=0, ge=0, le=100000)
+    store: Store,
+    archived: bool = False,
+    offset: int = Query(default=0, ge=0, le=100000),
+    summary: bool = False,
 ):
-    return store.call(
+    rows = store.call(
         "GET",
         "date_plans",
         params={
-            "select": SELECT,
+            "select": "id,content,published_content,archived" if summary else SELECT,
             "archived": f"eq.{str(archived).lower()}",
             "order": "updated_at.desc,id.asc",
             "limit": "50",
             "offset": str(offset),
         },
     )
+    return [summarize(row) for row in rows] if summary else rows
 
 
 @router.get("/plans/{id}", response_model=Plan)

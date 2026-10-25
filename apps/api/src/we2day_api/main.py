@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from time import perf_counter
 from typing import Annotated
 
 import httpx
@@ -36,6 +37,7 @@ from we2day_api.roulette import router as roulette_router
 from we2day_api.route_history import router as route_history_router
 from we2day_api.routes import router as routes_router
 from we2day_api.timezones import router as timezones_router
+from we2day_api.timing import Timings, current_timings
 from we2day_api.upcoming import router as upcoming_router
 from we2day_api.visits import router as visits_router
 from we2day_api.wishlist import router as wishlist_router
@@ -96,9 +98,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @application.middleware("http")
     async def private_responses(request, call_next):
-        response = await call_next(request)
-        response.headers["Cache-Control"] = "private, no-store"
-        return response
+        metrics = Timings()
+        token = current_timings.set(metrics)
+        start = perf_counter()
+        try:
+            response = await call_next(request)
+            metrics.add("total", perf_counter() - start)
+            response.headers["Server-Timing"] = metrics.header()
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
+        finally:
+            current_timings.reset(token)
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(request, error):

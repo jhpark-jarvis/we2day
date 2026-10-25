@@ -81,3 +81,46 @@ def test_plan_api_save_read_and_contract(upstream):  # noqa: F811
         ).status_code
         == 422
     )
+
+
+def test_plan_summary_omits_activity_contents_and_preserves_status(upstream):  # noqa: F811
+    client, calls, replies = upstream
+    content = {
+        **CONTENT,
+        "preparation": ["private preparation"],
+        "activities": [{"title": "산책", "place": "private address", "note": "private note"}],
+    }
+    rows = [
+        {
+            "id": str(uuid4()),
+            "content": content,
+            "published_content": published,
+            "archived": archived,
+        }
+        for published, archived in [
+            (None, False),
+            (content, False),
+            (CONTENT, False),
+            (content, True),
+        ]
+    ]
+    replies.append((200, rows))
+    response = client.get("/plans?summary=true&offset=50")
+    assert response.status_code == 200
+    assert [item["status"] for item in response.json()] == [
+        "draft",
+        "confirmed",
+        "changed",
+        "archived",
+    ]
+    assert all(item["activity_count"] == 1 for item in response.json())
+    assert "private" not in response.text
+    assert "appointment" not in calls[-1].url.params["select"]
+    assert calls[-1].url.params["offset"] == "50"
+    assert "no-store" in response.headers["cache-control"]
+    assert "auth;dur=" in response.headers["server-timing"]
+    assert "data;dur=" in response.headers["server-timing"]
+    # Request-local categories must not persist into a later unrelated request.
+    health = client.get("/health/live")
+    assert "auth;" not in health.headers["server-timing"]
+    assert "data;" not in health.headers["server-timing"]
