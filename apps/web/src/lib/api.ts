@@ -74,7 +74,12 @@ const errors: Record<string, string> = {
 };
 
 export async function callApi<T>(path: string, init: RequestInit = {}) {
-  const failure = (status: number, error: string) => ({ data: null as T | null, status, error });
+  const failure = (status: number, error: string) => ({
+    data: null as T | null,
+    status,
+    error,
+    serverTiming: "",
+  });
   try {
     const client = await createAuthClient();
     if (!client) return failure(503, "지금은 공유 공간에 연결할 수 없어요.");
@@ -91,26 +96,45 @@ export async function callApi<T>(path: string, init: RequestInit = {}) {
           Authorization: `Bearer ${data.session.access_token}`,
         },
         cache: "no-store",
-        signal: AbortSignal.timeout(path === "/photos" && init.method === "POST" ? 30_000 : 8_000),
+        signal: requestSignal(
+          init.signal,
+          path === "/photos" && init.method === "POST" ? 30_000 : 8_000,
+        ),
       },
     );
     const body = response.status === 204 ? null : await response.json();
     if (!response.ok) {
-      const message = typeof body?.detail === "string" ? errors[body.detail] : undefined;
-      return failure(
-        response.status,
-        message ||
-          (response.status === 401
-            ? "로그인이 필요해요. 다시 로그인해 주세요."
-            : response.status === 422
-              ? "입력한 날짜·시간과 내용의 길이를 확인해 주세요."
-              : "연결하지 못했어요. 잠시 후 다시 시도해 주세요."),
-      );
+      return failure(response.status, apiError(response.status, body?.detail));
     }
-    return { data: body as T, status: response.status, error: "" };
+    return {
+      data: body as T,
+      status: response.status,
+      error: "",
+      serverTiming: response.headers.get("Server-Timing") || "",
+    };
   } catch {
     return failure(503, "연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
   }
+}
+
+function requestSignal(signal: AbortSignal | null | undefined, milliseconds: number) {
+  const timeout = AbortSignal.timeout(milliseconds);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+export function timingHeaders(result: { serverTiming: string }): Record<string, string> {
+  return result.serverTiming ? { "Server-Timing": result.serverTiming } : {};
+}
+
+export function apiError(status: number, detail?: string) {
+  return (
+    (detail && errors[detail]) ||
+    (status === 401
+      ? "로그인이 필요해요. 다시 로그인해 주세요."
+      : status === 422
+        ? "입력한 날짜·시간과 내용의 길이를 확인해 주세요."
+        : "연결하지 못했어요. 잠시 후 다시 시도해 주세요.")
+  );
 }
 
 export async function callBinaryApi(
@@ -132,12 +156,15 @@ export async function callBinaryApi(
           Authorization: `Bearer ${data.session.access_token}`,
         },
         cache: "no-store",
-        signal: AbortSignal.timeout(path === "/photos/export" ? 60_000 : 20_000),
+        signal: requestSignal(init.signal, path === "/photos/export" ? 60_000 : 20_000),
       },
     );
     if (!response.ok) return new Response(null, { status: response.status });
     return new Response(await response.arrayBuffer(), {
-      headers: { "Content-Type": contentType },
+      headers: {
+        "Content-Type": contentType,
+        ...timingHeaders({ serverTiming: response.headers.get("Server-Timing") || "" }),
+      },
     });
   } catch {
     return new Response(null, { status: 503 });

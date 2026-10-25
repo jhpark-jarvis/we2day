@@ -1,13 +1,11 @@
+import { Suspense } from "react";
 import { AnniversarySummary } from "@/components/anniversary-summary";
 import { CalendarWorkspace } from "@/components/calendar-workspace";
 import { NextAppointment } from "@/components/next-appointment";
 import type { AnniversaryList } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
-import type { ProfileView } from "@/lib/profiles";
-import type { Appointment, Couple } from "@/lib/shared-calendar";
-import type { TimezoneView } from "@/lib/timezones";
-import type { NextAppointment as NextData } from "@/lib/upcoming";
+import { type HomeRead, section } from "@/lib/page-reads";
 
 export default async function HomePage({
   searchParams,
@@ -17,7 +15,9 @@ export default async function HomePage({
   const today = seoulToday();
   const { date } = await searchParams;
   const selectedDate = typeof date === "string" && isSupportedDate(date) ? date : today;
-  const couple = await callApi<Couple | null>("/couple");
+  const anniversaryRead = callApi<AnniversaryList>("/anniversaries");
+  const core = await callApi<HomeRead>(`/bootstrap/home?month=${selectedDate.slice(0, 7)}`);
+  const couple = section(core.data?.couple, core.status);
   const status = couple.error
     ? couple.status === 401
       ? "guest"
@@ -25,20 +25,30 @@ export default async function HomePage({
     : couple.data
       ? "ready"
       : "unlinked";
-  const [appointments, next, zoneResult, anniversaries, profiles] =
-    status === "ready"
-      ? await Promise.all([
-          callApi<Appointment[]>(`/appointments?month=${selectedDate.slice(0, 7)}`),
-          callApi<NextData>("/appointments/next"),
-          callApi<TimezoneView>("/timezones"),
-          callApi<AnniversaryList>("/anniversaries"),
-          callApi<ProfileView>("/profiles"),
-        ])
-      : [null, null, null, null, null];
-  const zones = zoneResult?.data || null;
+  const appointments = section(core.data?.appointments, core.status);
+  const next = section(core.data?.next, core.status);
+  const profiles = core.data?.profiles.data;
+  const zones = core.data?.zones.data || null;
   return (
     <>
-      {status === "ready" && <AnniversarySummary data={anniversaries?.data || null} />}
+      {status === "ready" && (
+        <div className="home-anniversary-slot">
+          <Suspense
+            fallback={
+              <div
+                className="anniversary-summary"
+                role="status"
+                aria-busy="true"
+                aria-label="기념일 불러오는 중"
+              >
+                <span className="loading-spinner" aria-hidden="true" />
+              </div>
+            }
+          >
+            <AnniversaryRead result={anniversaryRead} />
+          </Suspense>
+        </div>
+      )}
       {status === "ready" && (
         <NextAppointment
           data={next?.data || null}
@@ -55,11 +65,11 @@ export default async function HomePage({
         status={status}
         memberCount={couple.data?.member_count}
         participantNames={
-          profiles?.data
+          profiles
             ? [
-                profiles.data.mine?.display_name || "이름 미설정",
+                profiles.mine?.display_name || "이름 미설정",
                 ...(couple.data?.member_count === 2
-                  ? [profiles.data.partner?.display_name || "이름 미설정"]
+                  ? [profiles.partner?.display_name || "이름 미설정"]
                   : []),
               ]
             : []
@@ -69,4 +79,13 @@ export default async function HomePage({
       />
     </>
   );
+}
+
+async function AnniversaryRead({
+  result,
+}: {
+  result: ReturnType<typeof callApi<AnniversaryList>>;
+}) {
+  const value = await result;
+  return <AnniversarySummary data={value.data} />;
 }

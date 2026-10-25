@@ -10,6 +10,8 @@ let pkceExchanges = 0;
 let loseNextWriteResponse = false;
 let loseNextPhotoResponse = false;
 let loseNextPhotoDeleteResponse = false;
+let anniversaryReadDelay = 0;
+const planReads = { list: 0, detail: 0 };
 const photoObjects = new Map();
 
 function issue(user, previous) {
@@ -42,6 +44,11 @@ createServer(async (request, response) => {
   };
   if (url.pathname === "/health") return send(200, { status: "fixture" });
   if (url.pathname === "/__auth-events") return send(200, { pkceExchanges });
+  if (url.pathname === "/__plan-reads") return send(200, planReads);
+  if (url.pathname === "/__anniversary-read-delay" && process.env.WE2DAY_TEST_REST_URL) {
+    anniversaryReadDelay = url.searchParams.get("enabled") === "true" ? 2500 : 0;
+    return send(200, { status: "configured" });
+  }
   if (process.env.WE2DAY_TEST_PHOTO_STORAGE === "1" && process.env.WE2DAY_TEST_REST_URL) {
     if (url.pathname === "/__age-photo-trash") {
       // Disposable test database only. This helper never exists in product migrations.
@@ -147,6 +154,10 @@ createServer(async (request, response) => {
         "/rest/v1/rpc/agent_create_draft",
       ].includes(url.pathname);
     if (!users.has(token) && !anonymousAgent) return send(401, { error: "invalid fixture token" });
+    if (request.method === "GET" && url.pathname === "/rest/v1/date_plans")
+      planReads[url.searchParams.has("id") ? "detail" : "list"]++;
+    if (url.pathname === "/rest/v1/anniversaries" && anniversaryReadDelay)
+      await new Promise((resolve) => setTimeout(resolve, anniversaryReadDelay));
     let body = "";
     for await (const chunk of request) body += chunk;
     try {

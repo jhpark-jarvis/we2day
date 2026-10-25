@@ -14,18 +14,23 @@ import {
   type DatePlan,
   type PlanAction,
   type PlanContent,
+  type PlanSummary,
   planStatus,
+  summarizePlan,
+  summaryLabels,
 } from "@/lib/plans";
 
 export function PlanWorkspace({
   initialPlans,
   initialError,
+  initialListLoaded = true,
   today,
   initialContent = null,
   initialSelected = null,
   site = "",
 }: {
-  initialPlans: DatePlan[];
+  initialPlans: PlanSummary[];
+  initialListLoaded?: boolean;
   initialError: string;
   today: string;
   initialContent?: PlanContent | null;
@@ -33,6 +38,7 @@ export function PlanWorkspace({
   site?: string;
 }) {
   const [items, setItems] = useState(initialPlans);
+  const [listLoaded, setListLoaded] = useState(initialListLoaded);
   const [error, setError] = useState(initialError);
   const [archived, setArchived] = useState(false);
   const [more, setMore] = useState(initialPlans.length === 50);
@@ -46,9 +52,12 @@ export function PlanWorkspace({
   function load(includeArchived: boolean, offset = 0) {
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/plans?archived=${includeArchived}&offset=${offset}`, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/plans?archived=${includeArchived}&offset=${offset}&summary=true`,
+          {
+            cache: "no-store",
+          },
+        );
         const data = await response.json();
         if (!response.ok) throw new Error(data.error);
         setItems((current) =>
@@ -59,10 +68,24 @@ export function PlanWorkspace({
             : data,
         );
         setArchived(includeArchived);
+        setListLoaded(true);
         setMore(data.length === 50);
         setError("");
       } catch {
         setError("플랜을 불러오지 못했어요. 다시 시도해 주세요.");
+      }
+    });
+  }
+  function openPlan(id: string) {
+    startTransition(async () => {
+      try {
+        const response = await fetch(`/api/plans?id=${id}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        setSelected(data);
+        setError("");
+      } catch {
+        setError("플랜을 불러오지 못했어요. 다시 선택해 주세요.");
       }
     });
   }
@@ -85,12 +108,14 @@ export function PlanWorkspace({
           setSavedReview(action === "save" ? `${plan.id}:${plan.version}` : "");
           setNewId("");
           setItems((current) =>
-            [plan, ...current.filter((item) => item.id !== plan.id)].filter(
+            [summarizePlan(plan), ...current.filter((item) => item.id !== plan.id)].filter(
               (item) => item.archived === archived,
             ),
           );
           if (action === "archive" || action === "restore") {
             setSelected(null);
+            // Direct editor entry intentionally skipped the list; load it on return.
+            if (!listLoaded) load(archived);
             setNotice(
               action === "archive"
                 ? "플랜을 보관했어요. 기존 달력 약속과 만남 기록은 남아 있어요."
@@ -126,6 +151,7 @@ export function PlanWorkspace({
         <button
           type="button"
           className="primary-button"
+          disabled={pending}
           onClick={() => {
             setSeed(null);
             setNewId(crypto.randomUUID());
@@ -170,14 +196,15 @@ export function PlanWorkspace({
             key={plan.id}
             type="button"
             className="plan-card"
-            onClick={() => setSelected(plan)}
+            disabled={pending}
+            onClick={() => openPlan(plan.id)}
           >
             <small>
-              {plan.content.date} · {planStatus(plan)}
+              {plan.date} · {summaryLabels[plan.status]}
             </small>
-            <strong>{plan.content.title}</strong>
+            <strong>{plan.title}</strong>
             <span>
-              {plan.content.activities.length}개 활동 · {plan.content.transport || "교통수단 미정"}
+              {plan.activity_count}개 활동 · {plan.transport || "교통수단 미정"}
             </span>
             <span className="card-action-hint" aria-hidden="true">
               플랜 열기 ↗
@@ -185,7 +212,7 @@ export function PlanWorkspace({
           </button>
         ))}
       </div>
-      {!items.length && !error && (
+      {!items.length && !error && !pending && (
         <p className="empty-state">
           {archived ? "보관한 플랜이 없어요." : "첫 데이트 플랜을 함께 만들어 보세요."}
         </p>

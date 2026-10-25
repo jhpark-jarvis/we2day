@@ -61,6 +61,58 @@ test("home distinguishes recorded anniversaries and places accessible refresh be
   await page.getByLabel("기준 날짜").fill(today);
   await page.getByRole("button", { name: "기념일 저장하기", exact: true }).click();
   await expect(page.getByRole("heading", { name: "함께한 첫날 예시", exact: true })).toBeVisible();
-  await page.goto("/");
-  await expect(summary).toContainText("함께한 1일");
+  await page.request.get("http://127.0.0.1:54329/__anniversary-read-delay?enabled=true");
+  try {
+    await page.goto("/", { waitUntil: "commit" });
+    const calendar = page.locator(".calendar-workspace");
+    await expect(calendar).toBeVisible();
+    await expect(page.getByRole("status", { name: "기념일 불러오는 중" })).toBeVisible();
+    const before = await calendar.boundingBox();
+    await expect(summary).toContainText("함께한 1일");
+    const after = await calendar.boundingBox();
+    if (!before || !after) throw new Error("calendar geometry is missing");
+    expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+  } finally {
+    await page.request.get("http://127.0.0.1:54329/__anniversary-read-delay?enabled=false");
+  }
+});
+
+test("direct plan editors skip list reads and load the list on archive return", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto("/login");
+  await page.getByLabel("아이디", { exact: true }).fill("audit");
+  await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await page.goto("/settings");
+  const account = page.getByRole("region", { name: "계정 설정", exact: true });
+  await expect(account).toContainText("로그인한 상태예요.");
+  await expect(account.getByRole("link", { name: "로그인", exact: true })).toHaveCount(0);
+  await page.goto("/couple");
+  await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
+  const reads = async () => (await page.request.get("http://127.0.0.1:54329/__plan-reads")).json();
+  const initial = await reads();
+  await page.goto("/plans?new=1&date=2026-11-01");
+  await expect(page.getByLabel("플랜 날짜", { exact: true })).toHaveValue("2026-11-01");
+  await page.getByLabel("플랜 이름", { exact: true }).fill("직접 진입 예시");
+  await page.getByLabel("활동 1 이름", { exact: true }).fill("산책");
+  await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
+  await expect(page.getByText("초안", { exact: true })).toBeVisible();
+  expect((await reads()).list).toBe(initial.list);
+  const list = await page.request.get("/api/plans?summary=true");
+  expect(list.headers()["server-timing"]).toContain("auth;dur=");
+  const items = await list.json();
+  const plan = items.find((item: { title: string }) => item.title === "직접 진입 예시");
+  expect(plan).toBeTruthy();
+  expect(plan.content).toBeUndefined();
+  const before = await reads();
+  await page.goto(`/plans?item=${plan.id}`);
+  await expect(page.getByLabel("플랜 이름", { exact: true })).toHaveValue("직접 진입 예시");
+  expect((await reads()).list).toBe(before.list);
+  await page.getByRole("button", { name: "플랜 보관", exact: true }).click();
+  await expect(page.getByText("첫 데이트 플랜을 함께 만들어 보세요.")).toBeVisible();
+  expect((await reads()).list).toBe(before.list + 1);
 });

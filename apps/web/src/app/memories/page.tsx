@@ -4,8 +4,8 @@ import { PhotoWorkspace } from "@/components/photo-workspace";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, previousYearDate, seoulToday } from "@/lib/calendar";
-import { type ProfileView, profileNames } from "@/lib/profiles";
-import type { Couple } from "@/lib/shared-calendar";
+import type { ContextRead } from "@/lib/page-reads";
+import { profileNames } from "@/lib/profiles";
 
 export const metadata: Metadata = { title: "기록" };
 
@@ -18,11 +18,7 @@ export default async function MemoriesPage({
   const today = seoulToday();
   const selectedDate = typeof date === "string" && isSupportedDate(date) ? date : today;
   const lastYear = previousYearDate(today);
-  const [couple, user, profiles] = await Promise.all([
-    callApi<Couple | null>("/couple"),
-    callApi<{ id: string }>("/auth/me"),
-    callApi<ProfileView>("/profiles"),
-  ]);
+  const context = await callApi<ContextRead>("/bootstrap/context");
   return (
     <>
       <PageHeading>
@@ -36,9 +32,9 @@ export default async function MemoriesPage({
         key={selectedDate}
         today={selectedDate}
         browseHref="/memories/search"
-        userId={user.data?.id || null}
-        canSave={!!couple.data && !!user.data}
-        names={profileNames(profiles.data)}
+        userId={context.data?.user_id || null}
+        canSave={!!context.data?.couple.data && !!context.data?.user_id}
+        names={profileNames(context.data?.profiles.data || null)}
       />
       <section className="settings-section" aria-label="작년 오늘 돌아보기">
         <h2>작년 오늘은 어땠을까요?</h2>

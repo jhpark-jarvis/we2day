@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { callApi } from "@/lib/api";
+import { callApi, timingHeaders } from "@/lib/api";
 import { isSupportedDate } from "@/lib/calendar";
-import type { DatePlan } from "@/lib/plans";
+import type { DatePlan, PlanSummary } from "@/lib/plans";
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   const date = request.nextUrl.searchParams.get("date");
   const archived = request.nextUrl.searchParams.get("archived") === "true";
+  const summary = request.nextUrl.searchParams.get("summary") === "true";
   const offset = request.nextUrl.searchParams.get("offset") || "0";
   const headers = { "Cache-Control": "private, no-store" };
   if (
@@ -15,15 +16,15 @@ export async function GET(request: NextRequest) {
     Number(offset) > 100000
   )
     return NextResponse.json({ error: "플랜을 확인해 주세요." }, { status: 422, headers });
-  const result = await callApi<DatePlan[] | DatePlan>(
+  const result = await callApi<DatePlan[] | DatePlan | PlanSummary[]>(
     date
       ? `/timeline?date=${date}&offset=${offset}`
       : id
         ? `/plans/${id}`
-        : `/plans?archived=${archived}&offset=${offset}`,
+        : `/plans?archived=${archived}&offset=${offset}&summary=${summary}`,
   );
   return NextResponse.json(result.error ? { error: result.error } : result.data, {
     status: result.status,
-    headers,
+    headers: { ...headers, ...timingHeaders(result) },
   });
 }

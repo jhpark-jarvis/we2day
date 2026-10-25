@@ -4,7 +4,7 @@ import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
-import type { DatePlan, PlanContent } from "@/lib/plans";
+import type { DatePlan, PlanContent, PlanSummary } from "@/lib/plans";
 import type { Couple } from "@/lib/shared-calendar";
 import type { Wish } from "@/lib/wishlist";
 export default async function PlansPage({
@@ -12,9 +12,14 @@ export default async function PlansPage({
 }: {
   searchParams: Promise<{ wish?: string; item?: string; date?: string; new?: string }>;
 }) {
-  const [couple, plans] = await Promise.all([
+  const { wish: id, item, date, new: create } = await searchParams;
+  const editing = Boolean(item || id || create === "1");
+  const validItem =
+    typeof item === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(item);
+  const [couple, plans, selected] = await Promise.all([
     callApi<Couple | null>("/couple"),
-    callApi<DatePlan[]>("/plans"),
+    editing ? null : callApi<PlanSummary[]>("/plans?summary=true"),
+    validItem ? callApi<DatePlan>(`/plans/${item}`) : null,
   ]);
   if (!couple.data)
     return (
@@ -29,12 +34,7 @@ export default async function PlansPage({
       </section>
     );
 
-  const { wish: id, item, date, new: create } = await searchParams;
   const selectedDate = typeof date === "string" && isSupportedDate(date) ? date : seoulToday();
-  const selected =
-    item && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(item)
-      ? await callApi<DatePlan>(`/plans/${item}`)
-      : null;
   let seed: PlanContent | null = null;
   let seedError = "";
   if (id) {
@@ -73,9 +73,10 @@ export default async function PlansPage({
   return (
     <PlanWorkspace
       key={`${item || id || "list"}:${selectedDate}:${create || ""}`}
-      initialPlans={plans.data || []}
+      initialPlans={plans?.data || []}
+      initialListLoaded={!editing}
       initialError={
-        plans.error ||
+        plans?.error ||
         selected?.error ||
         seedError ||
         (item && !selected ? "플랜 주소를 확인해 주세요." : "")

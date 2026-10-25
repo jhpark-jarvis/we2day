@@ -59,6 +59,12 @@ select { font: inherit; }
 .anniversary-summary p { margin: 0; font-size: 12px; }
 .anniversary-summary strong { font-size: 16px; font-weight: 500; word-break: keep-all; }
 .anniversary-summary .icon-button { flex-shrink: 0; }
+.home-anniversary-slot { block-size: 78px; min-width: 0; }
+.home-anniversary-slot > .anniversary-summary { height: 60px; box-sizing: border-box; margin-bottom: 0; }
+.home-anniversary-slot .anniversary-summary > div { display: block; }
+.home-anniversary-slot .anniversary-summary strong, .home-anniversary-slot .anniversary-summary p { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.explorer-panel { min-block-size: 320px; }
+.explorer-loading { min-block-size: 320px; display: grid; place-items: center; }
 .anniversary-list { list-style: none; padding: 0; margin: 18px 0 0; }
 .anniversary-list li { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 0; border-bottom: 1px solid var(--line); }
 .anniversary-list li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
@@ -584,6 +590,7 @@ html[data-theme="white"] :is(.auth-field, .record-search-fields) select { border
 .trash-filters > .auth-field:has(select), .trash-filters > p { grid-column: 1 / -1; }
 
 /* Keep contextual editing focused, with summaries reserved for the calendar. */
+main:has(.appointment-detail, .appointment-editor) > .home-anniversary-slot,
 main:has(.appointment-detail, .appointment-editor) > .anniversary-summary,
 main:has(.appointment-detail, .appointment-editor) > .next-appointment { display: none; }
 .next-appointment { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; padding: 12px 16px; }

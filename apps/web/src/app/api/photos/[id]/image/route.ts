@@ -18,8 +18,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const result = await callImageApi(
     `/photos/${id}/image${conditions.size ? `?${conditions}` : ""}`,
   );
+  const serverTiming = result.headers.get("Server-Timing");
   return new Response(result.body, {
     status: result.status,
-    headers: { ...headers, ...(result.ok ? { "Content-Type": "image/webp" } : {}) },
+    headers: {
+      ...headers,
+      ...(result.ok ? { "Content-Type": "image/webp" } : {}),
+      ...(serverTiming ? { "Server-Timing": serverTiming } : {}),
+    },
   });
 }

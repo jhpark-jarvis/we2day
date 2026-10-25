@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { callApi } from "@/lib/api";
+import { callApi, timingHeaders } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 import type { MonthlyMemories } from "@/lib/monthly";
 import type { PhotoPage, SharedPhoto } from "@/lib/photos";
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
                   count: day.photo_count,
                 })) || [],
           },
-      { status: result.status, headers },
+      { status: result.status, headers: { ...headers, ...timingHeaders(result) } },
     );
   }
   const date = request.nextUrl.searchParams.get("date") || "";
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   );
   return NextResponse.json(result.error ? { error: result.error } : result.data, {
     status: result.status,
-    headers,
+    headers: { ...headers, ...timingHeaders(result) },
   });
 }
 

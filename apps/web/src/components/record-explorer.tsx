@@ -1,9 +1,30 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useState } from "react";
-import { DayCourseHistory } from "@/components/day-course-history";
-import { MonthlyMemories } from "@/components/monthly-memories";
-import { PhotoSearch } from "@/components/photo-search";
-import { RecordSearch } from "@/components/record-search";
+
+function PanelLoading() {
+  return (
+    <div className="explorer-loading" role="status">
+      <span className="loading-spinner" aria-hidden="true" />
+      <span className="sr-only">검색 화면 준비 중</span>
+    </div>
+  );
+}
+const DayCourseHistory = dynamic(
+  () => import("@/components/day-course-history").then((m) => m.DayCourseHistory),
+  { loading: PanelLoading },
+);
+const MonthlyMemories = dynamic(
+  () => import("@/components/monthly-memories").then((m) => m.MonthlyMemories),
+  { loading: PanelLoading },
+);
+const PhotoSearch = dynamic(() => import("@/components/photo-search").then((m) => m.PhotoSearch), {
+  loading: PanelLoading,
+});
+const RecordSearch = dynamic(
+  () => import("@/components/record-search").then((m) => m.RecordSearch),
+  { loading: PanelLoading },
+);
 
 const kinds = { photos: "사진", records: "기록", routes: "동선", monthly: "월간 추억" } as const;
 type Kind = keyof typeof kinds;
@@ -51,7 +72,7 @@ export function RecordExplorer({
         </select>
       </div>
       {visited.map((type) => (
-        <div key={type} hidden={kind !== type}>
+        <div className="explorer-panel" key={type} hidden={kind !== type}>
           {type === "photos" ? (
             <PhotoSearch start={`${today.slice(0, 8)}01`} end={today} names={names} />
           ) : type === "records" ? (

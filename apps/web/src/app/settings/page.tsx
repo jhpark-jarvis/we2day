@@ -6,30 +6,19 @@ import { PushSettings } from "@/components/push-settings";
 import { PwaSettings } from "@/components/pwa-settings";
 import { ThemePicker } from "@/components/theme-picker";
 import { callApi } from "@/lib/api";
-import { createAuthClient } from "@/lib/auth/server";
-import type { ProfileView } from "@/lib/profiles";
+import type { AccountRead } from "@/lib/page-reads";
 import { resolveTheme, THEME_COOKIE } from "@/lib/theme";
 
 export const metadata: Metadata = { title: "설정" };
 
 async function accountView() {
   try {
-    const client = await createAuthClient();
-    if (!client) return { status: "unavailable" as const };
-    const { data, error } = await client.auth.getUser();
-    if (error) {
-      return {
-        status:
-          "status" in error && [400, 401, 403].includes(error.status || 0)
-            ? ("guest" as const)
-            : ("unavailable" as const),
-      };
-    }
-    if (!data.user) return { status: "guest" as const };
-    const profiles = await callApi<ProfileView>("/profiles");
+    const account = await callApi<AccountRead>("/bootstrap/account");
+    if (!account.data)
+      return { status: account.status === 401 ? ("guest" as const) : ("unavailable" as const) };
     return {
       status: "ready" as const,
-      identity: profiles.data?.mine?.display_name || null,
+      identity: account.data.profiles.data?.mine?.display_name || null,
     };
   } catch {
     return { status: "unavailable" as const };

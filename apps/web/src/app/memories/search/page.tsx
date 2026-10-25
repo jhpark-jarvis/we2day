@@ -4,19 +4,19 @@ import { RecordExplorer } from "@/components/record-explorer";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
-import type { ProfileView } from "@/lib/profiles";
-import type { Couple } from "@/lib/shared-calendar";
+import { type ContextRead, section } from "@/lib/page-reads";
 
 export default async function SearchPage({
   searchParams,
 }: {
   searchParams: Promise<{ type?: string; month?: string; date?: string }>;
 }) {
-  const [query, couple, profiles] = await Promise.all([
+  const [query, context] = await Promise.all([
     searchParams,
-    callApi<Couple | null>("/couple"),
-    callApi<ProfileView>("/profiles"),
+    callApi<ContextRead>("/bootstrap/context"),
   ]);
+  const couple = section(context.data?.couple, context.status);
+  const profiles = context.data?.profiles.data;
   const today = seoulToday();
   const type =
     query.type === "records" || query.type === "routes" || query.type === "monthly"
@@ -41,8 +41,8 @@ export default async function SearchPage({
           initialDate={query.date && isSupportedDate(query.date) ? query.date : today}
           site={getAuthConfig()?.site || ""}
           names={{
-            mine: profiles.data?.mine?.display_name || "",
-            partner: profiles.data?.partner?.display_name || "",
+            mine: profiles?.mine?.display_name || "",
+            partner: profiles?.partner?.display_name || "",
           }}
         />
       ) : (
