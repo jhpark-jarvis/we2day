@@ -107,11 +107,15 @@ export function PhotoWorkspace({
       if (!controller.signal.aborted) setExporting(false);
     }
   };
-  const changed = useCallback((message: string) => {
-    setNotice(message);
-    setRecordId("");
-    setRefresh((value) => value + 1);
-  }, []);
+  const changed = useCallback(
+    (message: string, nextDate?: string) => {
+      if (!trash && nextDate) setDate(nextDate);
+      setNotice(message);
+      setRecordId("");
+      setRefresh((value) => value + 1);
+    },
+    [trash],
+  );
   const active = useRef<AbortController | null>(null);
   const load = async (day: string, cursor: string | null = null) => {
     active.current?.abort();

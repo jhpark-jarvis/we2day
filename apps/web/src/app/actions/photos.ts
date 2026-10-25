@@ -46,3 +46,26 @@ export async function changePhoto(
           : "사진 파일과 기록을 영구 삭제했어요.",
   };
 }
+
+export async function editPhoto(input: {
+  id: string;
+  date: string;
+  caption: string;
+  expected_version: number;
+  request_id: string;
+}) {
+  const { id, ...body } = input;
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
+    return { error: "변경할 사진을 확인해 주세요.", date: "" };
+  const result = await callApi<import("@/lib/photos").SharedPhoto>(`/photos/${id}/metadata`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (result.error || !result.data)
+    return { error: result.error || "사진을 저장하지 못했어요.", date: "" };
+  revalidatePath("/memories");
+  revalidatePath("/memories/search");
+  revalidatePath("/memories/month");
+  revalidatePath("/settings/trash");
+  return { error: "", date: result.data.date };
+}

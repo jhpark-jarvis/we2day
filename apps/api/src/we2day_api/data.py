@@ -63,6 +63,7 @@ class DataAPI:
             "version_conflict",
             "request_conflict",
             "invalid_photo",
+            "invalid_photo_metadata",
             "invalid_photo_search",
             "invalid_meeting_day",
             "invalid_route",

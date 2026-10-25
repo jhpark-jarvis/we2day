@@ -58,6 +58,7 @@ const errors: Record<string, string> = {
     "사진 파일이나 사진 정보를 확인해 주세요. 1MB·1600px 이하의 JPEG·WebP 압축본을 선택해 주세요.",
   photo_upload_incomplete: "사진 저장이 아직 완료되지 않았어요. 같은 사진으로 다시 시도해 주세요.",
   invalid_meeting_day: "오늘 또는 지난 날짜를 선택하고 메모 길이를 확인해 주세요.",
+  invalid_photo_metadata: "앨범 날짜와 500자 이내의 설명을 확인해 주세요.",
   invalid_photo_action: "사진과 요청 내용을 확인해 주세요.",
   photo_confirmation_required: "영구 삭제 확인 문구를 정확히 입력해 주세요.",
   photo_deleting: "영구 삭제를 진행 중인 사진이에요. 삭제 재시도로 마무리해 주세요.",

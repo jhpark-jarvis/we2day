@@ -12,7 +12,7 @@ USERS = [str(UUID(int=index)) for index in range(1, 6)]
 def reset_database(database_url):
     with psycopg.connect(database_url) as connection:
         connection.execute(
-            "truncate public.appointments, public.couple_invites, "
+            "truncate storage.objects, public.appointments, public.couple_invites, "
             "public.couple_members, public.couples, auth.users cascade"
         )
         for user in USERS:

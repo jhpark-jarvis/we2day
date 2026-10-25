@@ -4,6 +4,7 @@ export default defineConfig({
   ...journey,
   testMatch: [
     "photo-batch.spec.ts",
+    "photo-metadata.spec.ts",
     "agent-gateway.spec.ts",
     "route-retirement.spec.ts",
     "character-themes.spec.ts",

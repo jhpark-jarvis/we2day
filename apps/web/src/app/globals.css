@@ -739,3 +739,6 @@ body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 .photo-batch-status { min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--muted); }
 .photo-batch-status p { margin: 0; }
 .photo-batch-summary { min-height: 48px; padding-top: 12px; font-size: 14px; }
+
+.photo-edit-form { display: grid; gap: 14px; }
+.photo-edit-actions { display: flex; justify-content: flex-end; }

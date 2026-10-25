@@ -98,6 +98,30 @@ class PhotoAction(BaseModel):
     confirmation: str = Field(default="", max_length=20)
 
 
+class PhotoMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    date: Date = Field(ge=Date(2000, 1, 1), le=Date(2100, 12, 31))
+    caption: str = Field(max_length=500)
+    expected_version: int = Field(ge=1, le=2_147_483_646)
+    request_id: UUID
+
+    @field_validator("caption")
+    @classmethod
+    def clean_caption(cls, value: str) -> str:
+        return PhotoInput.clean_text(value)
+
+
+@router.post("/photos/{photo_id}/metadata", response_model=Photo)
+def edit_photo(photo_id: UUID, body: PhotoMetadata, store: Store):
+    return store.rpc(
+        "edit_photo",
+        {
+            "p_id": str(photo_id),
+            **{f"p_{key}": value for key, value in body.model_dump(mode="json").items()},
+        },
+    )[0]
+
+
 class PhotoPage(BaseModel):
     items: list[Photo]
     next_after: UUID | None

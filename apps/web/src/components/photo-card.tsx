@@ -1,9 +1,9 @@
 "use client";
 
-import { Download, Maximize2, Trash2, X } from "lucide-react";
+import { Download, Maximize2, Pencil, Trash2, X } from "lucide-react";
 import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
 import { createPortal, useFormStatus } from "react-dom";
-import { changePhoto } from "@/app/actions/photos";
+import { changePhoto, editPhoto } from "@/app/actions/photos";
 import { koreanTimestamp, type SharedPhoto } from "@/lib/photos";
 
 function ActionSubmit({
@@ -43,7 +43,7 @@ function PhotoActionForm({
   photo: SharedPhoto;
   action: "trash" | "restore" | "purge";
   label: string;
-  onChanged: (message: string) => void;
+  onChanged: (message: string, date?: string) => void;
   icon?: boolean;
   onError?: (message: string) => void;
 }) {
@@ -109,7 +109,7 @@ export function PhotoCard({
   photo: SharedPhoto;
   userId: string | null;
   trash: boolean;
-  onChanged: (message: string) => void;
+  onChanged: (message: string, date?: string) => void;
   selected?: boolean;
   selectingDisabled?: boolean;
   onSelect?: () => void;
@@ -176,6 +176,7 @@ export function PhotoCard({
               >
                 <Download size={18} aria-hidden="true" />
               </a>
+              {!trash && <PhotoEdit photo={photo} onChanged={onChanged} />}
               {!trash && (
                 <PhotoActionForm
                   photo={photo}
@@ -326,5 +327,124 @@ export function PhotoCard({
         </>
       )}
     </article>
+  );
+}
+
+function PhotoEdit({
+  photo,
+  onChanged,
+}: {
+  photo: SharedPhoto;
+  onChanged: (message: string, date?: string) => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const retry = useRef({ signature: "", id: "" });
+  const [date, setDate] = useState(photo.date);
+  const [caption, setCaption] = useState(photo.caption);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const titleId = `photo-edit-${photo.id}`;
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+    const signature = JSON.stringify([date, caption, photo.lifecycle_version]);
+    if (retry.current.signature !== signature)
+      retry.current = { signature, id: crypto.randomUUID() };
+    setPending(true);
+    setError("");
+    try {
+      const result = await editPhoto({
+        id: photo.id,
+        date,
+        caption,
+        expected_version: photo.lifecycle_version,
+        request_id: retry.current.id,
+      });
+      if (result.error) setError(result.error);
+      else {
+        dialog.current?.close();
+        onChanged("사진 정보를 저장했어요.", result.date);
+      }
+    } catch {
+      setError("사진을 저장하지 못했어요. 입력을 확인하고 다시 시도해 주세요.");
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className="icon-button"
+        aria-label="사진 정보 수정"
+        title="사진 정보 수정"
+        onClick={() => dialog.current?.showModal()}
+      >
+        <Pencil size={18} aria-hidden="true" />
+      </button>
+      <dialog
+        ref={dialog}
+        className="photo-upload-dialog"
+        aria-labelledby={titleId}
+        onCancel={(event) => {
+          if (pending) event.preventDefault();
+        }}
+        onClose={() => trigger.current?.focus()}
+      >
+        <div className="section-heading">
+          <h2 id={titleId}>사진 정보</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="사진 정보 닫기"
+            title="닫기"
+            disabled={pending}
+            onClick={() => dialog.current?.close()}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <form onSubmit={save} className="photo-edit-form" aria-busy={pending}>
+          <div className="auth-field">
+            <label htmlFor={`${titleId}-date`}>앨범 날짜</label>
+            <input
+              id={`${titleId}-date`}
+              type="date"
+              min="2000-01-01"
+              max="2100-12-31"
+              required
+              value={date}
+              disabled={pending}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </div>
+          <div className="auth-field">
+            <label htmlFor={`${titleId}-caption`}>설명</label>
+            <textarea
+              id={`${titleId}-caption`}
+              maxLength={500}
+              value={caption}
+              disabled={pending}
+              onChange={(event) => setCaption(event.target.value)}
+            />
+          </div>
+          <p className="settings-hint">
+            앨범 날짜와 설명만 바뀌어요. 촬영 정보와 사진 파일은 그대로예요.
+          </p>
+          {error && (
+            <p role="alert" className="error-message">
+              {error}
+            </p>
+          )}
+          <div className="photo-edit-actions">
+            <button type="submit" className="primary-button" disabled={pending}>
+              {pending ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }
