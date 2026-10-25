@@ -2,14 +2,12 @@ import { GoalWorkspace } from "@/components/goal-workspace";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
-import type { Goal } from "@/lib/goals";
-import type { Couple } from "@/lib/shared-calendar";
+import { type GoalRead, section } from "@/lib/page-reads";
 
 export default async function GoalsPage() {
-  const [couple, goals] = await Promise.all([
-    callApi<Couple | null>("/couple"),
-    callApi<Goal[]>("/goals"),
-  ]);
+  const read = await callApi<GoalRead>("/bootstrap/goals");
+  const couple = section(read.data?.couple, read.status);
+  const goals = section(read.data?.goals, read.status);
   if (!couple.data)
     return (
       <section>

@@ -85,24 +85,18 @@ def test_plan_api_save_read_and_contract(upstream):  # noqa: F811
 
 def test_plan_summary_omits_activity_contents_and_preserves_status(upstream):  # noqa: F811
     client, calls, replies = upstream
-    content = {
-        **CONTENT,
-        "preparation": ["private preparation"],
-        "activities": [{"title": "산책", "place": "private address", "note": "private note"}],
-    }
     rows = [
         {
             "id": str(uuid4()),
-            "content": content,
-            "published_content": published,
-            "archived": archived,
+            "title": "산책",
+            "date": "2026-11-01",
+            "transport": "",
+            "activity_count": 1,
+            "status": status,
+            "archived": status == "archived",
+            "internal": "private",
         }
-        for published, archived in [
-            (None, False),
-            (content, False),
-            (CONTENT, False),
-            (content, True),
-        ]
+        for status in ["draft", "confirmed", "changed", "archived"]
     ]
     replies.append((200, rows))
     response = client.get("/plans?summary=true&offset=50")
@@ -115,8 +109,8 @@ def test_plan_summary_omits_activity_contents_and_preserves_status(upstream):  #
     ]
     assert all(item["activity_count"] == 1 for item in response.json())
     assert "private" not in response.text
-    assert "appointment" not in calls[-1].url.params["select"]
-    assert calls[-1].url.params["offset"] == "50"
+    assert calls[-1].url.path.endswith("/rpc/list_plan_summaries")
+    assert json.loads(calls[-1].content) == {"p_archived": False, "p_offset": 50}
     assert "no-store" in response.headers["cache-control"]
     assert "auth;dur=" in response.headers["server-timing"]
     assert "data;dur=" in response.headers["server-timing"]
@@ -124,3 +118,15 @@ def test_plan_summary_omits_activity_contents_and_preserves_status(upstream):  #
     health = client.get("/health/live")
     assert "auth;" not in health.headers["server-timing"]
     assert "data;" not in health.headers["server-timing"]
+
+
+def test_album_dates_minimal_projection_bounds(upstream):  # noqa: F811
+    client, calls, replies = upstream
+    replies.append((200, [{"date": "2026-10-24", "count": 2, "internal": "private"}]))
+    result = client.get("/photos/dates?month=2026-10")
+    assert result.status_code == 200
+    assert result.json() == {"month": "2026-10", "days": [{"date": "2026-10-24", "count": 2}]}
+    assert calls[-1].url.path.endswith("/rpc/photo_album_dates")
+    assert json.loads(calls[-1].content) == {"p_month": "2026-10-01"}
+    assert "no-store" in result.headers["cache-control"]
+    assert client.get("/photos/dates?month=2026-13").status_code == 422

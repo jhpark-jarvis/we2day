@@ -106,3 +106,36 @@ def test_unlinked_home_skips_data_and_invalid_month_is_rejected(bundle):
     assert result.json()["appointments"]["data"] is None
     assert len(calls) == 2
     assert client.get("/bootstrap/home?month=2026-13").status_code == 422
+
+
+@pytest.mark.parametrize(
+    "path,key,table",
+    [
+        ("today?date=2026-10-24&offset=50", "timeline", "date_plans"),
+        ("checklists", "lists", "shared_checklists"),
+        ("goals", "goals", "shared_goals"),
+    ],
+)
+def test_more_bundles_one_auth_partial_error_and_unlinked(bundle, path, key, table):
+    client, calls, state = bundle
+    state["fail"] = table
+    response = client.get(f"/bootstrap/{path}")
+    assert response.status_code == 200
+    assert response.json()[key]["status"] == 503
+    assert response.json()["couple"]["data"]["id"] == FIRST
+    assert sum(p == "/auth/v1/user" for _, p in calls) == 1
+    assert "no-store" in response.headers["cache-control"]
+    calls.clear()
+    state["linked"] = False
+    response = client.get(f"/bootstrap/{path}")
+    assert response.json()[key]["data"] is None and len(calls) == 2
+    assert (
+        client.get(f"/bootstrap/{path}", headers={"Authorization": "Bearer revoked"}).status_code
+        == 401
+    )
+
+
+def test_today_bounds(bundle):
+    client, _, _ = bundle
+    assert client.get("/bootstrap/today?date=1999-12-31").status_code == 422
+    assert client.get("/bootstrap/today?date=2026-10-24&offset=100001").status_code == 422

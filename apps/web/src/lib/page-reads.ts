@@ -22,3 +22,17 @@ export function section<T>(value: ReadSection<T> | undefined, fallbackStatus = 5
     error: status === 200 ? "" : apiError(status, value?.detail),
   };
 }
+
+export type TodayRead = {
+  couple: ReadSection<Couple>;
+  timeline: ReadSection<import("@/lib/plans").DatePlan[]>;
+  zones: ReadSection<TimezoneView>;
+};
+export type ChecklistRead = {
+  couple: ReadSection<Couple>;
+  lists: ReadSection<import("@/lib/checklists").Checklist[]>;
+};
+export type GoalRead = {
+  couple: ReadSection<Couple>;
+  goals: ReadSection<import("@/lib/goals").Goal[]>;
+};

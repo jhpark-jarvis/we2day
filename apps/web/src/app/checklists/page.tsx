@@ -2,14 +2,12 @@ import { ChecklistWorkspace } from "@/components/checklist-workspace";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
-import type { Checklist } from "@/lib/checklists";
-import type { Couple } from "@/lib/shared-calendar";
+import { type ChecklistRead, section } from "@/lib/page-reads";
 
 export default async function ChecklistsPage() {
-  const [couple, lists] = await Promise.all([
-    callApi<Couple | null>("/couple"),
-    callApi<Checklist[]>("/checklists"),
-  ]);
+  const read = await callApi<ChecklistRead>("/bootstrap/checklists");
+  const couple = section(read.data?.couple, read.status);
+  const lists = section(read.data?.lists, read.status);
   if (!couple.data)
     return (
       <section>

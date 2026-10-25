@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from starlette.concurrency import run_in_threadpool
 
 from we2day_api.auth import CurrentUser, bearer, require_user, unauthenticated
+from we2day_api.calendar_export import Month
 from we2day_api.data import DataAPI, require_data
 from we2day_api.timing import timed
 from we2day_api.upstream import upstream_transport
@@ -100,6 +101,21 @@ class PhotoAction(BaseModel):
 class PhotoPage(BaseModel):
     items: list[Photo]
     next_after: UUID | None
+
+
+class AlbumDate(BaseModel):
+    date: Date
+    count: int = Field(ge=1)
+
+
+class AlbumDates(BaseModel):
+    month: str
+    days: list[AlbumDate] = Field(max_length=31)
+
+
+@router.get("/photos/dates", response_model=AlbumDates)
+def album_dates(store: Store, month: Month):
+    return {"month": month, "days": store.rpc("photo_album_dates", {"p_month": f"{month}-01"})}
 
 
 _image_processing = ThreadPoolExecutor(max_workers=1, thread_name_prefix="photo-processing")

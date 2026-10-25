@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { callApi, timingHeaders } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
-import type { MonthlyMemories } from "@/lib/monthly";
 import type { PhotoPage, SharedPhoto } from "@/lib/photos";
 
 const headers = { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" };
@@ -15,22 +14,13 @@ export async function GET(request: NextRequest) {
       ["date", "trash", "after"].some((key) => request.nextUrl.searchParams.has(key))
     )
       return NextResponse.json({ error: "앨범 월을 확인해 주세요." }, { status: 422, headers });
-    const result = await callApi<MonthlyMemories>(`/memories/month?month=${month}`);
-    return NextResponse.json(
-      result.error
-        ? { error: result.error }
-        : {
-            month,
-            days:
-              result.data?.days
-                .filter((day) => day.photo_count > 0)
-                .map((day) => ({
-                  date: day.date,
-                  count: day.photo_count,
-                })) || [],
-          },
-      { status: result.status, headers: { ...headers, ...timingHeaders(result) } },
+    const result = await callApi<{ month: string; days: { date: string; count: number }[] }>(
+      `/photos/dates?month=${month}`,
     );
+    return NextResponse.json(result.error ? { error: result.error } : result.data, {
+      status: result.status,
+      headers: { ...headers, ...timingHeaders(result) },
+    });
   }
   const date = request.nextUrl.searchParams.get("date") || "";
   const after = request.nextUrl.searchParams.get("after");

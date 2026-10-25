@@ -91,27 +91,6 @@ class PlanSummary(BaseModel):
     archived: bool
 
 
-def summarize(row: dict) -> dict:
-    content = row["content"]
-    return {
-        "id": row["id"],
-        "title": content["title"],
-        "date": content["date"],
-        "transport": content.get("transport", ""),
-        "activity_count": len(content.get("activities", [])),
-        "archived": row["archived"],
-        "status": (
-            "archived"
-            if row["archived"]
-            else "draft"
-            if row.get("published_content") is None
-            else "confirmed"
-            if content == row["published_content"]
-            else "changed"
-        ),
-    }
-
-
 @router.get("/timeline", response_model=list[Plan])
 def read_timeline(store: Store, date: Date, offset: int = Query(default=0, ge=0, le=100000)):
     if not 2000 <= date.year <= 2100:
@@ -137,18 +116,19 @@ def list_plans(
     offset: int = Query(default=0, ge=0, le=100000),
     summary: bool = False,
 ):
-    rows = store.call(
+    if summary:
+        return store.rpc("list_plan_summaries", {"p_archived": archived, "p_offset": offset})
+    return store.call(
         "GET",
         "date_plans",
         params={
-            "select": "id,content,published_content,archived" if summary else SELECT,
+            "select": SELECT,
             "archived": f"eq.{str(archived).lower()}",
             "order": "updated_at.desc,id.asc",
             "limit": "50",
             "offset": str(offset),
         },
     )
-    return [summarize(row) for row in rows] if summary else rows
 
 
 @router.get("/plans/{id}", response_model=Plan)

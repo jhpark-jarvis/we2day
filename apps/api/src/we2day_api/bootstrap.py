@@ -1,15 +1,19 @@
 """Small page read bundles with one verified caller and independent section errors."""
 
 from collections.abc import Callable
+from datetime import date as Date
 from typing import Annotated
 
 import anyio
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from we2day_api.auth import CurrentUser, require_user, unauthenticated
 from we2day_api.calendar import Appointment, Couple, Store, list_appointments, my_couple
 from we2day_api.calendar_export import Month
+from we2day_api.checklists import Checklist, list_checklists
+from we2day_api.goals import Goal, list_goals
+from we2day_api.plans import Plan, read_timeline
 from we2day_api.profiles import ProfileView, read_profiles
 from we2day_api.timezones import TimezoneView, read_timezones
 from we2day_api.upcoming import NextAppointment, next_appointment
@@ -103,3 +107,53 @@ async def home(store: Store, user: User, month: Month):
         next=(next_appointment, NextAppointment, store),
     )
     return {"couple": couple, **result}
+
+
+class TodayRead(BaseModel):
+    couple: ReadResult[Couple | None]
+    timeline: ReadResult[list[Plan]]
+    zones: ReadResult[TimezoneView]
+
+
+class ChecklistRead(BaseModel):
+    couple: ReadResult[Couple | None]
+    lists: ReadResult[list[Checklist]]
+
+
+class GoalRead(BaseModel):
+    couple: ReadResult[Couple | None]
+    goals: ReadResult[list[Goal]]
+
+
+async def linked_reads(store, **reads):
+    couple = await anyio.to_thread.run_sync(lambda: capture(my_couple, Couple | None, store))
+    result = (
+        await parallel(**reads)
+        if couple["data"]
+        else {name: {"data": None, "status": 200} for name in reads}
+    )
+    return {"couple": couple, **result}
+
+
+@router.get("/bootstrap/today", response_model=TodayRead)
+async def today(
+    store: Store,
+    user: User,
+    date: Annotated[Date, Query(ge=Date(2000, 1, 1), le=Date(2100, 12, 31))],
+    offset: int = Query(0, ge=0, le=100000),
+):
+    return await linked_reads(
+        store,
+        timeline=(read_timeline, list[Plan], store, date, offset),
+        zones=(read_timezones, TimezoneView, store, user),
+    )
+
+
+@router.get("/bootstrap/checklists", response_model=ChecklistRead)
+async def checklists(store: Store, user: User):
+    return await linked_reads(store, lists=(list_checklists, list[Checklist], store, False, 0))
+
+
+@router.get("/bootstrap/goals", response_model=GoalRead)
+async def goals(store: Store, user: User):
+    return await linked_reads(store, goals=(list_goals, list[Goal], store, False, 0))

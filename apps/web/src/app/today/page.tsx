@@ -5,9 +5,7 @@ import { TodayWorkspace } from "@/components/today-workspace";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
-import type { DatePlan } from "@/lib/plans";
-import type { Couple } from "@/lib/shared-calendar";
-import type { TimezoneView } from "@/lib/timezones";
+import { section, type TodayRead } from "@/lib/page-reads";
 export default async function TodayPage({
   searchParams,
 }: {
@@ -22,11 +20,10 @@ export default async function TodayPage({
     Number(query.offset) <= 100000
       ? Number(query.offset)
       : 0;
-  const [couple, timeline, zones] = await Promise.all([
-    callApi<Couple | null>("/couple"),
-    callApi<DatePlan[]>(`/timeline?date=${date}&offset=${offset}`),
-    callApi<TimezoneView>("/timezones"),
-  ]);
+  const read = await callApi<TodayRead>(`/bootstrap/today?date=${date}&offset=${offset}`);
+  const couple = section(read.data?.couple, read.status);
+  const timeline = section(read.data?.timeline, read.status);
+  const zones = section(read.data?.zones, read.status);
   const plans = couple.data ? timeline : { data: null, error: couple.error };
   return (
     <section>
