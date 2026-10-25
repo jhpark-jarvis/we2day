@@ -38,7 +38,14 @@ class DataAPI:
             if code == "42501"
             else "upstream_error"
         )
-        if response.status_code >= 500 or code not in {"PT400", "PT404", "PT409", "PT413", "PT422"}:
+        if response.status_code >= 500 or code not in {
+            "PT400",
+            "PT403",
+            "PT404",
+            "PT409",
+            "PT413",
+            "PT422",
+        }:
             logger.warning(
                 "Data service failure: status=%s category=%s", response.status_code, category
             )
@@ -60,6 +67,8 @@ class DataAPI:
             "relationship_exists",
             "invalid_request",
             "appointment_not_found",
+            "appointment_owner_required",
+            "personal_appointment_required",
             "version_conflict",
             "request_conflict",
             "invalid_photo",
@@ -105,7 +114,10 @@ class DataAPI:
             "photo_retention_active",
             "photo_delete_incomplete",
         }
-        if code in {"PT400", "PT404", "PT409", "PT413", "PT422"} and message in safe_errors:
+        if (
+            code in {"PT400", "PT403", "PT404", "PT409", "PT413", "PT422"}
+            and message in safe_errors
+        ):
             raise HTTPException(int(code[2:]), message)
         # Never reflect SQL errors, query details, tokens, or upstream configuration.
         if code in {"PGRST202", "PGRST205", "42P01", "42883"}:

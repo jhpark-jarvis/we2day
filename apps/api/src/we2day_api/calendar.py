@@ -2,10 +2,10 @@ import calendar
 from datetime import date as Date
 from datetime import datetime
 from datetime import time as Time
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from we2day_api.data import DataAPI, require_data
@@ -55,11 +55,12 @@ class AppointmentInput(BaseModel):
         return {
             f"p_{key}": value
             for key, value in self.model_dump(mode="json").items()
-            if key not in {"request_id", "expected_version"}
+            if key not in {"request_id", "expected_version", "kind"}
         }
 
 
 class CreateAppointment(AppointmentInput):
+    kind: Literal["shared", "personal"] = "shared"
     request_id: UUID
 
 
@@ -68,6 +69,7 @@ class UpdateAppointment(AppointmentInput):
 
 
 class Appointment(BaseModel):
+    kind: Literal["shared", "personal"] = "shared"
     id: UUID
     title: str
     date: Date
@@ -113,7 +115,7 @@ def list_appointments(
         "appointments",
         params={
             "select": (
-                "id,title,date,time,place,note,version,created_by,updated_by,created_at,updated_at"
+                "id,title,date,time,place,note,version,created_by,updated_by,created_at,updated_at,kind"
             ),
             "and": f"(date.gte.{month}-01,date.lte.{month}-{last_day:02})",
             "order": "date.asc,time.asc.nullslast,id.asc",
@@ -123,8 +125,10 @@ def list_appointments(
 
 @router.post("/appointments", response_model=Appointment, status_code=201)
 def create_appointment(body: CreateAppointment, store: Store):
+    if body.kind == "personal" and body.place:
+        raise HTTPException(422, "invalid_appointment")
     rows = store.rpc(
-        "create_appointment",
+        "create_personal_appointment" if body.kind == "personal" else "create_appointment",
         {
             **body.rpc_fields(),
             "p_request_id": str(body.request_id),
@@ -144,3 +148,23 @@ def update_appointment(appointment_id: UUID, body: UpdateAppointment, store: Sto
         },
     )
     return rows[0]
+
+
+class DeletePersonalAppointment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=1, le=2_147_483_646)
+
+
+@router.delete("/appointments/{appointment_id}", status_code=204)
+def delete_personal_appointment(
+    appointment_id: UUID, body: DeletePersonalAppointment, store: Store
+):
+    try:
+        store.rpc(
+            "delete_personal_appointment",
+            {"p_id": str(appointment_id), "p_expected_version": body.expected_version},
+        )
+    except HTTPException as error:
+        if error.status_code != 404 or error.detail != "appointment_not_found":
+            raise
+    return Response(status_code=204)

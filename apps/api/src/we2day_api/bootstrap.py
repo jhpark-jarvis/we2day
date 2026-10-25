@@ -81,6 +81,7 @@ async def context(store: Store, user: User):
 
 
 class HomeRead(BaseModel):
+    user_id: str
     couple: ReadResult[Couple | None]
     appointments: ReadResult[list[Appointment]]
     zones: ReadResult[TimezoneView]
@@ -94,6 +95,7 @@ async def home(store: Store, user: User, month: Month):
     if not couple["data"]:
         empty = {"data": None, "status": 200}
         return {
+            "user_id": str(user.id),
             "couple": couple,
             "appointments": empty,
             "zones": empty,
@@ -106,7 +108,7 @@ async def home(store: Store, user: User, month: Month):
         profiles=(read_profiles, ProfileView, store, user),
         next=(next_appointment, NextAppointment, store),
     )
-    return {"couple": couple, **result}
+    return {"user_id": str(user.id), "couple": couple, **result}
 
 
 class TodayRead(BaseModel):

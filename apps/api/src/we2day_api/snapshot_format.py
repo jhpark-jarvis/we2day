@@ -8,6 +8,7 @@ MAX_FILE_BYTES = 5 * 1024 * 1024
 EXPORT_FIELDS = {
     "appointments": [
         "id",
+        "kind",
         "title",
         "date",
         "time",
@@ -174,7 +175,13 @@ def encode_snapshot(kind, rows, start, end, include_private):
         "end_date": str(end),
         "exported_at": datetime.now(UTC).isoformat(),
         "include_private": include_private,
-        "records": [{k: row[k] for k in EXPORT_FIELDS[kind]} for row in rows],
+        "records": [
+            {
+                k: row.get(k, "shared") if kind == "appointments" and k == "kind" else row[k]
+                for k in EXPORT_FIELDS[kind]
+            }
+            for row in rows
+        ],
     }
     digest = hashlib.sha256(canonical(payload)).hexdigest()
     content = canonical(
@@ -240,7 +247,11 @@ def inspect_snapshot(content):
         if datetime.fromisoformat(payload["exported_at"]).utcoffset() is None:
             raise ValueError("invalid_timestamp")
         for row in records:
-            if not isinstance(row, dict) or set(row) != set(EXPORT_FIELDS[kind]):
+            fields = set(EXPORT_FIELDS[kind])
+            allowed = [fields, fields - {"kind"}] if kind == "appointments" else [fields]
+            if not isinstance(row, dict) or set(row) not in allowed:
+                raise ValueError("invalid_record")
+            if kind == "appointments" and row.get("kind", "shared") not in {"shared", "personal"}:
                 raise ValueError("invalid_record")
         if hashlib.sha256(canonical(payload)).hexdigest() != doc["sha256"]:
             raise ValueError("checksum_mismatch")
