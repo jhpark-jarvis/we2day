@@ -76,6 +76,7 @@ test("photo preparation preserves allowed references locally and strips original
     .getByLabel("사진 선택")
     .setInputFiles({ name: "together.jpg", mimeType: "image/jpeg", buffer: source });
   await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
+  await page.getByText("사진 정보", { exact: true }).click();
   await expect(page.getByText("Example · Test Phone 01", { exact: true })).toBeVisible();
   await expect(page.getByText(/2026-10-18 15:42:00/)).toBeVisible();
   await expect(page.getByText(/1,?600 × 960/)).toBeVisible();
@@ -101,7 +102,7 @@ test("photo preparation preserves allowed references locally and strips original
   await page.setViewportSize({ width: 320, height: 900 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("photo-preparation.png"), fullPage: true });
-  await page.getByRole("button", { name: "선택 해제" }).click();
+  await page.getByRole("button", { name: "선택 해제", exact: true }).click();
   await expect(
     page.getByRole("img", {
       name: "\uc120\ud0dd\ud55c \uc0ac\uc9c4\uc758 \uc555\ucd95 \ubbf8\ub9ac\ubcf4\uae30",
@@ -150,6 +151,7 @@ test("invalid files recover to a photo without invented device or capture data",
       name: "\uc120\ud0dd\ud55c \uc0ac\uc9c4\uc758 \uc555\ucd95 \ubbf8\ub9ac\ubcf4\uae30",
     }),
   ).toBeVisible();
+  await page.getByText("사진 정보", { exact: true }).click();
   await expect(page.getByText("사진에 기기 정보가 없어요", { exact: true })).toBeVisible();
   await expect(page.getByText("사진에 촬영 시각이 없어요", { exact: true })).toBeVisible();
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
@@ -183,7 +185,7 @@ test("clearing during decode cannot restore an obsolete photo", async ({ page })
     buffer: await image(page, "image/png"),
   });
   await expect(page.getByRole("status")).toContainText("압축하고 있어요");
-  await page.getByRole("button", { name: "선택 해제" }).click();
+  await page.getByRole("button", { name: "선택 해제", exact: true }).click();
   await page.waitForTimeout(650); // Let the deliberately delayed decode finish after cancellation.
   await expect(
     page.getByRole("img", {
@@ -213,6 +215,7 @@ test("unsupported WebP encoder falls back to a metadata-free bounded JPEG", asyn
     .getByLabel("사진 선택")
     .setInputFiles({ name: "camera.jpg", mimeType: "image/jpeg", buffer: source });
   await expect(page.getByRole("img", { name: "선택한 사진의 압축 미리보기" })).toBeVisible();
+  await page.getByText("사진 정보", { exact: true }).click();
   await expect(page.getByText("Example · Test Phone 01", { exact: true })).toBeVisible();
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
   const downloading = page.waitForEvent("download");

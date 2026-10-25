@@ -3,6 +3,7 @@ import journey from "./playwright.journey.config";
 export default defineConfig({
   ...journey,
   testMatch: [
+    "photo-batch.spec.ts",
     "agent-gateway.spec.ts",
     "route-retirement.spec.ts",
     "character-themes.spec.ts",

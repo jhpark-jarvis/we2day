@@ -719,3 +719,16 @@ body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 .day-course-stops li + li { border-top: 1px solid var(--line); }
 .day-course-stops time { margin-left: 12px; color: var(--muted); }
 .day-course-stops p { margin-block: 8px; }
+
+.photo-batch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.photo-batch-list { display: grid; gap: 16px; list-style: none; padding: 0; margin: 12px 0; min-width: 0; }
+.photo-batch-item { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; overflow-wrap: anywhere; }
+.photo-batch-item .section-heading { margin-bottom: 10px; }
+.photo-batch-item .section-heading strong { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; }
+.photo-batch-item .photo-draft-story { margin: 0; }
+.photo-batch-item .photo-draft-story img { max-height: 220px; object-fit: contain; }
+.photo-batch-item .auth-field { margin-top: 14px; }
+.photo-batch-details summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.photo-batch-status { min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--muted); }
+.photo-batch-status p { margin: 0; }
+.photo-batch-summary { min-height: 48px; padding-top: 12px; font-size: 14px; }
