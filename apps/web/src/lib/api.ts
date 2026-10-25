@@ -52,6 +52,8 @@ const errors: Record<string, string> = {
   relationship_exists: "우리의 시작이 이미 등록되어 있어요. 최신 기념일을 불러와 수정해 주세요.",
   invalid_anniversary: "기념일의 종류와 날짜를 확인해 주세요.",
   request_conflict: "이전 저장 요청과 내용이 달라요. 최신 일정을 확인해 주세요.",
+  appointment_owner_required: "개인 일정은 작성자만 수정하거나 삭제할 수 있어요.",
+  personal_appointment_required: "개인 일정만 삭제할 수 있어요.",
   appointment_not_found: "약속을 찾지 못했어요. 최신 일정을 확인해 주세요.",
   photo_not_found: "사진을 찾지 못했어요. 날짜의 사진 목록을 새로고침해 주세요.",
   invalid_photo:

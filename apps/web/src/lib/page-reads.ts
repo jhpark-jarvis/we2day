@@ -8,6 +8,7 @@ export type ReadSection<T> = { data: T | null; status: number; detail: string };
 export type AccountRead = { user_id: string; profiles: ReadSection<ProfileView> };
 export type ContextRead = AccountRead & { couple: ReadSection<Couple> };
 export type HomeRead = {
+  user_id: string;
   couple: ReadSection<Couple>;
   appointments: ReadSection<Appointment[]>;
   zones: ReadSection<TimezoneView>;

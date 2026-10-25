@@ -15,6 +15,7 @@ export async function saveAppointment(_previous: SaveState, form: FormData): Pro
     return { error: "저장할 약속을 확인해 주세요." };
   }
   const body = {
+    ...(!id ? { kind: read("kind") || "shared" } : {}),
     title: read("title"),
     date: read("date"),
     time: read("time") || null,
@@ -29,4 +30,17 @@ export async function saveAppointment(_previous: SaveState, form: FormData): Pro
   if (result.error) return { error: result.error, conflict: result.status === 409 };
   revalidatePath("/");
   return { error: "", appointment: result.data || undefined };
+}
+
+export async function deletePersonalAppointment(id: string, version: number) {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
+    return { error: "삭제할 일정을 확인해 주세요." };
+  const result = await callApi(`/appointments/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ expected_version: version }),
+  });
+  if (result.error) return { error: result.error };
+  revalidatePath("/");
+  revalidatePath("/memories/search");
+  return { error: "" };
 }

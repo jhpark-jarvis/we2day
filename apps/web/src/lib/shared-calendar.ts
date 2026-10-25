@@ -1,5 +1,6 @@
 export type Couple = { id: string; member_count: number };
 export type Appointment = {
+  kind?: "shared" | "personal";
   id: string;
   title: string;
   date: string;

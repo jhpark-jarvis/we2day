@@ -2,6 +2,7 @@
 
 import {
   CalendarDays,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -9,9 +10,12 @@ import {
   MapPin,
   Pencil,
   RefreshCw,
+  Trash2,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import { deletePersonalAppointment } from "@/app/actions/appointments";
 import { AppointmentForm } from "@/components/appointment-form";
 import { LoadingRegion } from "@/components/loading-region";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
@@ -60,7 +64,11 @@ const examples = [
     photo: false,
   },
 ];
-type CalendarEvent = (typeof examples)[number] & { place?: string };
+type CalendarEvent = (typeof examples)[number] & {
+  place?: string;
+  kind?: "shared" | "personal";
+  created_by?: string;
+};
 
 export function CalendarWorkspace({
   today,
@@ -72,6 +80,8 @@ export function CalendarWorkspace({
   initialDate,
   zones = null,
   participantNames = [],
+  userId = null,
+  names = {},
 }: {
   today: string;
   preview?: boolean;
@@ -82,6 +92,8 @@ export function CalendarWorkspace({
   initialDate?: string;
   zones?: TimezoneView | null;
   participantNames?: string[];
+  userId?: string | null;
+  names?: Record<string, string>;
 }) {
   const [selected, setSelected] = useState(preview ? "2026-10-24" : initialDate || today);
   const [detail, setDetail] = useState<CalendarEvent | null>(null);
@@ -122,10 +134,10 @@ export function CalendarWorkspace({
   const weekday = weekdays[new Date(Date.UTC(year, month, day)).getUTCDay()];
 
   useEffect(() => {
-    if (!keyboardFocus.current) return;
+    if (!keyboardFocus.current || loading) return;
     calendarElement.current?.querySelector<HTMLButtonElement>(`[data-date="${selected}"]`)?.focus();
     keyboardFocus.current = false;
-  }, [selected]);
+  }, [selected, loading]);
 
   function moveDate(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -152,6 +164,7 @@ export function CalendarWorkspace({
     const nextSelected = calendarDate(nextYear, next.getUTCMonth(), next.getUTCDate());
     if (nextSelected === selected) return;
     keyboardFocus.current = true;
+    if (!preview && status === "ready" && nextSelected.slice(0, 7) !== monthKey) setLoading(true);
     setSelected(nextSelected);
     setMeetingNotice("");
   }
@@ -271,53 +284,72 @@ export function CalendarWorkspace({
         )}
         <section className="appointment-information" aria-label="약속 정보">
           <header className="section-heading">
-            <h2>약속 정보</h2>
-            {!preview && (
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="약속 수정하기"
-                title="약속 수정하기"
-                onClick={() =>
-                  setEditing({
-                    appointment: savedEvents.find((event) => event.id === detail.id),
-                    requestId: crypto.randomUUID(),
-                  })
-                }
-              >
-                <Pencil size={18} aria-hidden="true" />
-              </button>
+            <h2>{detail.kind === "personal" ? "개인 일정" : "약속 정보"}</h2>
+            {!preview && (detail.kind !== "personal" || detail.created_by === userId) && (
+              <div className="section-actions">
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={detail.kind === "personal" ? "개인 일정 수정" : "약속 수정하기"}
+                  title={detail.kind === "personal" ? "개인 일정 수정" : "약속 수정하기"}
+                  onClick={() =>
+                    setEditing({
+                      appointment: savedEvents.find((event) => event.id === detail.id),
+                      requestId: crypto.randomUUID(),
+                    })
+                  }
+                >
+                  <Pencil size={18} aria-hidden="true" />
+                </button>
+                {detail.kind === "personal" && (
+                  <DeletePersonal
+                    appointment={savedEvents.find((event) => event.id === detail.id)}
+                    onDeleted={() => {
+                      setSavedEvents((current) =>
+                        current.filter((event) => event.id !== detail.id),
+                      );
+                      setDetail(null);
+                    }}
+                  />
+                )}
+              </div>
             )}
           </header>
           <dl className="detail-list">
             <div>
-              <dt>함께</dt>
+              <dt>{detail.kind === "personal" ? "작성자" : "함께"}</dt>
               <dd>
-                {preview
-                  ? "가상 사용자 1 · 가상 사용자 2"
-                  : participantNames.join(" · ") || "이름을 불러오지 못했어요"}
+                {detail.kind === "personal"
+                  ? names[detail.created_by || ""] || "이름 미설정"
+                  : preview
+                    ? "가상 사용자 1 · 가상 사용자 2"
+                    : participantNames.join(" · ") || "이름을 불러오지 못했어요"}
               </dd>
             </div>
-            <div>
-              <dt>장소</dt>
-              <dd>
-                {preview ? (
-                  <span className="appointment-place">
-                    <MapPin size={14} aria-hidden="true" />
-                    <span>
-                      {detail.photo ? "강변 산책길 (예시)" : detail.place || "아직 정하지 않았어요"}
-                    </span>
-                  </span>
-                ) : (
-                  <PlaceSearch initialQuery={detail.place || ""} compact>
+            {detail.kind !== "personal" && (
+              <div>
+                <dt>장소</dt>
+                <dd>
+                  {preview ? (
                     <span className="appointment-place">
                       <MapPin size={14} aria-hidden="true" />
-                      <span>{detail.place || "아직 정하지 않았어요"}</span>
+                      <span>
+                        {detail.photo
+                          ? "강변 산책길 (예시)"
+                          : detail.place || "아직 정하지 않았어요"}
+                      </span>
                     </span>
-                  </PlaceSearch>
-                )}
-              </dd>
-            </div>
+                  ) : (
+                    <PlaceSearch initialQuery={detail.place || ""} compact>
+                      <span className="appointment-place">
+                        <MapPin size={14} aria-hidden="true" />
+                        <span>{detail.place || "아직 정하지 않았어요"}</span>
+                      </span>
+                    </PlaceSearch>
+                  )}
+                </dd>
+              </div>
+            )}
           </dl>
           {detail.note && <p className="note-panel">{detail.note}</p>}
         </section>
@@ -457,15 +489,20 @@ export function CalendarWorkspace({
               {Array.from({ length: daysInMonth(year, month) }, (_, i) => {
                 const value = i + 1,
                   key = calendarDate(year, month, value),
-                  hasEvent = events.some((event) => event.date === key),
+                  hasEvent = events.some(
+                    (event) => event.date === key && event.kind !== "personal",
+                  ),
+                  hasPersonal = events.some(
+                    (event) => event.date === key && event.kind === "personal",
+                  ),
                   hasMet =
                     !preview && meetings.some((meeting) => meeting.date === key && meeting.met);
                 return (
                   <button
-                    className={`calendar-day${(leading + i) % 7 === 0 ? " sunday" : ""}${hasMet ? " has-meeting" : ""}`}
+                    className={`calendar-day${(leading + i) % 7 === 0 ? " sunday" : ""}${hasMet ? " has-meeting" : ""}${hasPersonal ? " has-personal" : ""}`}
                     key={key}
                     type="button"
-                    aria-label={`${month + 1}월 ${value}일${hasEvent ? ", 약속 있음" : ""}${hasMet ? ", 만난 날" : ""}`}
+                    aria-label={`${month + 1}월 ${value}일${hasEvent ? ", 약속 있음" : ""}${hasMet ? ", 만난 날" : ""}${hasPersonal ? ", 개인 일정 있음" : ""}`}
                     aria-pressed={key === selected}
                     aria-current={key === today ? "date" : undefined}
                     aria-describedby={key === selected ? keyboardHelpId : undefined}
@@ -479,6 +516,9 @@ export function CalendarWorkspace({
                   >
                     <span className="day-number">
                       <span className="day-label">{value}</span>
+                      {hasMet && (
+                        <Check className="day-check" size={12} strokeWidth={3} aria-hidden="true" />
+                      )}
                       <span
                         className={`day-dot${hasEvent ? " has-event" : ""}`}
                         aria-hidden="true"
@@ -489,7 +529,9 @@ export function CalendarWorkspace({
               })}
             </div>
             <p className="calendar-caption">
-              {preview || status !== "ready" ? "함께할 날들" : "작은 점은 약속 · 밑줄은 만난 날"}
+              {preview || status !== "ready"
+                ? "함께할 날들"
+                : "점은 공동 약속 · 밑줄은 개인 일정 · 체크는 만난 날"}
             </p>
           </section>
           <div className="day-workspace">
@@ -498,7 +540,7 @@ export function CalendarWorkspace({
                 <h2 aria-live="polite">
                   {month + 1}월 {day}일 <small>{weekday}요일</small>
                 </h2>
-                <span className="muted">약속 {dayEvents.length}</span>
+                <span className="muted">일정 {dayEvents.length}</span>
               </header>
               {!preview && status === "ready" && (
                 <div className="calendar-toolbar agenda-actions">
@@ -518,7 +560,11 @@ export function CalendarWorkspace({
                     <time>{event.time}</time>
                     <span>
                       <strong>{event.title}</strong>
-                      <small>{event.note}</small>
+                      <small>
+                        {event.kind === "personal"
+                          ? `개인 일정 · ${names[event.created_by || ""] || "이름 미설정"}${event.note ? ` · ${event.note}` : ""}`
+                          : event.note}
+                      </small>
                     </span>
                     <ChevronRight size={16} aria-hidden="true" />
                   </button>
@@ -592,6 +638,88 @@ export function CalendarWorkspace({
         </div>
       </LoadingRegion>
       {preview && <p className="preview-label">화면 미리보기 · 저장되지 않는 예시 일정</p>}
+    </>
+  );
+}
+
+function DeletePersonal({
+  appointment,
+  onDeleted,
+}: {
+  appointment: Appointment | undefined;
+  onDeleted: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  if (!appointment) return null;
+  async function remove() {
+    if (!appointment || pending) return;
+    setPending(true);
+    setError("");
+    try {
+      const result = await deletePersonalAppointment(appointment.id, appointment.version);
+      if (result.error) setError(result.error);
+      else {
+        dialog.current?.close();
+        onDeleted();
+      }
+    } catch {
+      setError("일정을 삭제하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="개인 일정 삭제"
+        title="개인 일정 삭제"
+        onClick={() => dialog.current?.showModal()}
+      >
+        <Trash2 size={18} aria-hidden="true" />
+      </button>
+      <dialog
+        ref={dialog}
+        className="appointment-delete-dialog"
+        aria-label="개인 일정 삭제 확인"
+        onCancel={(event) => {
+          if (pending) event.preventDefault();
+        }}
+      >
+        <div className="section-heading">
+          <h2>개인 일정 삭제</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="삭제 취소"
+            title="취소"
+            disabled={pending}
+            onClick={() => dialog.current?.close()}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <p>‘{appointment.title}’ 일정을 삭제할까요? 삭제한 일정은 되돌릴 수 없어요.</p>
+        {error && (
+          <p className="error-message" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="place-search-actions">
+          <button
+            type="button"
+            className="primary-button"
+            disabled={pending}
+            aria-busy={pending}
+            onClick={() => void remove()}
+          >
+            삭제
+          </button>
+        </div>
+      </dialog>
     </>
   );
 }

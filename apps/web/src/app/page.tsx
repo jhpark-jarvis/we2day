@@ -6,6 +6,7 @@ import type { AnniversaryList } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
 import { type HomeRead, section } from "@/lib/page-reads";
+import { profileNames } from "@/lib/profiles";
 
 export default async function HomePage({
   searchParams,
@@ -60,6 +61,8 @@ export default async function HomePage({
       <CalendarWorkspace
         key={selectedDate}
         today={today}
+        userId={core.data?.user_id || null}
+        names={profileNames(profiles || null)}
         initialDate={selectedDate}
         zones={zones}
         status={status}

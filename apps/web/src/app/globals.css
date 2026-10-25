@@ -240,8 +240,8 @@ button { appearance: none; color: var(--foreground); }
 .username-login .auth-button { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .auth-divider { text-align: center; color: var(--muted); font-size: 12px; margin-top: 25px; }
 .calendar-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
-.calendar-day.has-meeting .day-label { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 6px; }
-.calendar-day.has-meeting[aria-pressed="true"] .day-label { text-decoration-color: currentColor; }
+.calendar-day.has-personal .day-label { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 6px; }
+.calendar-day.has-personal[aria-pressed="true"] .day-label { text-decoration-color: currentColor; }
 .meeting-day-editor { padding: 24px 0; border-top: 1px solid var(--line); }
 .meeting-day-editor h2 { font-size: 17px; font-weight: 500; margin-bottom: 14px; }
 .meeting-day-form { display: grid; gap: 14px; }
@@ -648,8 +648,8 @@ html[data-theme="sopoo"] .character-sopoo, html[data-theme="kuku"] .character-ku
 .roulette-create-dialog .meeting-fields { min-width: 0; }
 body:has(.roulette-create-dialog[open]) { overflow: hidden; }
 
-.photo-upload-dialog, .photo-album-dialog { box-sizing: border-box; width: min(640px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--foreground); overflow-y: auto; overscroll-behavior: contain; }
-.photo-upload-dialog::backdrop, .photo-album-dialog::backdrop { background: rgb(30 22 18 / 45%); }
+.photo-upload-dialog, .photo-album-dialog, .appointment-delete-dialog { box-sizing: border-box; width: min(640px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--foreground); overflow-y: auto; overscroll-behavior: contain; }
+.photo-upload-dialog::backdrop, .photo-album-dialog::backdrop, .appointment-delete-dialog::backdrop { background: rgb(30 22 18 / 45%); }
 body:has(.photo-upload-dialog[open], .photo-album-dialog[open]) { overflow: hidden; }
 .photo-upload-dialog .section-heading, .photo-album-dialog .section-heading { margin-bottom: 12px; }
 .photo-upload-dialog .photo-preparation { margin: 0; }
@@ -742,3 +742,11 @@ body:has(.favorite-place-dialog[open]) { overflow: hidden; }
 
 .photo-edit-form { display: grid; gap: 14px; }
 .photo-edit-actions { display: flex; justify-content: flex-end; }
+
+.day-check { position: absolute; top: 1px; right: 1px; color: var(--accent); }
+.calendar-day[aria-pressed="true"] .day-check { color: currentColor; }
+.schedule-kind { display: flex; gap: 10px; flex-wrap: wrap; padding: 0; border: 0; margin: 0; }
+.schedule-kind label { display: flex; gap: 7px; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.schedule-kind label:has(input:checked) { border-color: var(--accent); background: var(--soft); }
+.schedule-kind input { width: 18px; min-height: 18px; accent-color: var(--accent); }
+body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
