@@ -1,0 +1,1 @@
+reply,plan,context만 있는 JSON으로 완성하세요. date는 YYYY-MM-DD/null, activities는 문자열 목록입니다.

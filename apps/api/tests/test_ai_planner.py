@@ -182,6 +182,7 @@ def test_history_replay_does_not_call_provider_and_prompt_is_not_exposed(setup):
                 "request_id": rid,
                 "version": 1,
                 "user_text": "합성",
+                "prompt_version": "legacy-synthetic-v1",
                 "result": {"reply": "저장된 응답", "plan": None},
             }
         ],
@@ -203,6 +204,8 @@ def test_history_replay_does_not_call_provider_and_prompt_is_not_exposed(setup):
         },
     )
     assert response.status_code == 200 and response.json()["reply"] == "저장된 응답"
+    assert response.json()["prompt_version"] == "legacy-synthetic-v1"
+    assert response.json()["prompt_sha256"] is None
     assert not calls
     assert client.get("/ai/planner/prompt").status_code == 404
     response = client.post(
@@ -243,6 +246,9 @@ def test_successful_turn_persisted_and_conflict_before_provider(setup):
     response = client.post("/ai/planner", json=payload)
     assert response.status_code == 200 and response.json()["version"] == 1
     assert writes[0]["p_user"] == "질문" and writes[0]["p_prompt"] == ai_planner.PROMPT_VERSION
+    assert writes[0]["p_result"]["prompt_sha256"] == ai_planner.PROMPT_SHA256
+    assert response.json()["prompt_version"] == ai_planner.PROMPT_VERSION
+    assert response.json()["prompt_sha256"] == ai_planner.PROMPT_SHA256
     response = client.post("/ai/planner", json={**payload, "version": 1})
     assert response.status_code == 404 and len(calls) == 1
 
