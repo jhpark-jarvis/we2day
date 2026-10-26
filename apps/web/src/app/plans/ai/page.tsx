@@ -10,7 +10,9 @@ export default async function AiPlannerPage() {
     <section>
       <PageHeading>
         <div>
+          <p className="eyebrow">PLAN TOGETHER</p>
           <h1>위투 AI</h1>
+          <p className="muted">대화로 함께 짜는 데이트 코스.</p>
         </div>
       </PageHeading>
       {status.status === 401 ? (

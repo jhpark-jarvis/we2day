@@ -759,7 +759,7 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .plan-sort select { max-width: 100%; font-size: 16px; min-height: 44px; }
 @media (max-width: 600px) { .plan-sort { margin-left: 0; } }
 
-/* We2 AI: focused chat, compact disclosure, and a separate course workspace. */
+/* We2 AI: focused chat and a separate course/history column. */
 .we2-ai { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(280px,1fr); gap: 22px; align-items: start; min-width: 0; }
 .we2-chat { display: flex; flex-direction: column; height: min(72dvh,720px); min-height: 480px; min-width: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); overflow: hidden; }
 .we2-chat-header,.we2-proposal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 62px; padding: 8px 18px; border-bottom: 1px solid var(--line); box-sizing: border-box; }
@@ -786,11 +786,6 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-composer textarea { flex: 1; width: 100%; min-width: 0; min-height: 50px; max-height: 130px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 16px; line-height: 1.6; resize: none; outline: none; box-shadow: none; color: var(--foreground); }
 .we2-composer .we2-send { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: var(--accent); color: var(--on-accent); }
 .we2-composer .we2-send:not(:disabled):hover { background: var(--foreground); color: var(--surface); }
-.we2-disclosure { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; color: var(--muted); font-size: .65rem; line-height: 1.5; }
-.we2-disclosure details { position: relative; flex-shrink: 0; }
-.we2-disclosure summary { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; border-radius: 8px; cursor: pointer; }
-.we2-disclosure summary::marker { content: ''; }
-.we2-disclosure details > p { position: absolute; z-index: 5; bottom: 100%; right: 0; width: min(270px,70vw); padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: .8rem; line-height: 1.7; margin: 0; color: var(--foreground); }
 .we2-proposal { border: 1px solid var(--line); border-radius: 18px; min-width: 0; overflow-wrap: anywhere; scroll-margin-top: 24px; background: var(--surface); }
 .we2-proposal-header { font-size: .85rem; }
 .we2-draft-badge { font-size: .7rem; border: 1px solid var(--line); border-radius: 100px; padding: 4px 8px; color: var(--muted); }
@@ -818,10 +813,19 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-connection { padding: 12px 18px; font-size: .8rem; }
 .ai-spinner { animation: ai-spin 1s linear infinite; }
 @keyframes ai-spin { to { transform: rotate(360deg); } }
-@media (max-width: 760px) { .we2-ai { grid-template-columns: minmax(0,1fr); gap: 18px; } .we2-chat { min-height: 440px; height: min(69dvh,640px); } .we2-messages { padding: 16px; } .we2-chat-header { padding-inline: 12px; } .we2-course-jump { display: inline-flex; } .we2-proposal:not(.has-proposal) { display: none; } .we2-disclosure { justify-content: space-between; } }
+@media (max-width: 760px) { .we2-ai { grid-template-columns: minmax(0,1fr); gap: 18px; } .we2-chat { min-height: 440px; height: min(69dvh,640px); } .we2-messages { padding: 16px; } .we2-chat-header { padding-inline: 12px; } .we2-course-jump { display: inline-flex; } .we2-proposal:not(.has-proposal) { display: none; } }
 @media (prefers-reduced-motion: reduce) { .ai-spinner { animation: none; } }
 
-.we2-history { margin:0 18px 12px; padding:14px; border-radius:12px; background:var(--surface); border:1px solid var(--line); max-height:280px; overflow:auto; min-width:0; }
+.we2-sidebar { display:grid; gap:18px; min-width:0; }
+.we2-history { border:1px solid var(--line); border-radius:18px; background:var(--surface); min-width:0; overflow:hidden; scroll-margin-top:24px; }
+.we2-history-header { display:flex; justify-content:space-between; align-items:center; min-height:62px; padding:8px 16px; gap:12px; box-sizing:border-box; }
+.we2-history-header > span { display:flex; align-items:center; gap:8px; font-size:.85rem; }
+.we2-history-header svg { color:var(--accent); }
+.we2-history-header [aria-expanded="true"] svg { transform:rotate(180deg); }
+.we2-history-list { border-top:1px solid var(--line); padding:10px; max-height:280px; overflow-y:auto; }
+.we2-history-empty { margin:0; padding:16px 8px; font-size:.85rem; color:var(--muted); }
+.we2-history-item[aria-current="true"] { background:var(--soft); }
+
 .we2-history-item { display:flex; width:100%; gap:12px; justify-content:space-between; align-items:center; padding:10px; text-align:left; border:0; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
 .we2-history-item:hover { background:var(--surface-soft); }
 .we2-history-item span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

@@ -3,8 +3,8 @@
 import {
   ArrowDown,
   CalendarDays,
+  ChevronDown,
   History,
-  Info,
   LoaderCircle,
   MapPin,
   MessageSquarePlus,
@@ -48,6 +48,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const logRef = useRef<HTMLDivElement>(null);
   const previousLogHeight = useRef<number | null>(null);
   const proposalRef = useRef<HTMLElement>(null);
+  const historyRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [activityKeys, setActivityKeys] = useState<string[]>([]);
   const [proposal, setProposal] = useState<PlanContent | null>(null);
@@ -57,7 +58,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [saved, setSaved] = useState("");
   const saveIdentity = useRef({ id: crypto.randomUUID(), request: crypto.randomUUID() });
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [oldestTurn, setOldestTurn] = useState(1);
   const conversation = useRef({ id: crypto.randomUUID(), version: 0 });
@@ -87,7 +88,6 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
         setText("");
         setSaved("");
-        setHistoryOpen(false);
         saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
       }
     } catch (error) {
@@ -210,9 +210,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               className="icon-button"
               title="대화 기록"
               aria-label="대화 기록"
-              aria-expanded={historyOpen}
               disabled={busy}
-              onClick={() => setHistoryOpen(!historyOpen)}
+              onClick={() => {
+                setHistoryOpen(true);
+                historyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
             >
               <History size={20} aria-hidden="true" />
             </button>
@@ -251,28 +253,6 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </button>
           </div>
         </header>
-        {historyOpen && (
-          <section className="we2-history" aria-label="저장한 대화">
-            <strong>내 대화</strong>
-            <p className="settings-hint">최근 100개 · 본인만 조회</p>
-            {conversations.length ? (
-              conversations.map((item) => (
-                <button
-                  type="button"
-                  className="we2-history-item"
-                  key={item.id}
-                  disabled={busy}
-                  onClick={() => void openConversation(item.id)}
-                >
-                  <span>{item.title}</span>
-                  <small>{new Date(item.updated_at).toLocaleDateString("ko-KR")}</small>
-                </button>
-              ))
-            ) : (
-              <p>저장한 대화가 없어요.</p>
-            )}
-          </section>
-        )}
         {!available && (
           <p role="status" className="we2-connection">
             연결을 준비 중이에요. 잠시 후 다시 확인해 주세요.
@@ -398,93 +378,121 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               <Send size={19} aria-hidden="true" />
             </button>
           </form>
-          <div className="we2-disclosure">
-            <span>Cloudflare에서 처리 · 대화는 본인만 조회</span>
-            <details>
-              <summary aria-label="이용 안내" title="이용 안내">
-                <Info size={15} aria-hidden="true" />
-              </summary>
-              <p>
-                대화와 제안은 내 기록에 저장돼요. 최근 대화와 현재 코스만 AI에 전달해요.
-                계정·사진·개인 일정은 자동으로 보내지 않아요. 무료 제공량을 소진하면 요청이
-                중단돼요. 남길 코스는 초안으로 저장해 주세요.
-              </p>
-            </details>
-          </div>
         </div>
       </section>
-      <section
-        ref={proposalRef}
-        className={`we2-proposal${proposal ? " has-proposal" : ""}`}
-        aria-label="코스 초안"
-      >
-        <header className="we2-proposal-header">
-          <span>
-            <MapPin size={17} aria-hidden="true" />
-            코스 초안
-          </span>
-          {proposal && <span className="we2-draft-badge">미확정</span>}
-        </header>
-        {proposal ? (
-          <>
-            <div className="we2-proposal-body">
-              <h2>{proposal.title}</h2>
-              <p className="we2-proposal-date">
-                <CalendarDays size={15} aria-hidden="true" />
-                {proposal.date}
-                {proposal.transport && ` · ${proposal.transport}`}
+      <div className="we2-sidebar">
+        <section
+          ref={proposalRef}
+          className={`we2-proposal${proposal ? " has-proposal" : ""}`}
+          aria-label="코스 초안"
+        >
+          <header className="we2-proposal-header">
+            <span>
+              <MapPin size={17} aria-hidden="true" />
+              코스 초안
+            </span>
+            {proposal && <span className="we2-draft-badge">미확정</span>}
+          </header>
+          {proposal ? (
+            <>
+              <div className="we2-proposal-body">
+                <h2>{proposal.title}</h2>
+                <p className="we2-proposal-date">
+                  <CalendarDays size={15} aria-hidden="true" />
+                  {proposal.date}
+                  {proposal.transport && ` · ${proposal.transport}`}
+                </p>
+                <ol className="we2-itinerary">
+                  {proposal.activities.map((activity, index) => (
+                    <li key={activityKeys[index]}>
+                      <span className="we2-stop-number">{index + 1}</span>
+                      <div>
+                        <small>{activity.time || "시간 미정"}</small>
+                        <strong>{activity.title}</strong>
+                        {activity.place && <p>{activity.place}</p>}
+                        {activity.note && <p className="settings-hint">{activity.note}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                {proposal.preparation.length > 0 && (
+                  <div className="we2-preparation">
+                    <strong>준비물</strong>
+                    <p>{proposal.preparation.join(", ")}</p>
+                  </div>
+                )}
+              </div>
+              <footer className="we2-proposal-footer">
+                <p>저장 후 장소를 확인하고 확정해 주세요.</p>
+                {saved ? (
+                  <Link className="primary-button" href={`/plans?item=${saved}`}>
+                    저장한 초안 열기
+                  </Link>
+                ) : (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void save()}
+                  >
+                    {saving ? "저장 중…" : "초안 저장"}
+                  </button>
+                )}
+              </footer>
+            </>
+          ) : (
+            <div className="we2-proposal-empty">
+              <MapPin size={30} aria-hidden="true" />
+              <h2>코스를 여기에 모아둘게요.</h2>
+              <p>
+                대화하며 정한 장소와 시간을
+                <br />
+                한눈에 확인할 수 있어요.
               </p>
-              <ol className="we2-itinerary">
-                {proposal.activities.map((activity, index) => (
-                  <li key={activityKeys[index]}>
-                    <span className="we2-stop-number">{index + 1}</span>
-                    <div>
-                      <small>{activity.time || "시간 미정"}</small>
-                      <strong>{activity.title}</strong>
-                      {activity.place && <p>{activity.place}</p>}
-                      {activity.note && <p className="settings-hint">{activity.note}</p>}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              {proposal.preparation.length > 0 && (
-                <div className="we2-preparation">
-                  <strong>준비물</strong>
-                  <p>{proposal.preparation.join(", ")}</p>
-                </div>
-              )}
+              <span>확정 전에는 달력에 표시되지 않아요.</span>
             </div>
-            <footer className="we2-proposal-footer">
-              <p>저장 후 장소를 확인하고 확정해 주세요.</p>
-              {saved ? (
-                <Link className="primary-button" href={`/plans?item=${saved}`}>
-                  저장한 초안 열기
-                </Link>
+          )}
+        </section>
+        <section ref={historyRef} className="we2-history" aria-label="저장한 대화">
+          <header className="we2-history-header">
+            <span>
+              <History size={17} aria-hidden="true" />
+              대화 내역
+            </span>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={historyOpen ? "대화 내역 접기" : "대화 내역 펼치기"}
+              aria-expanded={historyOpen}
+              aria-controls="we2-history-list"
+              onClick={() => setHistoryOpen(!historyOpen)}
+            >
+              <ChevronDown size={18} aria-hidden="true" />
+            </button>
+          </header>
+          <div id="we2-history-list" className="we2-history-list" hidden={!historyOpen}>
+            {loadingHistory && <p role="status">기록을 불러오고 있어요.</p>}
+            {!loadingHistory &&
+              (conversations.length ? (
+                conversations.map((item) => (
+                  <button
+                    type="button"
+                    className="we2-history-item"
+                    key={item.id}
+                    disabled={busy}
+                    aria-current={conversation.current.id === item.id ? "true" : undefined}
+                    onClick={() => void openConversation(item.id)}
+                  >
+                    <span>{item.title}</span>
+                    <small>{new Date(item.updated_at).toLocaleDateString("ko-KR")}</small>
+                  </button>
+                ))
               ) : (
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void save()}
-                >
-                  {saving ? "저장 중…" : "초안 저장"}
-                </button>
-              )}
-            </footer>
-          </>
-        ) : (
-          <div className="we2-proposal-empty">
-            <MapPin size={30} aria-hidden="true" />
-            <h2>코스를 여기에 모아둘게요.</h2>
-            <p>
-              대화하며 정한 장소와 시간을
-              <br />
-              한눈에 확인할 수 있어요.
-            </p>
-            <span>확정 전에는 달력에 표시되지 않아요.</span>
+                <p className="we2-history-empty">저장한 대화가 없어요.</p>
+              ))}
           </div>
-        )}
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
