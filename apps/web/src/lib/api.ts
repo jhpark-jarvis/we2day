@@ -5,9 +5,10 @@ const errors: Record<string, string> = {
   plan_draft_required: "확정한 적이 있는 플랜은 삭제할 수 없어요. 보관을 이용해 주세요.",
   ai_not_configured: "AI 연결을 준비 중이에요. 서버 설정을 확인해 주세요.",
   ai_context_too_long: "대화가 길어요. 필요한 초안을 저장하고 새 대화를 시작해 주세요.",
-  ai_daily_limit:
-    "호출 간격 또는 하루 한도에 도달했어요. 잠시 후 다시 시도해 주세요. 일일 한도는 오전 9시에 초기화돼요.",
+  ai_daily_limit: "잠시 후 다시 전송해 주세요.",
+  ai_rate_limited: "연속 요청을 잠시 쉬고 다시 전송해 주세요.",
   ai_provider_limited: "Cloudflare AI 사용 한도에 도달했어요. 나중에 다시 시도해 주세요.",
+  ai_provider_busy: "지금 AI 요청이 몰리고 있어요. 잠시 후 다시 전송해 주세요.",
   ai_unavailable: "AI에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
   ai_invalid_response: "답변을 완성하지 못했어요. 요청을 짧게 나눠 다시 시도해 주세요.",
   agent_connection_limit: "사용 가능한 연결 키는 최대 5개예요. 기존 키를 폐기해 주세요.",

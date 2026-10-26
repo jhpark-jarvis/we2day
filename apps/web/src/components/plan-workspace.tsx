@@ -213,7 +213,7 @@ export function PlanWorkspace({
       </PageHeading>
       <div className="calendar-toolbar">
         <Link href="/plans/ai" className="text-button">
-          AI 플래너
+          위투 AI
         </Link>
         <button
           type="button"

@@ -10,8 +10,7 @@ export default async function AiPlannerPage() {
     <section>
       <PageHeading>
         <div>
-          <p className="eyebrow">PLAN TOGETHER</p>
-          <h1>AI 플래너</h1>
+          <h1>위투 AI</h1>
         </div>
       </PageHeading>
       {status.status === 401 ? (

@@ -1,7 +1,16 @@
 "use client";
 
-import { LoaderCircle, Send, Sparkles } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  ArrowDown,
+  CalendarDays,
+  Info,
+  LoaderCircle,
+  MapPin,
+  MessageSquarePlus,
+  Send,
+  Sparkles,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { changePlan } from "@/app/actions/plans";
 import Link from "@/components/progress-link";
 import type { PlanContent } from "@/lib/plans";
@@ -10,7 +19,10 @@ type Message = { id: string; role: "user" | "assistant"; content: string };
 export function AiPlanner({ available, today }: { available: boolean; today: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [pendingText, setPendingText] = useState("");
+  const logRef = useRef<HTMLDivElement>(null);
+  const proposalRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [activityKeys, setActivityKeys] = useState<string[]>([]);
   const [proposal, setProposal] = useState<PlanContent | null>(null);
   const [pending, setPending] = useState(false);
@@ -19,21 +31,34 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [saved, setSaved] = useState("");
   const saveIdentity = useRef({ id: crypto.randomUUID(), request: crypto.randomUUID() });
   const busy = pending || saving;
+  useEffect(() => {
+    if (messages.length || pendingText) {
+      const log = logRef.current;
+      if (log) log.scrollTop = log.scrollHeight;
+    }
+  }, [messages, pendingText]);
   async function send() {
-    if (busy || !text.trim() || !consent) return;
+    if (busy || !text.trim()) return;
     const next: Message[] = [
       ...messages,
       { id: crypto.randomUUID(), role: "user", content: text.trim() },
     ];
     setPending(true);
+    setPendingText(text.trim());
+    setText("");
     setError("");
+    const history = next.slice(-11).map(({ role, content }) => ({ role, content }));
+    while (
+      history.length > 1 &&
+      new TextEncoder().encode(JSON.stringify({ messages: history, proposal })).length > 18000
+    )
+      history.splice(0, 2);
     try {
       const response = await fetch("/api/ai/planner", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          consent: true,
-          messages: next.map(({ role, content }) => ({ role, content })),
+          messages: history,
           proposal,
         }),
         signal: AbortSignal.timeout(65000),
@@ -49,9 +74,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
       }
     } catch (error) {
+      setText(next[next.length - 1].content);
       setError(error instanceof Error ? error.message : "연결하지 못했어요. 다시 시도해 주세요.");
     } finally {
       setPending(false);
+      setPendingText("");
     }
   }
   async function save() {
@@ -70,140 +97,247 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     }
   }
   return (
-    <div className="ai-planner">
-      <p className="muted">날짜·지역·취향을 알려주면 코스를 함께 정리해요.</p>
-      {!available && (
-        <p role="status">AI 연결을 준비 중이에요. 서버 설정이 완료되면 사용할 수 있어요.</p>
-      )}
-      <label className="ai-consent">
-        <input
-          type="checkbox"
-          checked={consent}
-          disabled={busy}
-          onChange={(e) => setConsent(e.target.checked)}
-        />
-        입력한 대화와 현재 제안을 Cloudflare AI로 보내는 데 동의해요.
-      </label>
-      <p className="settings-hint">
-        대화는 이 화면에만 유지돼요. 계정·사진·개인 일정은 자동으로 보내지 않아요. 남길 코스는
-        초안으로 저장해 주세요.
-      </p>
-      <div className="ai-messages" role="log" aria-label="AI 대화" aria-busy={pending}>
-        {messages.length === 0 && (
-          <p className="muted">예: {today} 오후 2시부터 서울숲 근처에서 산책과 카페 코스를 짜줘.</p>
-        )}
-        {messages.map((message) => (
-          <div className={`ai-message ai-${message.role}`} key={message.id}>
-            <small>{message.role === "user" ? "내 요청" : "AI 플래너"}</small>
-            <p>{message.content}</p>
+    <div className="we2-ai">
+      <section className="we2-chat" aria-label="위투 AI 대화">
+        <header className="we2-chat-header">
+          <div>
+            <Sparkles size={18} aria-hidden="true" />
+            <strong>함께 짜는 데이트</strong>
           </div>
-        ))}
-      </div>
-      <div className="ai-status" role="status">
-        {pending && (
-          <>
-            <LoaderCircle size={18} className="ai-spinner" aria-hidden="true" /> 코스를 정리하고
-            있어요.
-          </>
-        )}
-      </div>
-      <form
-        className="ai-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send();
-        }}
-      >
-        <label htmlFor="ai-message" className="sr-only">
-          AI에게 보낼 내용
-        </label>
-        <textarea
-          id="ai-message"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={2000}
-          rows={3}
-          disabled={busy || !available}
-          placeholder="날짜와 원하는 코스를 입력해 주세요."
-        />
-        <button
-          className="icon-button"
-          type="submit"
-          aria-label="메시지 전송"
-          title="전송"
-          disabled={busy || !available || !consent || !text.trim() || messages.length >= 12}
-        >
-          <Send size={21} aria-hidden="true" />
-        </button>
-      </form>
-      <div className="calendar-toolbar ai-actions">
-        <button
-          type="button"
-          className="text-button"
-          disabled={busy || messages.length === 0}
-          onClick={() => {
-            setMessages([]);
-            setProposal(null);
-            setSaved("");
-            setError("");
-          }}
-        >
-          새 대화
-        </button>
-        <span className="settings-hint">하루 최대 50회 · 한국 시간 오전 9시 초기화</span>
-      </div>
-      {messages.length >= 12 && (
-        <p role="status">
-          대화 길이 제한에 도달했어요. 필요한 초안을 저장하고 새 대화를 시작해 주세요.
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="error-message">
-          {error}
-        </p>
-      )}
-      {proposal && (
-        <section className="plan-review ai-proposal" aria-label="제안한 코스">
-          <h2>
-            <Sparkles size={18} aria-hidden="true" /> {proposal.title}
-          </h2>
-          <p>
-            {proposal.date} {proposal.transport}
-          </p>
-          <ol>
-            {proposal.activities.map((activity, index) => (
-              <li key={activityKeys[index]}>
-                <strong>
-                  {activity.time || "시간 미정"} · {activity.title}
-                </strong>
-                {activity.place && <p>{activity.place}</p>}
-                {activity.note && <p className="settings-hint">{activity.note}</p>}
-              </li>
-            ))}
-          </ol>
-          {proposal.preparation.length > 0 && <p>준비물: {proposal.preparation.join(", ")}</p>}
-          <p className="settings-hint">
-            AI 제안은 실제 장소·영업정보 확인이 필요해요. 저장 후 편집 화면에서 장소를 검색하고
-            확정해 주세요.
-          </p>
-          <div className="calendar-toolbar ai-actions">
-            {saved ? (
-              <Link className="primary-button" href={`/plans?item=${saved}`}>
-                저장한 초안
-              </Link>
-            ) : (
+          <div className="we2-chat-tools">
+            {proposal && (
               <button
-                className="primary-button"
                 type="button"
-                disabled={busy}
-                onClick={() => void save()}
+                className="icon-button we2-course-jump"
+                title="코스 보기"
+                aria-label="코스 보기"
+                onClick={() =>
+                  proposalRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
               >
-                {saving ? "저장 중…" : "초안 저장"}
+                <ArrowDown size={19} aria-hidden="true" />
               </button>
             )}
+            <button
+              type="button"
+              className="icon-button"
+              title="새 대화"
+              aria-label="새 대화"
+              disabled={busy || messages.length === 0}
+              onClick={() => {
+                setMessages([]);
+                setText("");
+                setProposal(null);
+                setSaved("");
+                setError("");
+                setActivityKeys([]);
+              }}
+            >
+              <MessageSquarePlus size={20} aria-hidden="true" />
+            </button>
           </div>
-        </section>
-      )}
+        </header>
+        {!available && (
+          <p role="status" className="we2-connection">
+            연결을 준비 중이에요. 잠시 후 다시 확인해 주세요.
+          </p>
+        )}
+        <div
+          ref={logRef}
+          className="we2-messages"
+          role="log"
+          aria-label="AI 대화"
+          aria-busy={pending}
+        >
+          {messages.length === 0 && !pending && (
+            <div className="we2-welcome">
+              <span className="we2-welcome-icon">
+                <Sparkles size={28} aria-hidden="true" />
+              </span>
+              <h2>우리, 어디로 갈까요?</h2>
+              <p>날짜와 하고 싶은 일을 알려주세요.</p>
+              <div className="we2-starters">
+                {[
+                  { label: "산책과 카페", prompt: `${today} 오후 산책과 카페 코스를 같이 짜줘.` },
+                  {
+                    label: "비 오는 날",
+                    prompt: `${today} 비 오는 날 실내 데이트를 계획하고 싶어.`,
+                  },
+                  {
+                    label: "가벼운 하루",
+                    prompt: `${today} 무리하지 않는 가벼운 데이트를 계획하고 싶어.`,
+                  },
+                ].map(({ label, prompt }) => (
+                  <button
+                    type="button"
+                    className="text-button"
+                    key={label}
+                    disabled={busy || !available}
+                    onClick={() => {
+                      setText(prompt);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {messages.map((message) => (
+            <div className={`we2-message we2-${message.role}`} key={message.id}>
+              {message.role === "assistant" && (
+                <span className="we2-speaker">
+                  <Sparkles size={13} aria-hidden="true" />
+                  위투 AI
+                </span>
+              )}
+              <p>{message.content}</p>
+            </div>
+          ))}
+          {pendingText && (
+            <div className="we2-message we2-user">
+              <p>{pendingText}</p>
+            </div>
+          )}
+        </div>
+        <div className="we2-status" role="status">
+          {pending && (
+            <>
+              <LoaderCircle size={15} className="ai-spinner" aria-hidden="true" />
+              다음 코스를 생각하고 있어요.
+            </>
+          )}
+        </div>
+        <div className="we2-input-area">
+          {error && (
+            <p role="alert" className="error-message">
+              {error}
+            </p>
+          )}
+          <form
+            className="we2-composer"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+          >
+            <label htmlFor="ai-message" className="sr-only">
+              위투 AI에게 보낼 내용
+            </label>
+            <textarea
+              ref={inputRef}
+              id="ai-message"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={2000}
+              rows={2}
+              disabled={busy || !available}
+              placeholder="어떤 데이트를 하고 싶어요?"
+              enterKeyHint="send"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            <button
+              className="icon-button we2-send"
+              type="submit"
+              aria-label="메시지 전송"
+              title="전송"
+              disabled={busy || !available || !text.trim()}
+            >
+              <Send size={19} aria-hidden="true" />
+            </button>
+          </form>
+          <div className="we2-disclosure">
+            <span>Cloudflare에서 처리 · 대화는 이 화면에만 유지</span>
+            <details>
+              <summary aria-label="이용 안내" title="이용 안내">
+                <Info size={15} aria-hidden="true" />
+              </summary>
+              <p>
+                최근 대화와 현재 코스만 AI에 전달해요. 계정·사진·개인 일정은 자동으로 보내지 않아요.
+                무료 제공량을 소진하면 요청이 중단돼요. 남길 코스는 초안으로 저장해 주세요.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+      <section
+        ref={proposalRef}
+        className={`we2-proposal${proposal ? " has-proposal" : ""}`}
+        aria-label="코스 초안"
+      >
+        <header className="we2-proposal-header">
+          <span>
+            <MapPin size={17} aria-hidden="true" />
+            코스 초안
+          </span>
+          {proposal && <span className="we2-draft-badge">미확정</span>}
+        </header>
+        {proposal ? (
+          <>
+            <div className="we2-proposal-body">
+              <h2>{proposal.title}</h2>
+              <p className="we2-proposal-date">
+                <CalendarDays size={15} aria-hidden="true" />
+                {proposal.date}
+                {proposal.transport && ` · ${proposal.transport}`}
+              </p>
+              <ol className="we2-itinerary">
+                {proposal.activities.map((activity, index) => (
+                  <li key={activityKeys[index]}>
+                    <span className="we2-stop-number">{index + 1}</span>
+                    <div>
+                      <small>{activity.time || "시간 미정"}</small>
+                      <strong>{activity.title}</strong>
+                      {activity.place && <p>{activity.place}</p>}
+                      {activity.note && <p className="settings-hint">{activity.note}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              {proposal.preparation.length > 0 && (
+                <div className="we2-preparation">
+                  <strong>준비물</strong>
+                  <p>{proposal.preparation.join(", ")}</p>
+                </div>
+              )}
+            </div>
+            <footer className="we2-proposal-footer">
+              <p>저장 후 장소를 확인하고 확정해 주세요.</p>
+              {saved ? (
+                <Link className="primary-button" href={`/plans?item=${saved}`}>
+                  저장한 초안 열기
+                </Link>
+              ) : (
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void save()}
+                >
+                  {saving ? "저장 중…" : "초안 저장"}
+                </button>
+              )}
+            </footer>
+          </>
+        ) : (
+          <div className="we2-proposal-empty">
+            <MapPin size={30} aria-hidden="true" />
+            <h2>코스를 여기에 모아둘게요.</h2>
+            <p>
+              대화하며 정한 장소와 시간을
+              <br />
+              한눈에 확인할 수 있어요.
+            </p>
+            <span>확정 전에는 달력에 표시되지 않아요.</span>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

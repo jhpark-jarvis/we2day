@@ -78,6 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function routeTitle(pathname: string) {
+  if (pathname === "/plans/ai") return "위투 AI";
   if (pathname === "/") return "함께할 날들";
   const titles: Record<string, string> = {
     preview: "함께할 날들",
