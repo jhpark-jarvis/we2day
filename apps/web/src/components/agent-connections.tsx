@@ -62,7 +62,7 @@ export function AgentConnections({
         있어요.
       </p>
       <p className="settings-hint">
-        키는 30일 동안 유효하며 계정당 최대 5개예요. 연결할 에이전트가 준비됐을 때 발급하세요.
+        키는 1년 동안 유효하며 계정당 최대 5개예요. 연결할 에이전트가 준비됐을 때 발급하세요.
       </p>
       <form
         onSubmit={(event) => {

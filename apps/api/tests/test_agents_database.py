@@ -134,3 +134,32 @@ def test_daily_draft_quota_preserves_retry_and_no_calendar_side_effect(database_
     with actor(dsn, USERS[1]) as db:
         assert db.execute("select count(*) from public.date_plans").fetchone()[0] == 20
         assert db.execute("select count(*) from public.appointments").fetchone()[0] == 0
+
+
+def test_new_basic_and_managed_keys_expire_in_one_calendar_year(database_url):
+    dsn = database_url
+    connect_pair(dsn)
+    keys = [issue(dsn), call(dsn, USERS[0], "create_managed_agent_connection", "Managed", True)[0]]
+    with psycopg.connect(dsn) as db:
+        for key in keys:
+            assert db.execute(
+                "select expires_at=created_at+interval '1 year' from agent_connections where id=%s",
+                (key["id"],),
+            ).fetchone()[0]
+        db.execute(
+            "update agent_connections set expires_at=created_at+interval '30 days' where id=%s",
+            (keys[0]["id"],),
+        )
+        previous = db.execute(
+            "select expires_at from agent_connections where id=%s", (keys[0]["id"],)
+        ).fetchone()[0]
+        db.execute(
+            "alter table agent_connections alter column expires_at "
+            "set default now()+interval '1 year'"
+        )
+        assert (
+            db.execute(
+                "select expires_at from agent_connections where id=%s", (keys[0]["id"],)
+            ).fetchone()[0]
+            == previous
+        )
