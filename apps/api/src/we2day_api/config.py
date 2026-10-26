@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     )
     supabase_url: str | None = None
     supabase_publishable_key: str | None = Field(default=None, repr=False)
+    agent_oauth_origin: str | None = None
     push_enabled: bool = False
     push_automatic_enabled: bool = False
     push_private_key: str | None = Field(default=None, repr=False)

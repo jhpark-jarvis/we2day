@@ -74,10 +74,20 @@ def agent_rpc(request: Request, credentials, function: str, parameters: dict):
             trust_env=False,
             follow_redirects=False,
         ) as client:
+            payload = {"p_key": credentials.credentials, **parameters}
+            resource = getattr(request.state, "agent_oauth_resource", None)
+            if resource:
+                payload = {
+                    "p_key": credentials.credentials,
+                    "p_resource": resource,
+                    "p_function": function,
+                    "p_arguments": parameters,
+                }
+                function = "agent_oauth_dispatch"
             response = client.post(
                 f"{settings.supabase_url.rstrip('/')}/rest/v1/rpc/{function}",
                 headers={"apikey": settings.supabase_publishable_key},
-                json={"p_key": credentials.credentials, **parameters},
+                json=payload,
             )
         if response.status_code == 401:
             raise unauthenticated()
