@@ -46,6 +46,13 @@ def test_metadata_callback_and_pkce_cannot_be_redirected():
         result = client.get("/agent/oauth/authorize?" + urlencode(AUTH), follow_redirects=False)
         assert result.status_code == 303
         assert result.headers["location"].startswith(ORIGIN + "/settings/agents/authorize?")
+        assert (
+            client.get(
+                "/agent/oauth/authorize?" + urlencode({**AUTH, "ui_locales": "ko-KR"}),
+                follow_redirects=False,
+            ).status_code
+            == 303
+        )
         for field, bad in [
             ("client_id", "https://evil.example/client.json"),
             ("redirect_uri", CALLBACK + "/evil"),
@@ -153,3 +160,15 @@ def test_exchange_never_reflects_upstream_or_accepts_unbound_fields():
         ]:
             assert client.post("/agent/oauth/token", data=bad).status_code == 400
         assert len(requests) == 1
+
+
+def test_mcp_valid_json_rpc_without_json_mime():
+    with TestClient(app()) as client:
+        response = client.post(
+            "/agent/mcp",
+            content=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}),
+            headers={"content-type": "application/json-rpc"},
+        )
+        assert response.status_code == 200
+        assert len(response.json()["result"]["tools"]) == 6
+        assert response.json()["result"]["resultType"] == "complete"

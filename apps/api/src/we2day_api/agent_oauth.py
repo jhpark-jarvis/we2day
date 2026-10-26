@@ -56,6 +56,7 @@ class Authorization(BaseModel):
     state: str = Field(min_length=16, max_length=1024)
     resource: str
     scope: str
+    ui_locales: str | None = Field(default=None, max_length=64, pattern=r"^[A-Za-z0-9 -]+$")
 
 
 def validate_authorization(request, values):
@@ -114,14 +115,16 @@ def resource_metadata(request: Request):
 def authorize(request: Request):
     body = validate_authorization(request, unique_query(request))
     return RedirectResponse(
-        origin(request) + "/settings/agents/authorize?" + urlencode(body.model_dump()),
+        origin(request)
+        + "/settings/agents/authorize?"
+        + urlencode(body.model_dump(exclude_none=True)),
         status_code=303,
     )
 
 
 @router.get("/agent/oauth/review")
 def review(request: Request):
-    return validate_authorization(request, unique_query(request)).model_dump()
+    return validate_authorization(request, unique_query(request)).model_dump(exclude_none=True)
 
 
 @router.post("/agent/oauth/approve")
@@ -339,8 +342,7 @@ async def mcp(request: Request):
         return JSONResponse({"error": "invalid_origin"}, status_code=403)
     if request.url.query:
         return JSONResponse({"error": "invalid_request"}, status_code=400)
-    if request.headers.get("content-type", "").split(";")[0] != "application/json":
-        return JSONResponse({"error": "json_required"}, status_code=415)
+    # Accept a bounded JSON-RPC document; authentication never relies on MIME or cookies.
     raw = bytearray()
     async for chunk in request.stream():
         raw.extend(chunk)
@@ -424,4 +426,5 @@ async def mcp(request: Request):
             "id": id,
             "error": {"code": -32601, "message": "Method not found"},
         }
+    result.setdefault("resultType", "complete")
     return {"jsonrpc": "2.0", "id": id, "result": result}
