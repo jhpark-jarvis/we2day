@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from we2day_api.agent_oauth import router as agent_oauth_router
 from we2day_api.agents import router as agents_router
+from we2day_api.ai_planner import router as ai_planner_router
 from we2day_api.anniversaries import router as anniversaries_router
 from we2day_api.auth import CurrentUser, require_user
 from we2day_api.bootstrap import router as bootstrap_router
@@ -69,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(title="WE2DAY API", version="0.1.0", lifespan=lifespan)
     application.state.settings = config
     application.include_router(agents_router)
+    application.include_router(ai_planner_router)
     application.include_router(agent_oauth_router)
     application.include_router(bootstrap_router)
     application.include_router(push_router)

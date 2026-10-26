@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_publishable_key: str | None = Field(default=None, repr=False)
     agent_oauth_origin: str | None = None
+    cloudflare_account_id: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{32}$")
+    cloudflare_api_token: str | None = Field(default=None, repr=False)
     push_enabled: bool = False
     push_automatic_enabled: bool = False
     push_private_key: str | None = Field(default=None, repr=False)
