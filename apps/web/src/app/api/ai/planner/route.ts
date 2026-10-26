@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 
-export const maxDuration = 65;
+export const maxDuration = 105;
 const headers = { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" };
 
 export async function POST(request: NextRequest) {
@@ -49,14 +49,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const kind = request.nextUrl.searchParams.get("view");
-  if (kind !== "history")
+  if (kind !== "history" && kind !== "places")
     return NextResponse.json({ error: "요청을 확인해 주세요." }, { status: 422, headers });
   const query = new URLSearchParams();
-  for (const key of ["conversation_id", "before"]) {
+  for (const key of kind === "places" ? ["source", "offset"] : ["conversation_id", "before"]) {
     const value = request.nextUrl.searchParams.get(key);
     if (value) query.set(key, value);
   }
-  const result = await callApi(`/ai/planner/history?${query.toString()}`);
+  const result = await callApi(`/ai/planner/${kind}?${query.toString()}`);
   return NextResponse.json(result.error ? { error: result.error } : result.data, {
     status: result.status,
     headers,

@@ -2,6 +2,7 @@
 
 import {
   ArrowDown,
+  Bookmark,
   CalendarDays,
   ChevronDown,
   History,
@@ -21,10 +22,17 @@ type Turn = {
   request_id: string;
   version: number;
   user_text: string;
-  result: { reply: string; plan: PlanContent | null };
+  result: { reply: string; plan: PlanContent | null; checks?: string[]; weather?: unknown[] };
   prompt_version: string;
 };
-type Message = { id: string; role: "user" | "assistant"; content: string };
+type Message = { id: string; role: "user" | "assistant"; content: string; weatherSource?: boolean };
+type PlaceOption = { source: "favorite" | "wish"; id: string; title: string; address: string };
+type Candidate = {
+  ref: string;
+  source: "naver" | "selected" | "user";
+  title: string;
+  address: string;
+};
 async function read(view: string, query = "") {
   const response = await fetch(`/api/ai/planner?view=${view}${query}`, { cache: "no-store" });
   const result = await response.json();
@@ -38,6 +46,7 @@ function turnMessages(turns: Turn[]): Message[] {
       id: `${turn.request_id}-assistant`,
       role: "assistant" as const,
       content: turn.result.reply,
+      weatherSource: Boolean(turn.result.weather?.length),
     },
   ]);
 }
@@ -61,6 +70,16 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [historyOpen, setHistoryOpen] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [oldestTurn, setOldestTurn] = useState(1);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [chosenPlaces, setChosenPlaces] = useState<{ title: string; address: string }[]>([]);
+  const [checks, setChecks] = useState<string[]>([]);
+  const [placeOptions, setPlaceOptions] = useState<PlaceOption[]>([]);
+  const [selectedPlaces, setSelectedPlaces] = useState<PlaceOption[]>([]);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+  const [placesOpen, setPlacesOpen] = useState(false);
+  const [placeSource, setPlaceSource] = useState<"favorite" | "wish">("favorite");
+  const [placeOffset, setPlaceOffset] = useState(0);
+  const [hasMorePlaces, setHasMorePlaces] = useState(false);
   const conversation = useRef({ id: crypto.randomUUID(), version: 0 });
   const retry = useRef<{ id: string; text: string } | null>(null);
   const busy = pending || saving || loadingHistory;
@@ -87,6 +106,10 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         setProposal(plan);
         setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
         setText("");
+        setCandidates([]);
+        setChosenPlaces([]);
+        setSelectedPlaces([]);
+        setChecks(turns[turns.length - 1]?.result.checks || []);
         setSaved("");
         saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
       }
@@ -127,16 +150,38 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       }
     }
   }, [messages, pendingText]);
-  async function send() {
-    if (busy || !text.trim()) return;
-    const next: Message[] = [
-      ...messages,
-      { id: crypto.randomUUID(), role: "user", content: text.trim() },
-    ];
-    const requestId = retry.current?.text === text.trim() ? retry.current.id : crypto.randomUUID();
-    retry.current = { id: requestId, text: text.trim() };
+  async function loadPlaces(source: "favorite" | "wish", offset = 0) {
+    setLoadingPlaces(true);
+    setError("");
+    try {
+      const items: PlaceOption[] = await read("places", `&source=${source}&offset=${offset}`);
+      setPlaceSource(source);
+      setPlaceOffset(offset);
+      setHasMorePlaces(items.length === 50);
+      setPlaceOptions(offset ? (previous) => [...previous, ...items] : items);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "장소를 불러오지 못했어요.");
+    } finally {
+      setLoadingPlaces(false);
+    }
+  }
+  async function send(messageOverride?: string, candidate?: Candidate) {
+    const content = messageOverride ?? text.trim();
+    if (busy || !content) return;
+    const chosen = candidate
+      ? [
+          ...chosenPlaces.filter(
+            (p) => p.title !== candidate.title || p.address !== candidate.address,
+          ),
+          { title: candidate.title, address: candidate.address },
+        ].slice(-8)
+      : chosenPlaces;
+    const next: Message[] = [...messages, { id: crypto.randomUUID(), role: "user", content }];
+    const requestId = retry.current?.text === content ? retry.current.id : crypto.randomUUID();
+    retry.current = { id: requestId, text: content };
+    setChosenPlaces(chosen);
     setPending(true);
-    setPendingText(text.trim());
+    setPendingText(content);
     setText("");
     setError("");
     const history = next.slice(-11).map(({ role, content }) => ({ role, content }));
@@ -155,8 +200,10 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           conversation_id: conversation.current.id,
           version: conversation.current.version,
           request_id: requestId,
+          selected_places: selectedPlaces.map(({ source, id }) => ({ source, id })),
+          chosen_places: chosen,
         }),
-        signal: AbortSignal.timeout(65000),
+        signal: AbortSignal.timeout(110000),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "답변을 받지 못했어요.");
@@ -165,8 +212,18 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       void read("history")
         .then(setConversations)
         .catch(() => {});
-      setMessages([...next, { id: crypto.randomUUID(), role: "assistant", content: result.reply }]);
+      setMessages([
+        ...next,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: result.reply,
+          weatherSource: Boolean(result.weather?.length),
+        },
+      ]);
       setText("");
+      setCandidates(result.candidates || []);
+      setChecks(result.checks || []);
       if (result.plan) {
         setProposal(result.plan);
         setActivityKeys(result.plan.activities.map(() => crypto.randomUUID()));
@@ -247,6 +304,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 setSaved("");
                 setError("");
                 setActivityKeys([]);
+                setCandidates([]);
+                setChosenPlaces([]);
+                setSelectedPlaces([]);
+                setChecks([]);
+                setPlacesOpen(false);
               }}
             >
               <MessageSquarePlus size={20} aria-hidden="true" />
@@ -319,6 +381,18 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 </span>
               )}
               <p>{message.content}</p>
+              {message.weatherSource && (
+                <small className="we2-weather-source">
+                  도시 기준 예보 ·{" "}
+                  <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">
+                    Open-Meteo
+                  </a>
+                  {" / "}
+                  <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">
+                    GeoNames
+                  </a>
+                </small>
+              )}
             </div>
           ))}
           {pendingText && (
@@ -331,11 +405,91 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           {(pending || loadingHistory) && (
             <>
               <LoaderCircle size={15} className="ai-spinner" aria-hidden="true" />
-              {loadingHistory ? "대화 기록을 불러오고 있어요." : "다음 코스를 생각하고 있어요."}
+              {loadingHistory ? "대화 기록을 불러오고 있어요." : "장소와 코스를 살펴보고 있어요."}
             </>
           )}
         </div>
         <div className="we2-input-area">
+          <div className="we2-attachments">
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy || loadingPlaces}
+              aria-expanded={placesOpen}
+              aria-controls="we2-place-picker"
+              onClick={() => {
+                setPlacesOpen(!placesOpen);
+                if (!placesOpen) void loadPlaces(placeSource);
+              }}
+            >
+              <Bookmark size={16} aria-hidden="true" />
+              저장한 장소{selectedPlaces.length ? ` · ${selectedPlaces.length}` : ""}
+            </button>
+          </div>
+          {placesOpen && (
+            <section
+              className="we2-place-picker"
+              id="we2-place-picker"
+              aria-label="AI에 전달할 장소"
+            >
+              <div className="we2-place-tabs">
+                {(["favorite", "wish"] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    className="text-button"
+                    aria-pressed={placeSource === source}
+                    disabled={loadingPlaces || busy}
+                    onClick={() => void loadPlaces(source)}
+                  >
+                    {source === "favorite" ? "자주 가는 곳" : "위시"}
+                  </button>
+                ))}
+              </div>
+              <p className="settings-hint">선택한 장소만 메시지와 함께 AI에 전달해요. 최대 8개.</p>
+              <div className="we2-place-options" aria-busy={loadingPlaces}>
+                {loadingPlaces && <p role="status">장소를 불러오고 있어요.</p>}
+                {!loadingPlaces && placeOptions.length === 0 && <p>저장한 장소가 없어요.</p>}
+                {placeOptions.map((item) => {
+                  const checked = selectedPlaces.some(
+                    (p) => p.source === item.source && p.id === item.id,
+                  );
+                  return (
+                    <label key={`${item.source}-${item.id}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={busy || loadingPlaces || (!checked && selectedPlaces.length >= 8)}
+                        onChange={() =>
+                          setSelectedPlaces(
+                            checked
+                              ? selectedPlaces.filter(
+                                  (p) => p.source !== item.source || p.id !== item.id,
+                                )
+                              : [...selectedPlaces, item],
+                          )
+                        }
+                      />
+                      <span>
+                        {item.title}
+                        {item.address && <small>{item.address}</small>}
+                      </span>
+                    </label>
+                  );
+                })}
+                {hasMorePlaces && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={loadingPlaces}
+                    onClick={() => void loadPlaces(placeSource, placeOffset + 50)}
+                  >
+                    더 보기
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
           {error && (
             <p role="alert" className="error-message">
               {error}
@@ -423,6 +577,13 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 )}
               </div>
               <footer className="we2-proposal-footer">
+                {checks.length > 0 && (
+                  <ul className="we2-checks" aria-label="코스 확인 사항">
+                    {checks.map((check) => (
+                      <li key={check}>{check}</li>
+                    ))}
+                  </ul>
+                )}
                 <p>저장 후 장소를 확인하고 확정해 주세요.</p>
                 {saved ? (
                   <Link className="primary-button" href={`/plans?item=${saved}`}>
@@ -453,6 +614,40 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </div>
           )}
         </section>
+        {candidates.length > 0 && (
+          <section className="we2-candidates" aria-label="장소 후보">
+            <header className="we2-proposal-header">
+              <span>
+                <MapPin size={17} aria-hidden="true" />
+                장소 후보
+              </span>
+            </header>
+            <div className="we2-candidate-list">
+              {candidates.map((candidate) => (
+                <article key={candidate.ref}>
+                  <div>
+                    <strong>{candidate.title}</strong>
+                    {candidate.address && <p>{candidate.address}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    aria-label={`${candidate.title} 선택`}
+                    onClick={() =>
+                      void send(
+                        `${candidate.title}을(를) 선택할게. 정한 조건에 맞춰 코스에 반영해줘.`,
+                        candidate,
+                      )
+                    }
+                  >
+                    선택
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
         <section ref={historyRef} className="we2-history" aria-label="저장한 대화">
           <header className="we2-history-header">
             <span>

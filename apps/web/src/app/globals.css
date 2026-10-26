@@ -776,11 +776,31 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-starters .text-button { padding: 8px 12px; border-radius: 100px; font-size: .8rem; background: var(--surface); }
 .we2-message { max-width: 90%; min-width: 0; overflow-wrap: anywhere; }
 .we2-message p { margin: 0; white-space: pre-wrap; line-height: 1.8; font-size: .93rem; }
+.we2-weather-source { display:block; margin-top:8px; color:var(--muted); font-size:.7rem; }
 .we2-user { align-self: flex-end; border-radius: 16px 16px 4px 16px; padding: 12px 16px; background: var(--soft); }
 .we2-assistant { align-self: flex-start; padding: 2px 0; }
 .we2-speaker { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .74rem; margin-bottom: 7px; }
 .we2-status { height: 26px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding-inline: 20px; color: var(--muted); font-size: .76rem; }
 .we2-input-area { padding: 0 16px 12px; }
+.we2-attachments { display:flex; align-items:center; min-height:38px; }
+.we2-attachments .text-button { display:inline-flex; align-items:center; gap:6px; font-size:.8rem; }
+.we2-place-picker { margin:0 0 10px; padding:10px; border:1px solid var(--line); border-radius:12px; min-width:0; }
+.we2-place-tabs { display:flex; gap:6px; }
+.we2-place-tabs [aria-pressed="true"] { background:var(--soft); color:var(--accent); }
+.we2-place-options { max-height:130px; overflow-y:auto; overflow-wrap:anywhere; }
+.we2-place-options label { display:flex; align-items:flex-start; gap:8px; padding:8px 0; }
+.we2-place-options input { flex:0 0 18px; margin-top:3px; }
+.we2-place-options span { min-width:0; }
+.we2-place-options small { display:block; color:var(--muted); }
+.we2-candidates { min-width:0; border:1px solid var(--line); border-radius:18px; background:var(--surface); overflow:hidden; }
+.we2-candidate-list { max-height:360px; overflow-y:auto; padding:0 16px; }
+.we2-candidate-list article { display:flex; align-items:center; gap:8px; padding:12px 0; }
+.we2-candidate-list article + article { border-top:1px solid var(--line); }
+.we2-candidate-list article > div { flex:1; min-width:0; overflow-wrap:anywhere; }
+.we2-candidate-list strong { font-size:.85rem; }
+.we2-candidate-list p { font-size:.75rem; color:var(--muted); margin:5px 0 0; }
+.we2-candidate-list button { flex-shrink:0; }
+.we2-checks { padding-left:18px; font-size:.8rem; color:var(--muted); line-height:1.8; }
 .we2-composer { display: flex; align-items: flex-end; gap: 10px; padding: 12px; border: 1px solid var(--control-border); border-radius: 14px; background: var(--background); }
 .we2-composer:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .we2-composer textarea { flex: 1; width: 100%; min-width: 0; min-height: 50px; max-height: 130px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 16px; line-height: 1.6; resize: none; outline: none; box-shadow: none; color: var(--foreground); }

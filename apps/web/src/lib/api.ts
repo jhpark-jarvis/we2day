@@ -112,7 +112,7 @@ export async function callApi<T>(path: string, init: RequestInit = {}) {
         signal: requestSignal(
           init.signal,
           path === "/ai/planner"
-            ? 60_000
+            ? 100_000
             : path === "/photos" && init.method === "POST"
               ? 30_000
               : 8_000,

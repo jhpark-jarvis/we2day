@@ -1,4 +1,4 @@
-"""Transient, authenticated NAVER API HUB search. No persistence or AI reuse."""
+"""Transient NAVER API HUB search shared by authenticated UI and bounded AI tools."""
 
 from typing import Annotated
 
@@ -61,7 +61,12 @@ def search_places(
 ):
     if not store.rpc("get_my_couple"):
         raise HTTPException(403, "couple_required")
-    config = request.app.state.settings
+    return fetch_places(request.app.state.settings, body.query)
+
+
+def fetch_places(config, query: str) -> SearchResults:
+    """Fixed provider request; callers enforce authentication and their own tool budget."""
+    query = SearchInput(query=query).query
     if not (
         config.naver_search_enabled
         and config.naver_search_client_id
@@ -70,11 +75,11 @@ def search_places(
         raise HTTPException(503, "place_search_not_configured")
     try:
         # Fixed destination, no caller JWT, redirects, cookies, response cache or retries.
-        with httpx.Client(timeout=4.0, follow_redirects=False) as client:
+        with httpx.Client(timeout=4.0, follow_redirects=False, trust_env=False) as client:
             with client.stream(
                 "GET",
                 HUB_URL,
-                params={"query": body.query, "display": 5, "start": 1, "sort": "random"},
+                params={"query": query, "display": 5, "start": 1, "sort": "random"},
                 headers={
                     "X-NCP-APIGW-API-KEY-ID": config.naver_search_client_id,
                     "X-NCP-APIGW-API-KEY": config.naver_search_client_secret,
