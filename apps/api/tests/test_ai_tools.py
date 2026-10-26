@@ -63,7 +63,7 @@ def test_real_tool_evidence_canonicalization_and_untrusted_fields(monkeypatch):
     assert run.execute("search_places", {"query": "가상동 도서관"})["items"] == result["items"]
     assert len(seen) == 1
     resolved = run.resolve(ModelPlan.model_validate(plan()))
-    assert resolved.activities[0].place == "가상 도서관 · 가상로 1"
+    assert resolved.activities[0].place == "가상 도서관 (가상로 1)"
     assert resolved.activities[2].place == resolved.activities[2].map_url == ""
     issues = ai_tools.check_course(resolved)
     assert len(issues) == 3
@@ -197,7 +197,7 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
     settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
     answer = ai_planner.complete(settings, [{"role": "user", "content": "검색해줘"}], run)
     assert len(calls) == 2 and len(answer.checks) == 3
-    assert answer.plan.activities[0].place == "가상 도서관 · 가상로 1"
+    assert answer.plan.activities[0].place == "가상 도서관 (가상로 1)"
     assert answer.context.region == "가상동"
     assert not run.store.reads
 
@@ -340,3 +340,26 @@ def test_single_format_completion_stays_inside_budget(monkeypatch):
     answer = ai_planner.complete(settings, [{"role": "user", "content": "조건 유지"}], session())
     assert answer.reply == "조건을 유지했어요." and len(calls) == 2
     assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_object"
+
+
+def test_saved_destinations_share_links_and_previous_plan_survive_edits():
+    from we2day_api.plans import Activity
+
+    run = session()
+    selected = run.add("별칭", "실제 장소 (서울특별시 가상로 1)", "selected")
+    previous = run.seed(Activity(title="활동", place="가상 도서관 · 서울특별시 가상로 2"))
+    link = run.add("선택 장소", "https://naver.me/Example", "selected")
+    resolved = run.resolve(ModelPlan.model_validate(plan(activities=[
+        {"title": "첫 활동", "place_ref": selected.ref},
+        {"title": "다음 활동", "place_ref": previous.ref},
+        {"title": "공유 장소", "place_ref": link.ref},
+    ])))
+    assert resolved.activities[0].place == "실제 장소 (서울특별시 가상로 1)"
+    assert resolved.activities[1].place == "가상 도서관 (서울특별시 가상로 2)"
+    assert resolved.activities[2].map_url == "https://naver.me/Example"
+    new = session()
+    carried = new.seed(resolved.activities[2])
+    again = new.resolve(ModelPlan.model_validate(plan(activities=[{
+        "title": "공유 장소", "time": "14:00", "place_ref": carried.ref,
+    }])))
+    assert again.activities[0].map_url == "https://naver.me/Example"

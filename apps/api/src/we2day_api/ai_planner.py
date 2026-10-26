@@ -336,7 +336,7 @@ def chat(body: ChatInput, request: Request, response: Response, store: Store):
     if proposal:
         for activity in proposal.activities:
             if activity.place:
-                session.add(activity.place, "", "user")
+                session.seed(activity)
     today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
     messages = [{"role": "system", "content": SYSTEM + "\n오늘 한국 날짜: " + today}]
     messages.append(

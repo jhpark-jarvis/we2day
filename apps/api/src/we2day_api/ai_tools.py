@@ -26,6 +26,7 @@ class ChosenPlace(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     title: str = Field(min_length=1, max_length=100)
     address: str = Field(default="", max_length=180)
+    destination: str = Field(default="", max_length=200)
 
 
 class PlanningContext(BaseModel):
@@ -294,9 +295,9 @@ class ToolSession:
         self.selected_result = None
         self.calls = 0
         for item in chosen:
-            self.add(item.title, item.address, "user")
+            self.add(item.title, item.address, "user", item.destination)
 
-    def add(self, title, address, source):
+    def add(self, title, address, source, destination=""):
         title, address = clean(title, 100), clean(address, 180)
         if not title:
             return None
@@ -304,9 +305,34 @@ class ToolSession:
             if (candidate.title, candidate.address) == (title, address):
                 return candidate
         ref = f"p{len(self.candidates) + 1}"
-        candidate = Candidate(ref=ref, title=title, address=address, source=source)
+        if not destination:
+            if source == "selected":
+                destination = address or title
+            else:
+                # Match the existing editor/map handoff contract: name (address).
+                postal = re.sub(r"\([^)]*\)", "", address).strip()[: max(0, 197 - len(title))]
+                destination = f"{title} ({postal})" if postal else title
+        candidate = Candidate(
+            ref=ref,
+            title=title,
+            address=address,
+            source=source,
+            destination=clean(destination, 200),
+        )
         self.candidates[ref] = candidate
         return candidate
+
+    def seed(self, activity):
+        place = activity.place
+        if activity.map_url:
+            return self.add(place or activity.title, "", "user", activity.map_url)
+        if " · " in place:
+            title, address = place.split(" · ", 1)
+            return self.add(title, address, "user")
+        selected = re.fullmatch(r"(.+?)\s+\(([^()]*)\)", place)
+        if selected:
+            return self.add(selected[1], selected[2], "user", place)
+        return self.add(activity.title, place, "user", place)
 
     def resolve(self, plan: ModelPlan) -> PlanContent:
         result = PlanContent.model_validate(plan.model_dump(exclude={"activities"}))
@@ -315,12 +341,15 @@ class ToolSession:
             candidate = self.candidates.get(activity.place_ref)
             if candidate:
                 # Canonical server evidence, never model-generated names/addresses/URLs.
-                content["place"] = (
-                    candidate.title + (f" · {candidate.address}" if candidate.address else "")
-                )[:200]
+                content["place"] = candidate.destination
             else:
                 content["place"] = ""
             content["map_url"] = ""
+            if candidate and re.fullmatch(
+                r"https://naver\.me/[A-Za-z0-9_-]{1,80}", candidate.destination
+            ):
+                content["map_url"] = candidate.destination
+                content["place"] = candidate.title
             result.activities.append(Activity.model_validate(content))
         return result
 

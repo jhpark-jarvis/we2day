@@ -32,6 +32,7 @@ type Candidate = {
   source: "naver" | "selected" | "user";
   title: string;
   address: string;
+  destination?: string;
 };
 async function read(view: string, query = "") {
   const response = await fetch(`/api/ai/planner?view=${view}${query}`, { cache: "no-store" });
@@ -71,7 +72,9 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [oldestTurn, setOldestTurn] = useState(1);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [chosenPlaces, setChosenPlaces] = useState<{ title: string; address: string }[]>([]);
+  const [chosenPlaces, setChosenPlaces] = useState<
+    { title: string; address: string; destination?: string }[]
+  >([]);
   const [checks, setChecks] = useState<string[]>([]);
   const [placeOptions, setPlaceOptions] = useState<PlaceOption[]>([]);
   const [selectedPlaces, setSelectedPlaces] = useState<PlaceOption[]>([]);
@@ -173,7 +176,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           ...chosenPlaces.filter(
             (p) => p.title !== candidate.title || p.address !== candidate.address,
           ),
-          { title: candidate.title, address: candidate.address },
+          {
+            title: candidate.title,
+            address: candidate.address,
+            destination: candidate.destination,
+          },
         ].slice(-8)
       : chosenPlaces;
     const next: Message[] = [...messages, { id: crypto.randomUUID(), role: "user", content }];
