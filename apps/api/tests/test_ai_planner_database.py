@@ -5,7 +5,7 @@ import pytest
 from test_database import USERS, actor, call, connect_pair, reset_database  # noqa: F401
 
 
-def test_ai_budget_permissions_limit_and_race(database_url):
+def test_ai_permissions_burst_race_and_no_fifty_request_cap(database_url):
     dsn = database_url
     with psycopg.connect(dsn) as db:
         db.execute("truncate we2day_private.ai_planner_budget")
@@ -35,4 +35,8 @@ def test_ai_budget_permissions_limit_and_race(database_url):
         db.execute(
             "update we2day_private.ai_planner_budget set last_request=now()-interval '1 minute'"
         )
-    assert call(dsn, USERS[0], "reserve_ai_planner_request") == (False,)
+    assert call(dsn, USERS[0], "reserve_ai_planner_request") == (True,)
+    with psycopg.connect(dsn) as db:
+        assert db.execute("select requests from we2day_private.ai_planner_budget").fetchone() == (
+            51,
+        )

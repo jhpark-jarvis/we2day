@@ -15,7 +15,7 @@ from we2day_api.plans import PlanContent
 
 router = APIRouter(tags=["ai-planner"])
 MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
-SYSTEM = """당신은 WE2DAY 한국어 데이트 플래너입니다. 대화와 코스 제안만 수행합니다.
+SYSTEM = """당신은 WE2DAY의 '위투 AI'입니다. 한국어로 데이트 대화와 코스 제안만 수행합니다.
 DB 조회·저장·확정·검색을 실행하지 않으며 실행했다고 말하지 마세요.
 입력에 없는 사실, 실제 주소·영업시간·지도 URL을 만들어내지 마세요.
 장소는 사용자가 입력한 이름 또는 '카페 선택' 같은 일반 활동명으로 제안하세요.
@@ -39,7 +39,8 @@ class Message(BaseModel):
 
 class ChatInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    consent: Literal[True]
+    # Compatibility only. New UI explicitly submits text without a separate checkbox.
+    consent: Literal[True] | None = None
     messages: list[Message] = Field(min_length=1, max_length=12)
     proposal: PlanContent | None = None
 
@@ -68,15 +69,23 @@ def complete(settings, messages: list[dict]) -> ChatResult:
                     "response_format": {"type": "json_object"},
                 },
             ) as response:
-                if response.status_code == 429:
-                    raise HTTPException(429, "ai_provider_limited")
-                if not response.is_success:
+                if not response.is_success and response.status_code != 429:
                     raise HTTPException(503, "ai_unavailable")
                 raw = bytearray()
                 for chunk in response.iter_bytes():
                     raw.extend(chunk)
                     if len(raw) > 65536:
                         raise HTTPException(502, "ai_invalid_response")
+        if response.status_code == 429:
+            try:
+                error_payload = json.loads(raw)
+                errors = error_payload.get("errors", []) if isinstance(error_payload, dict) else []
+                exhausted = any(
+                    isinstance(item, dict) and item.get("code") == 3036 for item in errors
+                )
+            except ValueError:
+                exhausted = False
+            raise HTTPException(429, "ai_provider_limited" if exhausted else "ai_provider_busy")
         payload = json.loads(raw)
         if payload.get("success") is False:
             raise HTTPException(503, "ai_unavailable")
@@ -121,10 +130,17 @@ def chat(body: ChatInput, request: Request, response: Response, store: Store):
         messages.append(
             {"role": "user", "content": "현재 제안: " + body.proposal.model_dump_json()}
         )
-    messages.extend(message.model_dump() for message in body.messages)
+    history = [message.model_dump() for message in body.messages]
+    # Keep the latest turns and current proposal, without extra summarization/model calls.
+    while (
+        len(history) > 1
+        and len(json.dumps(messages + history, ensure_ascii=False).encode()) > 16000
+    ):
+        del history[: min(2, len(history) - 1)]
+    messages.extend(history)
     if len(json.dumps(messages, ensure_ascii=False).encode()) > 16000:
         raise HTTPException(422, "ai_context_too_long")
     # Atomic persistent reservation before every billable request, including failed requests.
     if not store.rpc("reserve_ai_planner_request"):
-        raise HTTPException(429, "ai_daily_limit")
+        raise HTTPException(429, "ai_rate_limited")
     return complete(settings, messages)
