@@ -3,6 +3,7 @@ import { createAuthClient } from "@/lib/auth/server";
 
 const errors: Record<string, string> = {
   plan_draft_required: "확정한 적이 있는 플랜은 삭제할 수 없어요. 보관을 이용해 주세요.",
+  ai_conversation_not_found: "대화 기록을 찾지 못했어요.",
   ai_not_configured: "AI 연결을 준비 중이에요. 서버 설정을 확인해 주세요.",
   ai_context_too_long: "대화가 길어요. 필요한 초안을 저장하고 새 대화를 시작해 주세요.",
   ai_daily_limit: "잠시 후 다시 전송해 주세요.",

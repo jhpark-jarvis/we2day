@@ -3,6 +3,8 @@
 import {
   ArrowDown,
   CalendarDays,
+  FileText,
+  History,
   Info,
   LoaderCircle,
   MapPin,
@@ -10,17 +12,52 @@ import {
   Send,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { changePlan } from "@/app/actions/plans";
 import Link from "@/components/progress-link";
 import type { PlanContent } from "@/lib/plans";
 
+type Conversation = { id: string; title: string; version: number; updated_at: string };
+type Turn = {
+  request_id: string;
+  version: number;
+  user_text: string;
+  result: { reply: string; plan: PlanContent | null };
+  prompt_version: string;
+};
+type PromptInfo = {
+  system: string;
+  today: string;
+  version: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  recent_messages: number;
+  input_bytes: number;
+};
 type Message = { id: string; role: "user" | "assistant"; content: string };
+async function read(view: string, query = "") {
+  const response = await fetch(`/api/ai/planner?view=${view}${query}`, { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "기록을 불러오지 못했어요.");
+  return result;
+}
+function turnMessages(turns: Turn[]): Message[] {
+  return turns.flatMap((turn) => [
+    { id: `${turn.request_id}-user`, role: "user" as const, content: turn.user_text },
+    {
+      id: `${turn.request_id}-assistant`,
+      role: "assistant" as const,
+      content: turn.result.reply,
+    },
+  ]);
+}
 export function AiPlanner({ available, today }: { available: boolean; today: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [pendingText, setPendingText] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
+  const previousLogHeight = useRef<number | null>(null);
   const proposalRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [activityKeys, setActivityKeys] = useState<string[]>([]);
@@ -30,11 +67,77 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const saveIdentity = useRef({ id: crypto.randomUUID(), request: crypto.randomUUID() });
-  const busy = pending || saving;
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [promptInfo, setPromptInfo] = useState<PromptInfo | null>(null);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [oldestTurn, setOldestTurn] = useState(1);
+  const conversation = useRef({ id: crypto.randomUUID(), version: 0 });
+  const retry = useRef<{ id: string; text: string } | null>(null);
+  const busy = pending || saving || loadingHistory;
+  const openConversation = useCallback(async (id: string, before?: number) => {
+    const older = Boolean(before);
+    setLoadingHistory(true);
+    setError("");
+    try {
+      const data = await read(
+        "history",
+        `&conversation_id=${id}${before ? `&before=${before}` : ""}`,
+      );
+      if (!data) throw new Error("대화 기록을 찾지 못했어요.");
+      const turns: Turn[] = data.turns;
+      setOldestTurn(turns[0]?.version || 1);
+      if (older) {
+        previousLogHeight.current = logRef.current?.scrollHeight || 0;
+        setMessages((previous) => [...turnMessages(turns), ...previous]);
+      } else {
+        conversation.current = { id, version: data.version };
+        retry.current = null;
+        setMessages(turnMessages(turns));
+        const plan = data.proposal || null;
+        setProposal(plan);
+        setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
+        setText("");
+        setSaved("");
+        setHistoryOpen(false);
+        saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "기록을 불러오지 못했어요.");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+  useEffect(() => {
+    let active = true;
+    void read("history")
+      .then(async (items: Conversation[]) => {
+        if (!active) return;
+        setConversations(items);
+        if (items[0]) await openConversation(items[0].id);
+      })
+      .catch(() => {
+        if (active) setError("대화 기록을 불러오지 못했어요. 새로고침해 주세요.");
+      })
+      .finally(() => {
+        if (active) setLoadingHistory(false);
+      });
+    return () => {
+      active = false;
+    };
+    // Initial history is restored once; selecting another record is explicit.
+  }, [openConversation]);
   useEffect(() => {
     if (messages.length || pendingText) {
       const log = logRef.current;
-      if (log) log.scrollTop = log.scrollHeight;
+      if (log) {
+        log.scrollTop =
+          previousLogHeight.current === null
+            ? log.scrollHeight
+            : log.scrollHeight - previousLogHeight.current;
+        previousLogHeight.current = null;
+      }
     }
   }, [messages, pendingText]);
   async function send() {
@@ -43,6 +146,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       ...messages,
       { id: crypto.randomUUID(), role: "user", content: text.trim() },
     ];
+    const requestId = retry.current?.text === text.trim() ? retry.current.id : crypto.randomUUID();
+    retry.current = { id: requestId, text: text.trim() };
     setPending(true);
     setPendingText(text.trim());
     setText("");
@@ -60,11 +165,19 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         body: JSON.stringify({
           messages: history,
           proposal,
+          conversation_id: conversation.current.id,
+          version: conversation.current.version,
+          request_id: requestId,
         }),
         signal: AbortSignal.timeout(65000),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "답변을 받지 못했어요.");
+      conversation.current.version = result.version;
+      retry.current = null;
+      void read("history")
+        .then(setConversations)
+        .catch(() => {});
       setMessages([...next, { id: crypto.randomUUID(), role: "assistant", content: result.reply }]);
       setText("");
       if (result.plan) {
@@ -105,6 +218,39 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             <strong>함께 짜는 데이트</strong>
           </div>
           <div className="we2-chat-tools">
+            <button
+              type="button"
+              className="icon-button"
+              title="대화 기록"
+              aria-label="대화 기록"
+              aria-expanded={historyOpen}
+              disabled={busy}
+              onClick={() => setHistoryOpen(!historyOpen)}
+            >
+              <History size={20} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              title="AI 지침"
+              aria-label="AI 지침"
+              aria-expanded={promptOpen}
+              disabled={busy}
+              onClick={async () => {
+                if (promptOpen) {
+                  setPromptOpen(false);
+                  return;
+                }
+                try {
+                  setPromptInfo(await read("prompt"));
+                  setPromptOpen(true);
+                } catch {
+                  setError("AI 지침을 불러오지 못했어요.");
+                }
+              }}
+            >
+              <FileText size={20} aria-hidden="true" />
+            </button>
             {proposal && (
               <button
                 type="button"
@@ -125,6 +271,9 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               aria-label="새 대화"
               disabled={busy || messages.length === 0}
               onClick={() => {
+                conversation.current = { id: crypto.randomUUID(), version: 0 };
+                retry.current = null;
+                setOldestTurn(1);
                 setMessages([]);
                 setText("");
                 setProposal(null);
@@ -137,6 +286,48 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </button>
           </div>
         </header>
+        {historyOpen && (
+          <section className="we2-history" aria-label="저장한 대화">
+            <strong>내 대화</strong>
+            <p className="settings-hint">최근 100개 · 본인만 조회</p>
+            {conversations.length ? (
+              conversations.map((item) => (
+                <button
+                  type="button"
+                  className="we2-history-item"
+                  key={item.id}
+                  disabled={busy}
+                  onClick={() => void openConversation(item.id)}
+                >
+                  <span>{item.title}</span>
+                  <small>{new Date(item.updated_at).toLocaleDateString("ko-KR")}</small>
+                </button>
+              ))
+            ) : (
+              <p>저장한 대화가 없어요.</p>
+            )}
+          </section>
+        )}
+        {promptOpen && promptInfo && (
+          <section className="we2-prompt" aria-label="현재 AI 지침">
+            <strong>현재 시스템 지침</strong>
+            <p className="settings-hint">
+              {promptInfo.version} · {promptInfo.model}
+              <br />
+              temperature {promptInfo.temperature} · 최대 출력 {promptInfo.max_tokens} 토큰 · 최근{" "}
+              {promptInfo.recent_messages}개 메시지 · 입력 {promptInfo.input_bytes}바이트
+            </p>
+            <pre>
+              {promptInfo.system}
+              {"\n오늘 한국 날짜: "}
+              {promptInfo.today}
+            </pre>
+            <p className="settings-hint">
+              현재 코스와 최근 대화를 함께 전달해요. 이전 기록에 남은 지침 버전은 당시 버전이며,
+              이어 대화에는 위 지침을 사용해요.
+            </p>
+          </section>
+        )}
         {!available && (
           <p role="status" className="we2-connection">
             연결을 준비 중이에요. 잠시 후 다시 확인해 주세요.
@@ -149,7 +340,17 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           aria-label="AI 대화"
           aria-busy={pending}
         >
-          {messages.length === 0 && !pending && (
+          {oldestTurn > 1 && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => void openConversation(conversation.current.id, oldestTurn)}
+            >
+              이전 대화
+            </button>
+          )}
+          {messages.length === 0 && !pending && !loadingHistory && (
             <div className="we2-welcome">
               <span className="we2-welcome-icon">
                 <Sparkles size={28} aria-hidden="true" />
@@ -202,10 +403,10 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           )}
         </div>
         <div className="we2-status" role="status">
-          {pending && (
+          {(pending || loadingHistory) && (
             <>
               <LoaderCircle size={15} className="ai-spinner" aria-hidden="true" />
-              다음 코스를 생각하고 있어요.
+              {loadingHistory ? "대화 기록을 불러오고 있어요." : "다음 코스를 생각하고 있어요."}
             </>
           )}
         </div>
@@ -253,14 +454,15 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </button>
           </form>
           <div className="we2-disclosure">
-            <span>Cloudflare에서 처리 · 대화는 이 화면에만 유지</span>
+            <span>Cloudflare에서 처리 · 대화는 본인만 조회</span>
             <details>
               <summary aria-label="이용 안내" title="이용 안내">
                 <Info size={15} aria-hidden="true" />
               </summary>
               <p>
-                최근 대화와 현재 코스만 AI에 전달해요. 계정·사진·개인 일정은 자동으로 보내지 않아요.
-                무료 제공량을 소진하면 요청이 중단돼요. 남길 코스는 초안으로 저장해 주세요.
+                대화와 제안은 내 기록에 저장돼요. 최근 대화와 현재 코스만 AI에 전달해요.
+                계정·사진·개인 일정은 자동으로 보내지 않아요. 무료 제공량을 소진하면 요청이
+                중단돼요. 남길 코스는 초안으로 저장해 주세요.
               </p>
             </details>
           </div>

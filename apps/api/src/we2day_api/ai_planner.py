@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -14,6 +15,7 @@ from we2day_api.calendar import Store
 from we2day_api.plans import PlanContent
 
 router = APIRouter(tags=["ai-planner"])
+PROMPT_VERSION = "we2-ai-2026-10-26-v1"
 MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 SYSTEM = """당신은 WE2DAY의 '위투 AI'입니다. 한국어로 데이트 대화와 코스 제안만 수행합니다.
 DB 조회·저장·확정·검색을 실행하지 않으며 실행했다고 말하지 마세요.
@@ -43,12 +45,20 @@ class ChatInput(BaseModel):
     consent: Literal[True] | None = None
     messages: list[Message] = Field(min_length=1, max_length=12)
     proposal: PlanContent | None = None
+    conversation_id: UUID | None = Field(default=None, strict=False)
+    request_id: UUID | None = Field(default=None, strict=False)
+    version: int = Field(default=0, ge=0)
 
 
 class ChatResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     reply: str = Field(min_length=1, max_length=4000)
     plan: PlanContent | None = None
+
+
+class SavedChatResult(ChatResult):
+    conversation_id: UUID | None = None
+    version: int = 0
 
 
 def complete(settings, messages: list[dict]) -> ChatResult:
@@ -116,7 +126,36 @@ def status(request: Request, response: Response, store: Store):
     return {"available": bool(settings.cloudflare_account_id and settings.cloudflare_api_token)}
 
 
-@router.post("/ai/planner", response_model=ChatResult)
+@router.get("/ai/planner/history")
+def history(
+    response: Response, store: Store, conversation_id: UUID | None = None, before: int | None = None
+):
+    response.headers["Cache-Control"] = "private, no-store"
+    return store.rpc(
+        "read_ai_conversations",
+        {"p_id": str(conversation_id) if conversation_id else None, "p_before": before},
+    )
+
+
+@router.get("/ai/planner/prompt")
+def prompt(response: Response, store: Store):
+    response.headers["Cache-Control"] = "private, no-store"
+    if not store.rpc("get_my_couple"):
+        raise HTTPException(403, "couple_required")
+    today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
+    return {
+        "version": PROMPT_VERSION,
+        "system": SYSTEM,
+        "today": today,
+        "model": MODEL,
+        "temperature": 0.4,
+        "max_tokens": 2048,
+        "recent_messages": 11,
+        "input_bytes": 16000,
+    }
+
+
+@router.post("/ai/planner", response_model=SavedChatResult)
 def chat(body: ChatInput, request: Request, response: Response, store: Store):
     response.headers["Cache-Control"] = "private, no-store"
     settings = request.app.state.settings
@@ -124,6 +163,24 @@ def chat(body: ChatInput, request: Request, response: Response, store: Store):
         raise HTTPException(503, "ai_not_configured")
     if body.messages[-1].role != "user":
         raise HTTPException(422, "ai_invalid_messages")
+    if bool(body.conversation_id) != bool(body.request_id):
+        raise HTTPException(422, "invalid_request")
+    if body.conversation_id:
+        stored = store.rpc("read_ai_conversations", {"p_id": str(body.conversation_id)})
+        if stored:
+            for turn in stored["turns"]:
+                if turn["request_id"] == str(body.request_id):
+                    if turn["user_text"] != body.messages[-1].content:
+                        raise HTTPException(409, "request_conflict")
+                    return SavedChatResult(
+                        **turn["result"],
+                        conversation_id=body.conversation_id,
+                        version=turn["version"],
+                    )
+            if stored["version"] != body.version:
+                raise HTTPException(409, "version_conflict")
+        elif body.version:
+            raise HTTPException(404, "ai_conversation_not_found")
     today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
     messages = [{"role": "system", "content": SYSTEM + "\n오늘 한국 날짜: " + today}]
     if body.proposal:
@@ -143,4 +200,20 @@ def chat(body: ChatInput, request: Request, response: Response, store: Store):
     # Atomic persistent reservation before every billable request, including failed requests.
     if not store.rpc("reserve_ai_planner_request"):
         raise HTTPException(429, "ai_rate_limited")
-    return complete(settings, messages)
+    answer = complete(settings, messages)
+    if body.conversation_id:
+        saved = store.rpc(
+            "append_ai_conversation",
+            {
+                "p_id": str(body.conversation_id),
+                "p_request": str(body.request_id),
+                "p_version": body.version,
+                "p_user": body.messages[-1].content,
+                "p_result": answer.model_dump(mode="json"),
+                "p_prompt": PROMPT_VERSION,
+            },
+        )
+        return SavedChatResult(
+            **saved["result"], conversation_id=body.conversation_id, version=saved["version"]
+        )
+    return SavedChatResult(**answer.model_dump())

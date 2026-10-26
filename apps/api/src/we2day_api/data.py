@@ -50,6 +50,7 @@ class DataAPI:
                 "Data service failure: status=%s category=%s", response.status_code, category
             )
         safe_errors = {
+            "ai_conversation_not_found",
             "invalid_agent_connection",
             "agent_connection_limit",
             "agent_connection_not_found",

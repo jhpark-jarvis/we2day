@@ -168,3 +168,83 @@ def test_free_exhaustion_and_capacity_are_distinct(setup):
         response = client.post("/ai/planner", json=body())
         assert response.status_code == 429 and response.json()["detail"] == expected
         assert "private" not in response.text
+
+
+def test_history_replay_does_not_call_provider_and_prompt_is_exact(setup):
+    from uuid import uuid4
+
+    client, store, calls, _ = setup
+    cid, rid = str(uuid4()), str(uuid4())
+    stored = {
+        "version": 1,
+        "turns": [
+            {
+                "request_id": rid,
+                "version": 1,
+                "user_text": "합성",
+                "result": {"reply": "저장된 응답", "plan": None},
+            }
+        ],
+    }
+
+    def rpc(name, values=None):
+        if name == "read_ai_conversations":
+            return stored
+        return True
+
+    store.rpc = rpc
+    response = client.post(
+        "/ai/planner",
+        json={
+            "messages": [{"role": "user", "content": "합성"}],
+            "conversation_id": cid,
+            "request_id": rid,
+            "version": 0,
+        },
+    )
+    assert response.status_code == 200 and response.json()["reply"] == "저장된 응답"
+    assert not calls
+    prompt = client.get("/ai/planner/prompt")
+    assert prompt.json()["system"] == ai_planner.SYSTEM
+    assert prompt.json()["model"] == ai_planner.MODEL
+    assert "no-store" in prompt.headers["cache-control"]
+    response = client.post(
+        "/ai/planner",
+        json={
+            "messages": [{"role": "user", "content": "변경"}],
+            "conversation_id": cid,
+            "request_id": rid,
+            "version": 0,
+        },
+    )
+    assert response.status_code == 409 and not calls
+
+
+def test_successful_turn_persisted_and_conflict_before_provider(setup):
+    from uuid import uuid4
+
+    client, store, calls, replies = setup
+    writes = []
+
+    def rpc(name, values=None):
+        if name == "read_ai_conversations":
+            return None
+        if name == "append_ai_conversation":
+            writes.append(values)
+            return {"version": 1, "result": values["p_result"]}
+        return True
+
+    store.rpc = rpc
+    payload = {
+        "messages": [{"role": "user", "content": "질문"}],
+        "conversation_id": str(uuid4()),
+        "request_id": str(uuid4()),
+    }
+    replies.append(
+        httpx.Response(200, json={"result": {"response": {"reply": "답변", "plan": None}}})
+    )
+    response = client.post("/ai/planner", json=payload)
+    assert response.status_code == 200 and response.json()["version"] == 1
+    assert writes[0]["p_user"] == "질문" and writes[0]["p_prompt"] == ai_planner.PROMPT_VERSION
+    response = client.post("/ai/planner", json={**payload, "version": 1})
+    assert response.status_code == 404 and len(calls) == 1
