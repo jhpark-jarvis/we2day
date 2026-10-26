@@ -22,6 +22,7 @@
 /guides/*
 !/guides/setup.md
 !/guides/deployment.md
+!/guides/recovery.md
 !/guides/architecture.md
 !/guides/ai-roadmap.md
 !/guides/agent-api.md

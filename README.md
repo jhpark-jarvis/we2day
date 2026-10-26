@@ -4,7 +4,7 @@
 
 WE2DAY는 연인이 함께 일정과 추억을 관리하는 웹앱입니다. 달력에 약속을 잡고, 데이트 계획을 세우고, 만난 날의 사진과 후기를 남길 수 있습니다. PC와 모바일에서 같은 기록을 확인하며, 휴대폰 홈 화면에 추가해 앱처럼 사용할 수도 있습니다. 직접 운영하려면 자신의 서버와 Supabase 프로젝트에 설치하면 됩니다.
 
-[시작하기](#quickstart) · [화면](#screens) · [사용법](#usage) · [설치 가이드](guides/setup.md) · [배포 가이드](guides/deployment.md) · [아키텍처](guides/architecture.md) · [AI 로드맵](guides/ai-roadmap.md) · [에이전트 연결 API](guides/agent-api.md)
+[시작하기](#quickstart) · [화면](#screens) · [사용법](#usage) · [설치 가이드](guides/setup.md) · [배포 가이드](guides/deployment.md) · [장애 복구](guides/recovery.md) · [아키텍처](guides/architecture.md) · [AI 로드맵](guides/ai-roadmap.md) · [에이전트 연결 API](guides/agent-api.md)
 
 <a id="screens"></a>
 
