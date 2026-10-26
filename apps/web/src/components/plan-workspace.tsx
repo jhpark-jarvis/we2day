@@ -160,6 +160,9 @@ export function PlanWorkspace({
         </div>
       </PageHeading>
       <div className="calendar-toolbar">
+        <Link href="/plans/ai" className="text-button">
+          AI 플래너
+        </Link>
         <button
           type="button"
           className="primary-button"

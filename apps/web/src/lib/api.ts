@@ -2,6 +2,13 @@ import "server-only";
 import { createAuthClient } from "@/lib/auth/server";
 
 const errors: Record<string, string> = {
+  ai_not_configured: "AI 연결을 준비 중이에요. 서버 설정을 확인해 주세요.",
+  ai_context_too_long: "대화가 길어요. 필요한 초안을 저장하고 새 대화를 시작해 주세요.",
+  ai_daily_limit:
+    "호출 간격 또는 하루 한도에 도달했어요. 잠시 후 다시 시도해 주세요. 일일 한도는 오전 9시에 초기화돼요.",
+  ai_provider_limited: "Cloudflare AI 사용 한도에 도달했어요. 나중에 다시 시도해 주세요.",
+  ai_unavailable: "AI에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
+  ai_invalid_response: "답변을 완성하지 못했어요. 요청을 짧게 나눠 다시 시도해 주세요.",
   agent_connection_limit: "사용 가능한 연결 키는 최대 5개예요. 기존 키를 폐기해 주세요.",
   invalid_agent_connection: "연결 이름을 1~60자로 입력해 주세요.",
   agent_connection_not_found: "연결 키를 찾지 못했어요. 목록을 새로고침해 주세요.",
@@ -101,7 +108,11 @@ export async function callApi<T>(path: string, init: RequestInit = {}) {
         cache: "no-store",
         signal: requestSignal(
           init.signal,
-          path === "/photos" && init.method === "POST" ? 30_000 : 8_000,
+          path === "/ai/planner"
+            ? 60_000
+            : path === "/photos" && init.method === "POST"
+              ? 30_000
+              : 8_000,
         ),
       },
     );

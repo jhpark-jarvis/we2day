@@ -67,3 +67,9 @@
 
 !/apps/web/src/app/settings/places/
 !/apps/web/src/app/settings/places/page.tsx
+
+!/apps/web/src/app/plans/ai/
+!/apps/web/src/app/plans/ai/page.tsx
+!/apps/web/src/app/api/ai/
+!/apps/web/src/app/api/ai/planner/
+!/apps/web/src/app/api/ai/planner/route.ts
