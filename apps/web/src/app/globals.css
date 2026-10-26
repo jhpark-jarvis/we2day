@@ -836,3 +836,5 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-ai-icon > img { position:absolute; width:150%; height:150%; max-width:none; left:-25%; top:-25%; object-fit:contain; }
 
 .calendar-toolbar > .home-ai-entry { margin-inline-start:auto; }
+
+.calendar-toolbar > .home-ai-entry:hover { background:transparent; border:0; }

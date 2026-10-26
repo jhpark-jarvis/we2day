@@ -448,9 +448,13 @@ export function CalendarWorkspace({
                   <Link href="/calendar/export">캘린더 내보내기</Link>
                 </nav>
               </details>
-              <Link href="/plans/ai" className="text-button home-ai-entry">
-                <We2AiIcon size={24} />
-                위투 AI
+              <Link
+                href="/plans/ai"
+                className="icon-button home-ai-entry"
+                aria-label="위투 AI"
+                title="위투 AI"
+              >
+                <We2AiIcon size={32} />
               </Link>
               {memberCount === 1 && (
                 <Link className="text-button" href="/couple">
