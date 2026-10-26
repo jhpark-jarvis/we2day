@@ -137,24 +137,6 @@ def history(
     )
 
 
-@router.get("/ai/planner/prompt")
-def prompt(response: Response, store: Store):
-    response.headers["Cache-Control"] = "private, no-store"
-    if not store.rpc("get_my_couple"):
-        raise HTTPException(403, "couple_required")
-    today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
-    return {
-        "version": PROMPT_VERSION,
-        "system": SYSTEM,
-        "today": today,
-        "model": MODEL,
-        "temperature": 0.4,
-        "max_tokens": 2048,
-        "recent_messages": 11,
-        "input_bytes": 16000,
-    }
-
-
 @router.post("/ai/planner", response_model=SavedChatResult)
 def chat(body: ChatInput, request: Request, response: Response, store: Store):
     response.headers["Cache-Control"] = "private, no-store"

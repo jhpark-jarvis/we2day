@@ -3,7 +3,6 @@
 import {
   ArrowDown,
   CalendarDays,
-  FileText,
   History,
   Info,
   LoaderCircle,
@@ -24,16 +23,6 @@ type Turn = {
   user_text: string;
   result: { reply: string; plan: PlanContent | null };
   prompt_version: string;
-};
-type PromptInfo = {
-  system: string;
-  today: string;
-  version: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
-  recent_messages: number;
-  input_bytes: number;
 };
 type Message = { id: string; role: "user" | "assistant"; content: string };
 async function read(view: string, query = "") {
@@ -70,8 +59,6 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const [promptInfo, setPromptInfo] = useState<PromptInfo | null>(null);
-  const [promptOpen, setPromptOpen] = useState(false);
   const [oldestTurn, setOldestTurn] = useState(1);
   const conversation = useRef({ id: crypto.randomUUID(), version: 0 });
   const retry = useRef<{ id: string; text: string } | null>(null);
@@ -229,28 +216,6 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             >
               <History size={20} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              className="icon-button"
-              title="AI 지침"
-              aria-label="AI 지침"
-              aria-expanded={promptOpen}
-              disabled={busy}
-              onClick={async () => {
-                if (promptOpen) {
-                  setPromptOpen(false);
-                  return;
-                }
-                try {
-                  setPromptInfo(await read("prompt"));
-                  setPromptOpen(true);
-                } catch {
-                  setError("AI 지침을 불러오지 못했어요.");
-                }
-              }}
-            >
-              <FileText size={20} aria-hidden="true" />
-            </button>
             {proposal && (
               <button
                 type="button"
@@ -306,26 +271,6 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             ) : (
               <p>저장한 대화가 없어요.</p>
             )}
-          </section>
-        )}
-        {promptOpen && promptInfo && (
-          <section className="we2-prompt" aria-label="현재 AI 지침">
-            <strong>현재 시스템 지침</strong>
-            <p className="settings-hint">
-              {promptInfo.version} · {promptInfo.model}
-              <br />
-              temperature {promptInfo.temperature} · 최대 출력 {promptInfo.max_tokens} 토큰 · 최근{" "}
-              {promptInfo.recent_messages}개 메시지 · 입력 {promptInfo.input_bytes}바이트
-            </p>
-            <pre>
-              {promptInfo.system}
-              {"\n오늘 한국 날짜: "}
-              {promptInfo.today}
-            </pre>
-            <p className="settings-hint">
-              현재 코스와 최근 대화를 함께 전달해요. 이전 기록에 남은 지침 버전은 당시 버전이며,
-              이어 대화에는 위 지침을 사용해요.
-            </p>
           </section>
         )}
         {!available && (

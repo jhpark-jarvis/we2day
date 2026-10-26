@@ -170,7 +170,7 @@ def test_free_exhaustion_and_capacity_are_distinct(setup):
         assert "private" not in response.text
 
 
-def test_history_replay_does_not_call_provider_and_prompt_is_exact(setup):
+def test_history_replay_does_not_call_provider_and_prompt_is_not_exposed(setup):
     from uuid import uuid4
 
     client, store, calls, _ = setup
@@ -204,10 +204,7 @@ def test_history_replay_does_not_call_provider_and_prompt_is_exact(setup):
     )
     assert response.status_code == 200 and response.json()["reply"] == "저장된 응답"
     assert not calls
-    prompt = client.get("/ai/planner/prompt")
-    assert prompt.json()["system"] == ai_planner.SYSTEM
-    assert prompt.json()["model"] == ai_planner.MODEL
-    assert "no-store" in prompt.headers["cache-control"]
+    assert client.get("/ai/planner/prompt").status_code == 404
     response = client.post(
         "/ai/planner",
         json={

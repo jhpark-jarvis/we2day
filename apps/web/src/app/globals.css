@@ -821,9 +821,8 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 @media (max-width: 760px) { .we2-ai { grid-template-columns: minmax(0,1fr); gap: 18px; } .we2-chat { min-height: 440px; height: min(69dvh,640px); } .we2-messages { padding: 16px; } .we2-chat-header { padding-inline: 12px; } .we2-course-jump { display: inline-flex; } .we2-proposal:not(.has-proposal) { display: none; } .we2-disclosure { justify-content: space-between; } }
 @media (prefers-reduced-motion: reduce) { .ai-spinner { animation: none; } }
 
-.we2-history,.we2-prompt { margin:0 18px 12px; padding:14px; border-radius:12px; background:var(--surface); border:1px solid var(--line); max-height:280px; overflow:auto; min-width:0; }
+.we2-history { margin:0 18px 12px; padding:14px; border-radius:12px; background:var(--surface); border:1px solid var(--line); max-height:280px; overflow:auto; min-width:0; }
 .we2-history-item { display:flex; width:100%; gap:12px; justify-content:space-between; align-items:center; padding:10px; text-align:left; border:0; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
 .we2-history-item:hover { background:var(--surface-soft); }
 .we2-history-item span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .we2-history-item small { flex-shrink:0; }
-.we2-prompt pre { font:inherit; font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
