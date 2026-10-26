@@ -110,7 +110,11 @@ def test_plan_summary_omits_activity_contents_and_preserves_status(upstream):  #
     assert all(item["activity_count"] == 1 for item in response.json())
     assert "private" not in response.text
     assert calls[-1].url.path.endswith("/rpc/list_plan_summaries")
-    assert json.loads(calls[-1].content) == {"p_archived": False, "p_offset": 50}
+    assert json.loads(calls[-1].content) == {
+        "p_archived": False,
+        "p_offset": 50,
+        "p_sort": "date_desc",
+    }
     assert "no-store" in response.headers["cache-control"]
     assert "auth;dur=" in response.headers["server-timing"]
     assert "data;dur=" in response.headers["server-timing"]

@@ -115,16 +115,29 @@ def list_plans(
     archived: bool = False,
     offset: int = Query(default=0, ge=0, le=100000),
     summary: bool = False,
+    sort: Literal["date_desc", "date_asc", "updated_desc", "title_asc"] = "date_desc",
 ):
     if summary:
-        return store.rpc("list_plan_summaries", {"p_archived": archived, "p_offset": offset})
+        return store.rpc(
+            "list_plan_summaries",
+            {
+                "p_archived": archived,
+                "p_offset": offset,
+                "p_sort": sort,
+            },
+        )
     return store.call(
         "GET",
         "date_plans",
         params={
             "select": SELECT,
             "archived": f"eq.{str(archived).lower()}",
-            "order": "updated_at.desc,id.asc",
+            "order": {
+                "date_desc": "content->>date.desc,id.asc",
+                "date_asc": "content->>date.asc,id.asc",
+                "updated_desc": "updated_at.desc,id.asc",
+                "title_asc": "content->>title.asc,id.asc",
+            }[sort],
             "limit": "50",
             "offset": str(offset),
         },
@@ -153,3 +166,13 @@ def change_plan(id: UUID, body: PlanChange, store: Store):
         },
     )
     return read_plan(id, store)
+
+
+class DeleteDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    expected_version: int = Field(ge=1, le=2_147_483_646)
+
+
+@router.delete("/plans/{id}", status_code=204)
+def delete_draft(id: UUID, body: DeleteDraft, store: Store):
+    store.rpc("delete_plan_draft", {"p_id": str(id), "p_expected_version": body.expected_version})

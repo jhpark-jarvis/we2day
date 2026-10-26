@@ -77,6 +77,7 @@ class DataAPI:
             "invalid_meeting_day",
             "invalid_route",
             "invalid_plan",
+            "plan_draft_required",
             "plan_not_found",
             "plan_archived",
             "invalid_report",
