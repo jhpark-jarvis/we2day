@@ -8,6 +8,7 @@ import { PageHeading } from "@/components/page-heading";
 import { PlaceSearch } from "@/components/place-search";
 import { PlanChecks } from "@/components/plan-checks";
 import Link from "@/components/progress-link";
+import { We2AiIcon } from "@/components/we2-ai-icon";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import { useItemHistory } from "@/lib/page-history";
 import {
@@ -213,6 +214,7 @@ export function PlanWorkspace({
       </PageHeading>
       <div className="calendar-toolbar">
         <Link href="/plans/ai" className="text-button">
+          <We2AiIcon size={24} />
           위투 AI
         </Link>
         <button

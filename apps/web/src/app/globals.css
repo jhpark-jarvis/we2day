@@ -769,7 +769,7 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-course-jump { display: none; }
 .we2-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
 .we2-welcome { margin: auto; text-align: center; padding: 8px 0; width: 100%; }
-.we2-welcome-icon { display: inline-flex; justify-content: center; align-items: center; width: 60px; height: 60px; border-radius: 20px; background: var(--soft); color: var(--accent); }
+.we2-welcome-icon { display: inline-flex; justify-content: center; align-items: center; width: 80px; height: 80px; }
 .we2-welcome h2 { font-size: 1.35rem; font-weight: 500; margin: 18px 0 8px; }
 .we2-welcome > p { color: var(--muted); font-size: .9rem; margin: 0; }
 .we2-starters { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 22px; }
@@ -830,3 +830,7 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-history-item:hover { background:var(--surface-soft); }
 .we2-history-item span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .we2-history-item small { flex-shrink:0; }
+
+/* Preserve the supplied artwork; frame only its transparent outer padding. */
+.we2-ai-icon { position:relative; display:inline-block; flex-shrink:0; overflow:hidden; vertical-align:middle; }
+.we2-ai-icon > img { position:absolute; width:150%; height:150%; max-width:none; left:-25%; top:-25%; object-fit:contain; }

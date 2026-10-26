@@ -9,11 +9,11 @@ import {
   MapPin,
   MessageSquarePlus,
   Send,
-  Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { changePlan } from "@/app/actions/plans";
 import Link from "@/components/progress-link";
+import { We2AiIcon } from "@/components/we2-ai-icon";
 import type { PlanContent } from "@/lib/plans";
 
 type Conversation = { id: string; title: string; version: number; updated_at: string };
@@ -201,7 +201,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       <section className="we2-chat" aria-label="위투 AI 대화">
         <header className="we2-chat-header">
           <div>
-            <Sparkles size={18} aria-hidden="true" />
+            <We2AiIcon size={28} />
             <strong>함께 짜는 데이트</strong>
           </div>
           <div className="we2-chat-tools">
@@ -278,7 +278,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           {messages.length === 0 && !pending && !loadingHistory && (
             <div className="we2-welcome">
               <span className="we2-welcome-icon">
-                <Sparkles size={28} aria-hidden="true" />
+                <We2AiIcon size={72} />
               </span>
               <h2>우리, 어디로 갈까요?</h2>
               <p>날짜와 하고 싶은 일을 알려주세요.</p>
@@ -314,7 +314,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             <div className={`we2-message we2-${message.role}`} key={message.id}>
               {message.role === "assistant" && (
                 <span className="we2-speaker">
-                  <Sparkles size={13} aria-hidden="true" />
+                  <We2AiIcon size={20} />
                   위투 AI
                 </span>
               )}
