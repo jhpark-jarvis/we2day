@@ -9,6 +9,7 @@ import { PlaceSearch } from "@/components/place-search";
 import { PlanChecks } from "@/components/plan-checks";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
+import { useItemHistory } from "@/lib/page-history";
 import {
   type Activity,
   type DatePlan,
@@ -42,8 +43,17 @@ export function PlanWorkspace({
   const [error, setError] = useState(initialError);
   const [archived, setArchived] = useState(false);
   const [more, setMore] = useState(initialPlans.length === 50);
-  const [selected, setSelected] = useState<DatePlan | null>(initialSelected);
-  const [newId, setNewId] = useState(() => (initialContent ? crypto.randomUUID() : ""));
+  const [detailCache, setDetailCache] = useState<DatePlan | null>(initialSelected);
+  const [initialNewId] = useState(() => (initialContent ? crypto.randomUUID() : ""));
+  const navigation = useItemHistory(
+    "plans",
+    detailCache ? [detailCache] : [],
+    "/api/plans",
+    initialSelected?.id || "",
+    initialNewId,
+  );
+  const selected = navigation.selected;
+  const newId = !selected ? navigation.id : "";
   const [seed, setSeed] = useState(initialContent);
   const [notice, setNotice] = useState("");
   const [editorEpoch, setEditorEpoch] = useState(0);
@@ -82,7 +92,8 @@ export function PlanWorkspace({
         const response = await fetch(`/api/plans?id=${id}`, { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error);
-        setSelected(data);
+        setDetailCache(data);
+        navigation.open(data.id);
         setError("");
       } catch {
         setError("플랜을 불러오지 못했어요. 다시 선택해 주세요.");
@@ -100,20 +111,20 @@ export function PlanWorkspace({
         seed={seed}
         site={site}
         onClone={(content) => {
-          setSelected(null);
+          setDetailCache(null);
           setSeed({ ...content, title: `${content.title.slice(0, 94)} · 복사`, date: today });
-          setNewId(crypto.randomUUID());
+          navigation.open(crypto.randomUUID(), true);
         }}
         onSaved={(plan, action) => {
           setSavedReview(action === "save" ? `${plan.id}:${plan.version}` : "");
-          setNewId("");
           setItems((current) =>
             [summarizePlan(plan), ...current.filter((item) => item.id !== plan.id)].filter(
               (item) => item.archived === archived,
             ),
           );
           if (action === "archive" || action === "restore") {
-            setSelected(null);
+            setDetailCache(null);
+            navigation.close();
             // Direct editor entry intentionally skipped the list; load it on return.
             if (!listLoaded) load(archived);
             setNotice(
@@ -122,7 +133,8 @@ export function PlanWorkspace({
                 : "플랜을 복원했어요.",
             );
           } else {
-            setSelected(plan);
+            setDetailCache(plan);
+            navigation.select(plan.id);
             setNotice("");
           }
         }}
@@ -132,8 +144,8 @@ export function PlanWorkspace({
           });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error);
-          setSelected(data);
-          setNewId("");
+          setDetailCache(data);
+          navigation.select(data.id);
           setEditorEpoch((value) => value + 1);
         }}
       />
@@ -154,7 +166,7 @@ export function PlanWorkspace({
           disabled={pending}
           onClick={() => {
             setSeed(null);
-            setNewId(crypto.randomUUID());
+            navigation.open(crypto.randomUUID(), true);
           }}
         >
           플랜 만들기
@@ -180,9 +192,9 @@ export function PlanWorkspace({
         </nav>
       </details>
       <p className="settings-hint">초안은 달력에 표시되지 않아요. 확정하면 약속 하나로 연결돼요.</p>
-      {error && (
+      {(error || navigation.error) && (
         <p role="alert" className="error-message">
-          {error}
+          {error || navigation.error}
         </p>
       )}
       {notice && (

@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 function PanelLoading() {
@@ -43,7 +44,9 @@ export function RecordExplorer({
   site: string;
   names: { mine: string; partner: string };
 }) {
-  const [kind, setKind] = useState(initialType);
+  const search = useSearchParams();
+  const queryKind = search.get("type");
+  const kind = queryKind && queryKind in kinds ? (queryKind as Kind) : initialType;
   const [visited, setVisited] = useState<Kind[]>([initialType]);
   return (
     <div className="record-explorer">
@@ -55,7 +58,6 @@ export function RecordExplorer({
           onChange={(event) => {
             const next = event.target.value as Kind;
             if (!(next in kinds)) return;
-            setKind(next);
             setVisited((previous) => (previous.includes(next) ? previous : [...previous, next]));
             const url = new URL(window.location.href);
             url.search = "";
@@ -71,7 +73,7 @@ export function RecordExplorer({
           ))}
         </select>
       </div>
-      {visited.map((type) => (
+      {[...new Set([...visited, kind])].map((type) => (
         <div className="explorer-panel" key={type} hidden={kind !== type}>
           {type === "photos" ? (
             <PhotoSearch start={`${today.slice(0, 8)}01`} end={today} names={names} />

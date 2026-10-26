@@ -6,6 +6,7 @@ import { saveWish } from "@/app/actions/wishlist";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
+import { useItemHistory } from "@/lib/page-history";
 import type { Wish, WishContent } from "@/lib/wishlist";
 export function WishWorkspace({
   initialItems,
@@ -20,8 +21,19 @@ export function WishWorkspace({
   const [error, setError] = useState(initialError);
   const [archived, setArchived] = useState(false);
   const [more, setMore] = useState(initialItems.length === 50);
-  const [selected, setSelected] = useState<Wish | null>(initialSelected);
-  const [id, setId] = useState(initialSelected?.id || "");
+  const {
+    id,
+    selected,
+    open,
+    close,
+    finish,
+    error: navigationError,
+  } = useItemHistory(
+    "wishlist",
+    [...items, ...(initialSelected ? [initialSelected] : [])],
+    "/api/wishlist",
+    initialSelected?.id || "",
+  );
   const [pending, startTransition] = useTransition();
   function load(next: boolean, offset = 0) {
     startTransition(async () => {
@@ -52,18 +64,14 @@ export function WishWorkspace({
         key={`${id}:${selected?.version || 0}`}
         id={id}
         wish={selected}
-        onClose={() => {
-          setId("");
-          setSelected(null);
-        }}
+        onClose={close}
         onSaved={(wish) => {
           setItems((current) =>
             [wish, ...current.filter((v) => v.id !== wish.id)].filter(
               (v) => v.archived === archived,
             ),
           );
-          setSelected(null);
-          setId("");
+          finish();
         }}
       />
     );
@@ -77,7 +85,11 @@ export function WishWorkspace({
         </div>
       </PageHeading>
       <div className="calendar-toolbar">
-        <button className="primary-button" type="button" onClick={() => setId(crypto.randomUUID())}>
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => open(crypto.randomUUID(), true)}
+        >
           위시 추가
         </button>
         <ArchiveToggle label="위시 구분" archived={archived} pending={pending} onChange={load} />
@@ -86,9 +98,9 @@ export function WishWorkspace({
       <p className="settings-hint">
         직접 작성한 내용만 저장해요. 완료 표시는 만난 날이나 실제 방문 기록을 만들지 않아요.
       </p>
-      {error && (
+      {(error || navigationError) && (
         <p role="alert" className="error-message">
-          {error}
+          {error || navigationError}
         </p>
       )}
       <div className="plan-list">
@@ -107,8 +119,7 @@ export function WishWorkspace({
               aria-label={`위시 수정 · ${wish.title}`}
               title="위시 수정"
               onClick={() => {
-                setSelected(wish);
-                setId(wish.id);
+                open(wish.id);
               }}
             >
               <Pencil size={18} aria-hidden="true" />

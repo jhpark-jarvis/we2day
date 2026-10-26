@@ -2,13 +2,14 @@
 import { Pencil } from "lucide-react";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useTransition } from "react";
 import { AnniversaryForm } from "@/components/anniversary-form";
 import { useAnniversaryDay } from "@/components/anniversary-summary";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RefreshButton } from "@/components/workspace-controls";
 import { type Anniversary, type AnniversaryList, countdown, kinds } from "@/lib/anniversaries";
+import { usePageHistory } from "@/lib/page-history";
 
 export function AnniversaryWorkspace({
   data,
@@ -19,14 +20,29 @@ export function AnniversaryWorkspace({
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
-  const [editing, setEditing] = useState<{ anniversary?: Anniversary; requestId: string } | null>(
-    null,
+  const [view, pushView, replaceView, backView] = usePageHistory("anniversaries", {
+    id: "",
+    request: "",
+  });
+  const selected = data?.items.find((item) => item.id === view.id);
+  const editing =
+    view.id === "new" || selected ? { anniversary: selected, requestId: view.request } : null;
+  const setEditing = useCallback(
+    (item: { anniversary?: Anniversary; requestId: string } | null) => {
+      const value = {
+        id: item ? item.anniversary?.id || "new" : "",
+        request: item?.requestId || "",
+      };
+      if (item) pushView(value);
+      else replaceView(value);
+    },
+    [pushView, replaceView],
   );
   useAnniversaryDay(data?.as_of);
   const saved = useCallback(() => {
     setEditing(null);
     startRefresh(() => router.refresh());
-  }, [router]);
+  }, [router, setEditing]);
   const reload = () => {
     setEditing(null);
     startRefresh(() => router.refresh());
@@ -39,7 +55,7 @@ export function AnniversaryWorkspace({
         today={data.as_of}
         hasRelationship={hasRelationship}
         onSaved={saved}
-        onCancel={() => setEditing(null)}
+        onCancel={() => backView({ id: "", request: "" })}
         onReload={reload}
       />
     );

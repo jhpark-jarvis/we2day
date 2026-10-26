@@ -27,6 +27,7 @@ export default defineConfig({
     "home-summary.spec.ts",
     "calendar-controls.spec.ts",
     "personal-schedules.spec.ts",
+    "page-history.spec.ts",
     "control-affordance.spec.ts",
     "loading-stability.spec.ts",
   ],

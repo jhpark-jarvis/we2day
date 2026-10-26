@@ -7,6 +7,7 @@ import { PageHeading } from "@/components/page-heading";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import type { Goal, GoalContent, GoalStep } from "@/lib/goals";
 import { goalProgress } from "@/lib/goals";
+import { useItemHistory } from "@/lib/page-history";
 
 export function GoalWorkspace({
   initialGoals,
@@ -20,8 +21,14 @@ export function GoalWorkspace({
   const [message, setMessage] = useState("");
   const [archived, setArchived] = useState(false);
   const [more, setMore] = useState(initialGoals.length === 50);
-  const [selected, setSelected] = useState<Goal | null>(null);
-  const [id, setId] = useState("");
+  const {
+    id,
+    selected,
+    open,
+    close,
+    finish,
+    error: navigationError,
+  } = useItemHistory("goals", goals, "/api/goals");
   const [pending, startTransition] = useTransition();
   function load(next: boolean, offset = 0) {
     startTransition(async () => {
@@ -47,10 +54,6 @@ export function GoalWorkspace({
       }
     });
   }
-  function close() {
-    setId("");
-    setSelected(null);
-  }
   if (id)
     return (
       <GoalEditor
@@ -64,7 +67,7 @@ export function GoalWorkspace({
               (v) => v.archived === archived,
             ),
           );
-          close();
+          finish();
           setMessage("목표를 저장했어요.");
         }}
       />
@@ -85,7 +88,7 @@ export function GoalWorkspace({
           disabled={pending}
           onClick={() => {
             setMessage("");
-            setId(crypto.randomUUID());
+            open(crypto.randomUUID(), true);
           }}
         >
           목표 만들기
@@ -96,9 +99,9 @@ export function GoalWorkspace({
       <p className="settings-hint">
         두 사람 모두 수정할 수 있어요. 단계 진행률과 목표 달성 표시는 따로 관리해요.
       </p>
-      {error && (
+      {(error || navigationError) && (
         <p role="alert" className="error-message">
-          {error}
+          {error || navigationError}
         </p>
       )}
       {message && <p role="status">{message}</p>}
@@ -141,8 +144,7 @@ export function GoalWorkspace({
               title="목표 수정"
               type="button"
               onClick={() => {
-                setSelected(goal);
-                setId(goal.id);
+                open(goal.id);
               }}
             >
               <Pencil size={18} aria-hidden="true" />

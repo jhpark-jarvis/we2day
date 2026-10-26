@@ -24,8 +24,9 @@ import { PageHeading } from "@/components/page-heading";
 import { PhotoStory } from "@/components/photo-story";
 import { PlaceSearch } from "@/components/place-search";
 import Link from "@/components/progress-link";
-import { calendarDate, daysInMonth, parseDate } from "@/lib/calendar";
+import { calendarDate, daysInMonth, isSupportedDate, parseDate } from "@/lib/calendar";
 import type { MeetingDay } from "@/lib/meetings";
+import { usePageHistory } from "@/lib/page-history";
 import type { Appointment } from "@/lib/shared-calendar";
 import type { TimezoneView } from "@/lib/timezones";
 
@@ -95,8 +96,41 @@ export function CalendarWorkspace({
   userId?: string | null;
   names?: Record<string, string>;
 }) {
-  const [selected, setSelected] = useState(preview ? "2026-10-24" : initialDate || today);
-  const [detail, setDetail] = useState<CalendarEvent | null>(null);
+  const [view, pushView, replaceView, backView] = usePageHistory(
+    "calendar",
+    {
+      date: preview ? "2026-10-24" : initialDate || today,
+      detail: "",
+      edit: "",
+      request: "",
+    },
+    (v) => isSupportedDate(v.date),
+  );
+  const selected = view.date;
+  const setSelected = useCallback(
+    (date: string) => replaceView((v) => ({ ...v, date })),
+    [replaceView],
+  );
+  const setDetail = useCallback(
+    (event: CalendarEvent | null) => {
+      const next = (v: typeof view) => ({ ...v, detail: event?.id || "", edit: "", request: "" });
+      if (event) pushView(next);
+      else replaceView(next);
+    },
+    [pushView, replaceView],
+  );
+  const setEditing = useCallback(
+    (editing: { appointment?: Appointment; requestId: string } | null) => {
+      const next = (v: typeof view) => ({
+        ...v,
+        edit: editing ? editing.appointment?.id || "new" : "",
+        request: editing?.requestId || "",
+      });
+      if (editing) pushView(next);
+      else replaceView(next);
+    },
+    [pushView, replaceView],
+  );
   const [savedEvents, setSavedEvents] = useState(initialEvents);
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
@@ -109,9 +143,6 @@ export function CalendarWorkspace({
   const calendarElement = useRef<HTMLDivElement>(null);
   const keyboardFocus = useRef(false);
   const keyboardHelpId = useId();
-  const [editing, setEditing] = useState<{ appointment?: Appointment; requestId: string } | null>(
-    null,
-  );
   useEffect(() => {
     const reset = () => {
       setDetail(null);
@@ -119,7 +150,7 @@ export function CalendarWorkspace({
     };
     window.addEventListener("we2day:calendar-home", reset);
     return () => window.removeEventListener("we2day:calendar-home", reset);
-  }, []);
+  }, [setDetail, setEditing]);
   const [year, month, day] = parseDate(selected);
   const events: CalendarEvent[] = preview
     ? examples
@@ -128,6 +159,12 @@ export function CalendarWorkspace({
         time: event.time?.slice(0, 5) || "시간 미정",
         photo: false,
       }));
+  const detail = events.find((event) => event.id === view.detail) || null;
+  const savedEditing = savedEvents.find((event) => event.id === view.edit);
+  const editing =
+    view.edit === "new" || savedEditing
+      ? { appointment: savedEditing, requestId: view.request }
+      : null;
   const monthKey = selected.slice(0, 7);
   const dayEvents = events.filter((event) => event.date === selected);
   const leading = new Date(Date.UTC(year, month, 1)).getUTCDay();
@@ -227,17 +264,18 @@ export function CalendarWorkspace({
     return () => controller.abort();
   }, [monthKey, preview, status, refresh]);
 
-  const onSaved = useCallback((appointment: Appointment) => {
-    setSavedEvents((current) =>
-      [...current.filter((event) => event.id !== appointment.id), appointment].sort((a, b) =>
-        `${a.date}${a.time || "99"}`.localeCompare(`${b.date}${b.time || "99"}`),
-      ),
-    );
-    setSelected(appointment.date);
-    setEditing(null);
-    setDetail(null);
-    setError("");
-  }, []);
+  const onSaved = useCallback(
+    (appointment: Appointment) => {
+      setSavedEvents((current) =>
+        [...current.filter((event) => event.id !== appointment.id), appointment].sort((a, b) =>
+          `${a.date}${a.time || "99"}`.localeCompare(`${b.date}${b.time || "99"}`),
+        ),
+      );
+      replaceView({ date: appointment.date, detail: "", edit: "", request: "" });
+      setError("");
+    },
+    [replaceView],
+  );
 
   if (editing)
     return (
@@ -245,7 +283,7 @@ export function CalendarWorkspace({
         date={selected}
         {...editing}
         onSaved={onSaved}
-        onCancel={() => setEditing(null)}
+        onCancel={() => backView((v) => ({ ...v, edit: "", request: "" }))}
         onReload={() => {
           setEditing(null);
           setDetail(null);

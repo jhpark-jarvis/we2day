@@ -5,6 +5,7 @@ import { useRef, useState, useTransition } from "react";
 import { saveChecklist } from "@/app/actions/checklists";
 import { PageHeading } from "@/components/page-heading";
 import type { Checklist, ChecklistContent, ChecklistItem } from "@/lib/checklists";
+import { useItemHistory } from "@/lib/page-history";
 
 export function ChecklistWorkspace({
   initialLists,
@@ -18,8 +19,14 @@ export function ChecklistWorkspace({
   const [message, setMessage] = useState("");
   const [archived, setArchived] = useState(false);
   const [more, setMore] = useState(initialLists.length === 50);
-  const [selected, setSelected] = useState<Checklist | null>(null);
-  const [id, setId] = useState("");
+  const {
+    id,
+    selected,
+    open,
+    close,
+    finish,
+    error: navigationError,
+  } = useItemHistory("checklists", lists, "/api/checklists");
   const [pending, startTransition] = useTransition();
   function load(next: boolean, offset = 0) {
     startTransition(async () => {
@@ -45,10 +52,6 @@ export function ChecklistWorkspace({
       }
     });
   }
-  function close() {
-    setId("");
-    setSelected(null);
-  }
   if (id)
     return (
       <ChecklistEditor
@@ -62,7 +65,7 @@ export function ChecklistWorkspace({
               (v) => v.archived === archived,
             ),
           );
-          close();
+          finish();
           setMessage("목록을 저장했어요.");
         }}
       />
@@ -83,7 +86,7 @@ export function ChecklistWorkspace({
           disabled={pending}
           onClick={() => {
             setMessage("");
-            setId(crypto.randomUUID());
+            open(crypto.randomUUID(), true);
           }}
         >
           목록 만들기
@@ -121,9 +124,9 @@ export function ChecklistWorkspace({
       <p className="settings-hint">
         둘 다 작성하고 체크를 되돌릴 수 있어요. 수정 후 저장하면 상대에게 반영돼요.
       </p>
-      {error && (
+      {(error || navigationError) && (
         <p role="alert" className="error-message">
-          {error}
+          {error || navigationError}
         </p>
       )}
       {message && <p role="status">{message}</p>}
@@ -151,8 +154,7 @@ export function ChecklistWorkspace({
               title="목록 수정"
               type="button"
               onClick={() => {
-                setSelected(list);
-                setId(list.id);
+                open(list.id);
               }}
             >
               <Pencil size={18} aria-hidden="true" />
