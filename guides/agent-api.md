@@ -177,3 +177,20 @@ uv run --project apps/api python -m we2day_api.agent_client appointment --target
 uv run --project apps/api python -m we2day_api.agent_client change-plan --target-id 11111111-1111-4111-8111-111111111111 --input /private/agent/plan-save.json --output /private/agent/saved.json
 uv run --project apps/api python -m we2day_api.agent_client change-appointment --target-id 22222222-2222-4222-8222-222222222222 --input /private/agent/appointment-create.json --output /private/agent/created.json
 ```
+
+
+## ChatGPT 플러그인 연결 (OAuth·MCP)
+
+GPT의 지침을 플러그인으로 이전해도 Actions 연결은 자동으로 이전되지 않습니다. 기존 API와 별도로 OAuth·MCP 어댑터를 사용합니다.
+
+1. SQL034까지 적용한 같은 프로젝트에 `supabase/migrations/202610260035_agent_oauth.sql`을 적용합니다.
+2. API 서버에 `WE2DAY_AGENT_OAUTH_ORIGIN=https://your-domain.example`을 설정합니다. HTTPS origin만 사용하며 경로·포트·끝의 `/`를 붙이지 않습니다. 웹의 `WE2DAY_SITE_URL`과 같은 주소를 사용합니다.
+3. 플러그인의 MCP 주소를 `https://your-domain.example/api/agent/mcp`로 설정하고 OAuth·CIMD, 기본 scope `we2day:manage`를 선택합니다. 인증 서버와 보호 리소스 메타데이터는 루트의 `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`에서 제공합니다.
+4. ChatGPT에서 연결을 시작하고 WE2DAY에 로그인한 뒤 공동 일정·코스 관리 권한을 확인합니다. 비밀번호나 연결 키를 대화·플러그인 지침에 넣지 않습니다.
+5. 특정 기간을 읽기 전용으로 조회해 연결을 확인합니다. 실제 변경 시험은 별도 요청과 확인 뒤 진행합니다.
+
+이 어댑터는 ChatGPT의 stable CIMD 문서와 정확한 production callback만 허용합니다. 다른 호스트·클라이언트는 지원하지 않습니다. S256 PKCE와 5분 일회 코드를 사용하고, 발급된 토큰은 1년간 유효합니다. 자동갱신은 없으며 에이전트 연결 설정에서 폐기할 수 있습니다. OAuth 토큰은 해당 MCP 리소스에 묶여 일반 로그인이나 기존 REST 키로 사용할 수 없습니다. 기존 연결 키는 기존 권한·만료와 REST 경로를 유지합니다.
+
+MCP 도구 이름은 `readCalendar`, `readPlan`, `readAppointment`, `createDraft`, `changePlan`, `changeAppointment`입니다. 조회 도구는 경로·검색 매개변수를 인자로 받고, 쓰기 도구는 기존 JSON 본문을 `body` 인자로 받습니다. 변경 대상 UUID, 버전, 요청 ID와 명시 확인 규칙은 위 API 명세·예제를 그대로 따릅니다. 개인 일정·사진·계정·설정은 제공하지 않습니다.
+
+OAuth 코드·토큰 원문은 DB에 저장하지 않습니다. 코드 해시와 승인 메타데이터는 비공개 스키마, 토큰 해시는 기존 연결 테이블에 보관됩니다. 전체 DB 백업에는 이 구조도 포함됩니다. 기존 최대 5개 연결·분당 요청 한도·공간 멤버 검사·수정 충돌 방어가 적용되며 승인 메타데이터의 자동 삭제는 수행하지 않습니다.
