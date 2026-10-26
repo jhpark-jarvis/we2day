@@ -2,7 +2,7 @@
 
 [README](../README.md) · [설치](setup.md) · [배포](deployment.md) · [AI 설계 방향](ai-roadmap.md)
 
-이 문서는 현재 구현된 시스템이 어떻게 동작하는지 설명합니다. AI는 아직 구현되지 않았으며, 도입 방향은 [AI 로드맵](ai-roadmap.md)에 따로 정리했습니다.
+이 문서는 현재 구현된 시스템이 어떻게 동작하는지 설명합니다. 내부 AI 플래너는 기존 API 서버에서 Cloudflare Workers AI를 호출하며, 명시적으로 제출한 대화로 코스를 제안합니다. [연결 구조와 한계](ai-roadmap.md)를 따로 정리했습니다.
 
 ## 1. 전체 구성
 
