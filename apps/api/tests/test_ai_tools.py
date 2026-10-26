@@ -316,3 +316,27 @@ def test_weather_empty_city_and_failure_do_not_invent_forecast(monkeypatch):
     )
     result = run.execute("get_weather", {"city": "서울", "date": today})
     assert result == {"error": "weather_unavailable"} and not run.weather
+
+
+def test_single_format_completion_stays_inside_budget(monkeypatch):
+    calls, original = [], httpx.Client
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        text = (
+            "코스 조건을 정리했어요."
+            if len(calls) == 1
+            else '{"reply":"조건을 유지했어요.","plan":null}'
+        )
+        return httpx.Response(200, json={"choices": [{"message": {"content": text}}]})
+
+    monkeypatch.setattr(
+        ai_planner.httpx,
+        "Client",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
+    )
+    settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
+    answer = ai_planner.complete(settings, [{"role": "user", "content": "조건 유지"}], session())
+    assert answer.reply == "조건을 유지했어요." and len(calls) == 2
+    assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_object"

@@ -636,7 +636,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                     aria-label={`${candidate.title} 선택`}
                     onClick={() =>
                       void send(
-                        `${candidate.title}을(를) 선택할게. 정한 조건에 맞춰 코스에 반영해줘.`,
+                        `선택한 장소: ${candidate.title}. 정한 조건에 맞춰 코스에 반영해줘.`,
                         candidate,
                       )
                     }

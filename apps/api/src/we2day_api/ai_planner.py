@@ -1,6 +1,7 @@
 """Bounded read tools and private conversation context; no model-directed business writes."""
 
 import json
+import logging
 import re
 import time
 from datetime import datetime
@@ -28,6 +29,7 @@ from we2day_api.calendar import Store
 from we2day_api.plans import PlanContent
 
 router = APIRouter(tags=["ai-planner"])
+logger = logging.getLogger(__name__)
 PROMPT_VERSION = "we2-ai-2026-10-26-tools-v2"
 MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 SYSTEM = """당신은 WE2DAY의 '위투 AI'입니다. 한국어로 데이트 대화와 코스 제안만 수행합니다.
@@ -35,6 +37,8 @@ SYSTEM = """당신은 WE2DAY의 '위투 AI'입니다. 한국어로 데이트 대
 필요한 날짜·지역·활동이 이미 정해졌으면 같은 질문을 반복하지 말고 다음 단계로 진행하세요.
 구체 장소를 정하자는 요청은 지역이 있으면 즉시 search_places로 검색하세요.
 여러 업종이면 지역을 붙인 업종별 질의를 함께 호출할 수 있습니다.
+단, 사용자가 '먼저 도서관만'처럼 이번 단계의 범위를 정했으면 그 종류만 검색하세요.
+지금 요청하지 않은 후속 활동을 미리 검색하거나 장소를 임의로 선택하지 마세요.
 선택 도서관 주변 요청이면 검색 결과 주소의 동네를 다음 질의에 사용하세요.
 거리/소요시간은 추측하지 마세요.
 lookup_selected_places는 사용자가 명시 선택한 항목만 읽습니다. 선택이 있으면 이 도구로 확인하세요.
@@ -106,13 +110,14 @@ def complete(settings, messages: list[dict], session: ToolSession | None = None)
     if len(json.dumps(messages, ensure_ascii=False).encode()) > 24000:
         raise HTTPException(422, "ai_context_too_long")
     deadline = time.monotonic() + 85
+    format_completion = False
     try:
         with httpx.Client(trust_env=False, follow_redirects=False) as client:
             for step in range(3):
                 remaining = deadline - time.monotonic()
                 if remaining <= 1:
                     raise HTTPException(503, "ai_unavailable")
-                final = step == 2 or session is None
+                final = step == 2 or session is None or format_completion
                 inputs = {
                     "model": MODEL,
                     "messages": messages,
@@ -208,12 +213,35 @@ def complete(settings, messages: list[dict], session: ToolSession | None = None)
                         )
                     continue
                 text = message.get("content")
-                if isinstance(text, str):
-                    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
-                    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
-                    model_answer = ModelAnswer.model_validate_json(text)
-                else:
-                    model_answer = ModelAnswer.model_validate(text)
+                try:
+                    if isinstance(text, str):
+                        text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+                        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+                        model_answer = ModelAnswer.model_validate_json(text)
+                    else:
+                        model_answer = ModelAnswer.model_validate(text)
+                except ValidationError:
+                    if final:
+                        raise
+                    # One formatting completion inside the same three-call budget, never a
+                    # retry of transport/provider failures or permission errors.
+                    format_completion = True
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": text
+                            if isinstance(text, str)
+                            else json.dumps(text, ensure_ascii=False),
+                        }
+                    )
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": "reply,plan,context만 있는 JSON으로 완성하세요."
+                            " date는 YYYY-MM-DD/null, activities는 문자열 목록입니다.",
+                        }
+                    )
+                    continue
                 plan = session.resolve(model_answer.plan) if session and model_answer.plan else None
                 checks = check_course(plan) if plan else []
                 if plan and session:
@@ -238,6 +266,7 @@ def complete(settings, messages: list[dict], session: ToolSession | None = None)
         AttributeError,
         ValidationError,
     ) as error:
+        logger.warning("AI completion failed: category=%s", type(error).__name__)
         raise HTTPException(502, "ai_invalid_response") from error
 
 

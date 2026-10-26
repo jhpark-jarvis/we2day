@@ -118,11 +118,11 @@ def test_invalid_output_and_missing_key_fail_closed(setup):
         "not json",
         '{"reply":"ok","execute":"delete"}',
     ]:
-        replies.append(httpx.Response(200, json={"result": {"response": text}}))
+        replies.extend([httpx.Response(200, json={"result": {"response": text}}) for _ in range(2)])
         assert client.post("/ai/planner", json=body()).status_code == 502
     client.app.state.settings.cloudflare_api_token = None
     assert client.post("/ai/planner", json=body()).status_code == 503
-    assert len(calls) == 3 and len(store.calls) == 3
+    assert len(calls) == 6 and len(store.calls) == 3
 
 
 def test_anonymous_request_denied():
