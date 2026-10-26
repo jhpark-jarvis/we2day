@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/agents";
 
 export type AgentConnection = {
+  can_manage?: boolean;
   id: string;
   label: string;
   created_at: string;
@@ -27,6 +28,7 @@ export function AgentConnections({
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const [items, setItems] = useState(initial);
+  const [canManage, setCanManage] = useState(false);
   const [label, setLabel] = useState("");
   const [secret, setSecret] = useState<{ id: string; key: string } | null>(null);
   const [notice, setNotice] = useState(initialError);
@@ -56,7 +58,8 @@ export function AgentConnections({
         </button>
       </div>
       <p className="muted">
-        일정·코스 조회와 새 플랜 초안 작성만 허용해요. 확정·수정·삭제는 허용하지 않아요.
+        기본 권한은 공동 일정·코스 조회와 새 초안 작성이에요. 관리 권한은 새 키에만 선택할 수
+        있어요.
       </p>
       <p className="settings-hint">
         키는 30일 동안 유효하며 계정당 최대 5개예요. 연결할 에이전트가 준비됐을 때 발급하세요.
@@ -66,7 +69,7 @@ export function AgentConnections({
           event.preventDefault();
           start(async () => {
             setNotice("");
-            const result = await createAgentConnection(label);
+            const result = await createAgentConnection(label, canManage);
             if (result.error) setNotice(result.error);
             else if (result.data) {
               setSecret({ id: result.data.id, key: result.data.key });
@@ -88,6 +91,18 @@ export function AgentConnections({
             onChange={(e) => setLabel(e.target.value)}
           />
         </div>
+        <label className="settings-hint">
+          <input
+            type="checkbox"
+            checked={canManage}
+            disabled={!ready || pending || !!secret}
+            onChange={(event) => setCanManage(event.target.checked)}
+          />
+          공동 일정·코스 관리 허용 (수정·확정·보관·독립 약속 삭제)
+        </label>
+        <p className="settings-hint">
+          관리 키를 가진 도구는 공유 자료를 변경할 수 있어요. 개인 일정·사진·계정은 제외돼요.
+        </p>
         <button
           type="submit"
           className="primary-button"
@@ -110,7 +125,7 @@ export function AgentConnections({
             </button>
           </div>
           <p>
-            이 키로 둘의 일정·코스를 읽고 초안을 만들 수 있어요. 신뢰하는 에이전트에만 직접
+            선택한 권한으로 둘의 일정·코스에 접근할 수 있어요. 신뢰하는 에이전트에만 직접
             전달하세요.
           </p>
           <div className="auth-field">
@@ -175,6 +190,8 @@ export function AgentConnections({
                 )}
               </div>
               <p className="settings-hint">
+                {item.can_manage ? "조회·초안·관리" : "조회·초안"}
+                {" · "}
                 {item.revoked_at ? "폐기됨" : expired ? "만료됨" : "사용 가능"}
                 {" · 만료 "}
                 {new Date(item.expires_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}

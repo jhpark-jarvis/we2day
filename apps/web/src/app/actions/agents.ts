@@ -5,10 +5,10 @@ import { callApi } from "@/lib/api";
 export async function agentConnections() {
   return callApi<AgentConnection[]>("/agent-connections");
 }
-export async function createAgentConnection(label: string) {
+export async function createAgentConnection(label: string, canManage = false) {
   return callApi<AgentConnection & { key: string }>("/agent-connections", {
     method: "POST",
-    body: JSON.stringify({ label }),
+    body: JSON.stringify({ label, can_manage: canManage }),
   });
 }
 export async function revokeAgentConnection(id: string) {

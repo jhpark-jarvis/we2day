@@ -5,8 +5,9 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   const path = (await context.params).path.join("/");
   const valid =
     request.method === "GET"
-      ? path === "calendar" || /^plans\/[0-9a-f-]{36}$/i.test(path)
-      : request.method === "POST" && path === "drafts";
+      ? path === "calendar" || /^(?:plans|appointments)\/[0-9a-f-]{36}$/i.test(path)
+      : request.method === "POST" &&
+        (path === "drafts" || /^(?:plans|appointments)\/[0-9a-f-]{36}\/changes$/i.test(path));
   if (!valid) return NextResponse.json({ error: "not_found" }, { status: 404, headers });
   const authorization = request.headers.get("authorization") || "";
   if (!/^Bearer w2d_agent_[0-9a-f]{64}$/.test(authorization))

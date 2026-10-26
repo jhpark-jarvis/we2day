@@ -74,6 +74,97 @@ test("explicit key issuance, scoped draft access, human review and revocation", 
       })
     ).status(),
   ).toBe(409);
+  const change = { action: "save", expected_version: 1, request_id: crypto.randomUUID(), content };
+  expect(
+    (
+      await page.request.post(`${api}/plans/${body.id}/changes`, { headers, data: change })
+    ).status(),
+  ).toBe(403);
+  const schemaResponse = await page.request.get("/api/agent/openapi.json");
+  expect(schemaResponse.status()).toBe(200);
+  const schema = await schemaResponse.json();
+  expect(schema.paths["/plans/{plan_id}/changes"].post["x-openai-isConsequential"]).toBe(true);
+  expect(schema.servers[0].url).toBe("http://127.0.0.1:3100/api/agent/v1");
+  await page.goto("/settings/agents");
+  await page.getByLabel("연결 이름").fill("Synthetic management");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "연결 키 발급", exact: true }).click();
+  const managed = {
+    Authorization: `Bearer ${await page.getByLabel("발급된 연결 키").inputValue()}`,
+  };
+  await page.getByRole("button", { name: "연결 키 닫기" }).click();
+  const saved = await page.request.post(`${api}/plans/${body.id}/changes`, {
+    headers: managed,
+    data: change,
+  });
+  expect(saved.status()).toBe(200);
+  expect((await saved.json()).version).toBe(2);
+  const confirm = {
+    action: "confirm",
+    expected_version: 2,
+    request_id: crypto.randomUUID(),
+    confirmed: true,
+  };
+  expect(
+    (
+      await page.request.post(`${api}/plans/${body.id}/changes`, {
+        headers: managed,
+        data: { ...confirm, confirmed: false },
+      })
+    ).status(),
+  ).toBe(422);
+  expect(
+    (
+      await page.request.post(`${api}/plans/${body.id}/changes`, {
+        headers: managed,
+        data: confirm,
+      })
+    ).status(),
+  ).toBe(200);
+  const confirmed = await (
+    await page.request.get(`${api}/plans/${body.id}`, { headers: managed })
+  ).json();
+  expect(confirmed.published_revision).toBe(1);
+  const standalone = crypto.randomUUID();
+  const create = {
+    action: "create",
+    expected_version: 0,
+    request_id: crypto.randomUUID(),
+    content: { title: "Synthetic shared", date, time: null, place: "", note: "" },
+  };
+  expect(
+    (
+      await page.request.post(`${api}/appointments/${standalone}/changes`, {
+        headers: managed,
+        data: create,
+      })
+    ).status(),
+  ).toBe(200);
+  expect(
+    (
+      await page.request.post(`${api}/appointments/${standalone}/changes`, {
+        headers: managed,
+        data: create,
+      })
+    ).status(),
+  ).toBe(200);
+  const deletion = {
+    action: "delete",
+    expected_version: 1,
+    request_id: crypto.randomUUID(),
+    confirmed: true,
+  };
+  expect(
+    (
+      await page.request.post(`${api}/appointments/${standalone}/changes`, {
+        headers: managed,
+        data: deletion,
+      })
+    ).status(),
+  ).toBe(200);
+  expect(
+    (await page.request.get(`${api}/appointments/${standalone}`, { headers: managed })).status(),
+  ).toBe(404);
   await page.goto(`/plans?item=${body.id}`);
   await expect(page.getByLabel("플랜 이름", { exact: true })).toHaveValue(content.title);
   await page.goto("/settings/agents");
@@ -82,7 +173,11 @@ test("explicit key issuance, scoped draft access, human review and revocation", 
     fullPage: true,
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole("button", { name: "폐기", exact: true }).click();
+  await page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "Synthetic connection", exact: true }) })
+    .getByRole("button", { name: "폐기", exact: true })
+    .click();
   await expect(page.getByText(/폐기됨/)).toBeVisible();
   expect((await page.request.get(`${api}/plans/${body.id}`, { headers })).status()).toBe(401);
 });

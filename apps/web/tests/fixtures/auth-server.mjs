@@ -152,6 +152,8 @@ createServer(async (request, response) => {
         "/rest/v1/rpc/agent_calendar",
         "/rest/v1/rpc/agent_plan",
         "/rest/v1/rpc/agent_create_draft",
+        "/rest/v1/rpc/agent_appointment",
+        "/rest/v1/rpc/agent_change",
       ].includes(url.pathname);
     if (!users.has(token) && !anonymousAgent) return send(401, { error: "invalid fixture token" });
     if (request.method === "GET" && url.pathname === "/rest/v1/date_plans")
