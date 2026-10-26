@@ -43,12 +43,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   pathname === "/preview" ||
                   pathname === "/anniversaries" ||
                   pathname.startsWith("/plans") ||
-                  pathname === "/wishlist" ||
                   pathname === "/today" ||
                   pathname === "/reminders" ||
                   pathname.startsWith("/calendar")
                 : href === "/together"
                   ? pathname === "/together" ||
+                    pathname === "/wishlist" ||
                     pathname === "/checklists" ||
                     pathname === "/goals" ||
                     pathname.startsWith("/questions") ||

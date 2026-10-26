@@ -243,23 +243,6 @@ export function PlanWorkspace({
           </select>
         </label>
       </div>
-      <details className="compact-help">
-        <summary>관련 기능</summary>
-        <nav className="calendar-toolbar">
-          <Link className="text-button" href="/wishlist">
-            위시리스트
-          </Link>
-          <Link className="text-button" href={`/today?date=${today}`}>
-            데이트 코스
-          </Link>
-          <Link className="text-button" href="/checklists">
-            목록
-          </Link>
-          <Link className="text-button" href="/goals">
-            목표
-          </Link>
-        </nav>
-      </details>
       <p className="settings-hint">초안은 달력에 표시되지 않아요. 확정하면 약속 하나로 연결돼요.</p>
       {(error || navigation.error) && (
         <p role="alert" className="error-message">

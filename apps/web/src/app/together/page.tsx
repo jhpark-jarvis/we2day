@@ -1,4 +1,4 @@
-import { ChevronRight, Dices, ListChecks, MessagesSquare, Target } from "lucide-react";
+import { Bookmark, ChevronRight, Dices, ListChecks, MessagesSquare, Target } from "lucide-react";
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
@@ -6,6 +6,12 @@ import Link from "@/components/progress-link";
 export const metadata: Metadata = { title: "함께" };
 
 const features = [
+  {
+    href: "/wishlist",
+    label: "위시",
+    description: "함께 가고 싶은 곳과 해보고 싶은 일",
+    icon: Bookmark,
+  },
   { href: "/checklists", label: "목록", description: "준비물과 함께 챙길 일", icon: ListChecks },
   { href: "/goals", label: "목표", description: "같이 이루고 싶은 일", icon: Target },
   { href: "/questions", label: "질문", description: "서로의 생각과 일상", icon: MessagesSquare },
