@@ -24,6 +24,7 @@ import { PageHeading } from "@/components/page-heading";
 import { PhotoStory } from "@/components/photo-story";
 import { PlaceSearch } from "@/components/place-search";
 import Link from "@/components/progress-link";
+import { We2AiIcon } from "@/components/we2-ai-icon";
 import { calendarDate, daysInMonth, isSupportedDate, parseDate } from "@/lib/calendar";
 import type { MeetingDay } from "@/lib/meetings";
 import { usePageHistory } from "@/lib/page-history";
@@ -447,6 +448,10 @@ export function CalendarWorkspace({
                   <Link href="/calendar/export">캘린더 내보내기</Link>
                 </nav>
               </details>
+              <Link href="/plans/ai" className="text-button home-ai-entry">
+                <We2AiIcon size={24} />
+                위투 AI
+              </Link>
               {memberCount === 1 && (
                 <Link className="text-button" href="/couple">
                   초대

@@ -834,3 +834,5 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 /* Preserve the supplied artwork; frame only its transparent outer padding. */
 .we2-ai-icon { position:relative; display:inline-block; flex-shrink:0; overflow:hidden; vertical-align:middle; }
 .we2-ai-icon > img { position:absolute; width:150%; height:150%; max-width:none; left:-25%; top:-25%; object-fit:contain; }
+
+.calendar-toolbar > .home-ai-entry { margin-inline-start:auto; }
