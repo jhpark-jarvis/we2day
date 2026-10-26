@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { changePlan } from "@/app/actions/plans";
+import { changePlan, deletePlanDraft } from "@/app/actions/plans";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { PageHeading } from "@/components/page-heading";
 import { PlaceSearch } from "@/components/place-search";
@@ -59,11 +59,12 @@ export function PlanWorkspace({
   const [editorEpoch, setEditorEpoch] = useState(0);
   const [savedReview, setSavedReview] = useState("");
   const [pending, startTransition] = useTransition();
-  function load(includeArchived: boolean, offset = 0) {
+  const [sort, setSort] = useState("date_desc");
+  function load(includeArchived: boolean, offset = 0, ordering = sort) {
     startTransition(async () => {
       try {
         const response = await fetch(
-          `/api/plans?archived=${includeArchived}&offset=${offset}&summary=true`,
+          `/api/plans?archived=${includeArchived}&offset=${offset}&summary=true&sort=${ordering}`,
           {
             cache: "no-store",
           },
@@ -78,6 +79,7 @@ export function PlanWorkspace({
             : data,
         );
         setArchived(includeArchived);
+        setSort(ordering);
         setListLoaded(true);
         setMore(data.length === 50);
         setError("");
@@ -100,6 +102,55 @@ export function PlanWorkspace({
       }
     });
   }
+  function removeOrArchive(plan: PlanSummary) {
+    startTransition(async () => {
+      try {
+        const response = await fetch(`/api/plans?id=${plan.id}`, { cache: "no-store" });
+        const current: DatePlan = await response.json();
+        if (!response.ok) throw new Error("최신 플랜을 불러오지 못했어요.");
+        const draft = plan.status === "draft";
+        if (draft && (current.published_content || current.published_revision !== 0))
+          throw new Error("플랜이 확정됐어요. 목록을 새로고침해 주세요.");
+        if (draft) {
+          if (
+            !window.confirm(
+              `‘${current.content.title}’ 초안을 영구 삭제할까요? 두 사람의 목록에서 삭제되며 복구할 수 없어요.`,
+            )
+          )
+            return;
+          const result = await deletePlanDraft(current.id, current.version);
+          if (result.error) throw new Error(result.error);
+          setNotice("초안을 삭제했어요.");
+        } else {
+          const action = current.archived ? "restore" : "archive";
+          const result = await changePlan(
+            current.id,
+            action,
+            null,
+            current.version,
+            current.appointment?.version || 0,
+            crypto.randomUUID(),
+          );
+          if (result.error) throw new Error(result.error);
+          setNotice(
+            action === "archive"
+              ? "플랜을 보관했어요. 기존 달력 약속과 기록은 유지돼요."
+              : "플랜을 복원했어요.",
+          );
+        }
+        setItems((items) => items.filter((item) => item.id !== current.id));
+        setError("");
+        load(archived);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "처리하지 못했어요. 새로고침해 주세요.");
+      }
+    });
+  }
+  const orderedItems = [...items].sort((a, b) => {
+    if (sort === "updated_desc" || sort === "title_asc") return 0;
+    const compared = a.date.localeCompare(b.date);
+    return (sort === "date_desc" ? -compared : compared) || a.id.localeCompare(b.id);
+  });
   if (selected || newId)
     return (
       <PlanEditor
@@ -136,6 +187,7 @@ export function PlanWorkspace({
             setDetailCache(plan);
             navigation.select(plan.id);
             setNotice("");
+            load(archived);
           }
         }}
         onReload={async () => {
@@ -176,6 +228,20 @@ export function PlanWorkspace({
         </button>
         <ArchiveToggle label="플랜 구분" archived={archived} pending={pending} onChange={load} />
         <RefreshButton label="플랜 새로고침" pending={pending} onClick={() => load(archived)} />
+        <label className="plan-sort">
+          <span className="sr-only">플랜 정렬</span>
+          <select
+            aria-label="플랜 정렬"
+            value={sort}
+            disabled={pending}
+            onChange={(event) => load(archived, 0, event.target.value)}
+          >
+            <option value="date_desc">날짜 최신순</option>
+            <option value="date_asc">날짜 빠른순</option>
+            <option value="updated_desc">최근 수정순</option>
+            <option value="title_asc">이름순</option>
+          </select>
+        </label>
       </div>
       <details className="compact-help">
         <summary>관련 기능</summary>
@@ -206,25 +272,42 @@ export function PlanWorkspace({
         </p>
       )}
       <div className="plan-list">
-        {items.map((plan) => (
-          <button
-            key={plan.id}
-            type="button"
-            className="plan-card"
-            disabled={pending}
-            onClick={() => openPlan(plan.id)}
-          >
-            <small>
-              {plan.date} · {summaryLabels[plan.status]}
-            </small>
-            <strong>{plan.title}</strong>
-            <span>
-              {plan.activity_count}개 활동 · {plan.transport || "교통수단 미정"}
-            </span>
-            <span className="card-action-hint" aria-hidden="true">
-              플랜 열기 ↗
-            </span>
-          </button>
+        {orderedItems.map((plan) => (
+          <div className="plan-card-shell" key={plan.id}>
+            <button
+              type="button"
+              className="plan-card"
+              disabled={pending}
+              onClick={() => openPlan(plan.id)}
+            >
+              <small>
+                {plan.date} · {summaryLabels[plan.status]}
+              </small>
+              <strong>{plan.title}</strong>
+              <span>
+                {plan.activity_count}개 활동 · {plan.transport || "교통수단 미정"}
+              </span>
+              <span className="card-action-hint" aria-hidden="true">
+                플랜 열기 ↗
+              </span>
+            </button>
+            <button
+              type="button"
+              className="icon-button plan-card-control"
+              disabled={pending}
+              aria-label={`${plan.title} ${plan.status === "draft" ? "초안 삭제" : plan.archived ? "복원" : "보관"}`}
+              title={plan.status === "draft" ? "초안 삭제" : plan.archived ? "복원" : "보관"}
+              onClick={() => removeOrArchive(plan)}
+            >
+              {plan.status === "draft" ? (
+                <Trash2 size={18} aria-hidden="true" />
+              ) : plan.archived ? (
+                <ArchiveRestore size={18} aria-hidden="true" />
+              ) : (
+                <Archive size={18} aria-hidden="true" />
+              )}
+            </button>
+          </div>
         ))}
       </div>
       {!items.length && !error && !pending && (

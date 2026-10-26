@@ -771,3 +771,11 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .ai-spinner { animation: ai-spin 1s linear infinite; }
 @keyframes ai-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ai-spinner { animation: none; } }
+
+/* Separate card navigation and destructive actions: no nested buttons. */
+.plan-card-shell { position: relative; min-width: 0; display: flex; }
+.plan-card-shell > .plan-card { width: 100%; padding-right: 58px; }
+.plan-card-control { position: absolute; top: 10px; right: 10px; }
+.plan-sort { margin-left: auto; min-width: 0; }
+.plan-sort select { max-width: 100%; font-size: 16px; min-height: 44px; }
+@media (max-width: 600px) { .plan-sort { margin-left: 0; } }
