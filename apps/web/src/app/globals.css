@@ -768,7 +768,7 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-chat-header svg,.we2-proposal-header svg { color: var(--accent); }
 .we2-course-jump { display: none; }
 .we2-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
-.we2-welcome { margin: auto; text-align: center; padding: 18px 0; width: 100%; }
+.we2-welcome { margin: auto; text-align: center; padding: 8px 0; width: 100%; }
 .we2-welcome-icon { display: inline-flex; justify-content: center; align-items: center; width: 60px; height: 60px; border-radius: 20px; background: var(--soft); color: var(--accent); }
 .we2-welcome h2 { font-size: 1.35rem; font-weight: 500; margin: 18px 0 8px; }
 .we2-welcome > p { color: var(--muted); font-size: .9rem; margin: 0; }
@@ -795,7 +795,7 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-proposal-header { font-size: .85rem; }
 .we2-draft-badge { font-size: .7rem; border: 1px solid var(--line); border-radius: 100px; padding: 4px 8px; color: var(--muted); }
 .we2-proposal-empty { padding: 44px 20px; text-align: center; color: var(--muted); }
-.we2-proposal-empty > svg { color: var(--accent); opacity: .65; }
+.we2-proposal-empty > svg { color: var(--accent); opacity: .65; margin-inline: auto; }
 .we2-proposal-empty h2 { font-weight: 500; font-size: 1rem; color: var(--foreground); margin: 18px 0 10px; }
 .we2-proposal-empty p { font-size: .85rem; line-height: 1.8; }
 .we2-proposal-empty > span { display: block; font-size: .7rem; margin-top: 26px; }
