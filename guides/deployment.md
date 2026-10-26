@@ -243,7 +243,7 @@ uv run --project apps/api python -m we2day_api.local_archive decrypt --key /priv
 
 키와 암호화 사본은 서로 다른 디렉터리에 보관해야 하며, 같은 PC 고장에 대비한 별도 키 보관이 필요합니다. 입력/키/대조 원본은 작업 중 수정하지 않는 일반 파일, 출력은 아직 존재하지 않는 파일이어야 합니다. 원본과 키가 같은 파일을 가리키면 하드 링크 별칭도 거부합니다. 입력·대조 원본의 크기/수정 정보가 읽는 중 달라져도 실패하며, 검사 동안 파일을 닫아 두어야 합니다. 기존 파일·원본·키를 덮어쓰지 않고 잘못된 키/손상 시 최종 복호화 파일을 남기지 않습니다. 복호화 중 출력 디렉터리에 임시 평문이 생길 수 있으므로 접근 제한·디스크 암호화를 적용한 로컬 경로를 사용합니다. 강제 종료 시 남은 `.we2day-partial-*`는 자동 재사용하지 않으며 운영자가 확인/정리해야 합니다. 도구는 Windows ACL·BitLocker·오프라인 키 보관을 자동 설정하지 않습니다.
 
-백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 수집·일별 실행과 보관 개수 계산을 제공하며, 사본 자동 삭제는 제공하지 않습니다. 예약은 운영자가 복구 검증과 별도 키 보관을 확인한 뒤 직접 활성화해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
+백업 보관의 기본안은 하루 한 번 생성하고 최근 일별 7개와 주별 4개를 남기는 것입니다. 일별 생성기는 기존 사본을 삭제하지 않습니다. 별도 [백업 정리기](#backup-cleanup)는 기본 미리보기이며 별도 검토 후에만 실행할 수 있습니다. 예약은 운영자가 복구 검증과 별도 키 보관을 확인한 뒤 직접 활성화해야 합니다. JSON이나 일부 사진 ZIP을 받았거나 암호화 검사에 통과한 것만으로 전체 백업이 준비된 것은 아닙니다. 이 도구는 외부 저장소로 파일을 자동 전송하지 않습니다.
 
 <a id="backup-collection"></a>
 ## 서버에서 DB·사진 수집
@@ -499,3 +499,21 @@ VM만 유실된 경우와 Supabase 자료를 복구해야 하는 경우의 실�
 | 전환·되돌리기 절차 | 운영 원본을 유지한 채 별도 환경 확인, 실패 시 기존 주소·설정 복귀 순서 준비 | 장애 시 복귀 지연 가능 |
 
 비밀번호와 비밀키는 이 표나 저장소에 기록하지 말고 별도 보호된 보관소에서 관리하세요. 격리 복구 시험의 성공만으로 운영 전환이나 기존 사본 삭제를 진행하지 않습니다.
+
+<a id="backup-cleanup"></a>
+### 별도 검토가 필요한 백업 정리기
+
+백업 이미지의 `backup_cleanup`은 `we2day-auto-YYYY-MM-DD.enc`만 정리할 수 있습니다. 수동·checkpoint는 보존하며 자동본의 최근 일별7개와 주별4개의 합집합을 남깁니다. 모든 관리 사본의 무결성·최근36시간 이내 자동 사본·source/key 일치·수집기와 같은 잠금을 확인합니다. 손상·링크·파일 변경·다른 source/key·잠금 충돌은 삭제 전 중단합니다.
+
+백업용 Compose 디렉터리에서 다음을 실행합니다. `prepare`는 아직 없는 `cleanup-review.json`을 비활성 상태로 만들며 기존 생성용 `review.json`을 바꾸지 않습니다.
+
+```sh
+docker compose run --rm --no-deps -T --entrypoint python backup -m we2day_api.backup_cleanup prepare --config /run/config/runtime.env --key /run/keys/archive.key --gate /run/config/cleanup-review.json --directory /copies
+docker compose run --rm --no-deps -T --entrypoint python backup -m we2day_api.backup_cleanup preview --config /run/config/runtime.env --key /run/keys/archive.key --gate /run/config/cleanup-review.json --directory /copies
+```
+
+삭제를 검토할 때는 별도 사본/키의 실제 사용과 전체 복구 범위·남은 한계, 보관 정책을 운영자가 확인합니다. 그 뒤에만 gate의 `enabled`, `full_restore_reviewed`, `offsite_copy_reviewed`를 true로 바꾸고 `approval_reference`에 검토 기록을 남깁니다. 자동 생성된 `source_id`, `key_id`, `policy`는 수정하지 않습니다. gate는 사본 디렉터리 밖에서 본인만 읽고 쓰도록 보관합니다. 기본 false를 소프트웨어가 자동 변경하지 않습니다.
+
+`preview` 대신 `run`을 지정하면 활성 gate를 재검사한 뒤 대상 파일을 영구 삭제합니다. gate가 미승인이면 pending_review/종료2, 무결성·설정·잠금 실패는 종료1입니다. 일부 삭제 뒤 실패하면 중단 상태와 삭제 개수를 `.we2day-cleanup-status.json`에 남깁니다. 파일시스템 전체의 원자적 삭제를 보장하지 않으며, 중단 시 성공으로 처리하지 마세요.
+
+예약 예시는 [서비스](../apps/api/deployment/backup/we2day-cleanup.service)와 [타이머](../apps/api/deployment/backup/we2day-cleanup.timer)입니다. 전용 경로/계정을 맞추고 `systemd-analyze verify`로 검사한 뒤, 수동 run 결과와 실제 활성화 결정을 확인해야 합니다. 예시 파일 제공이나 이미지 갱신만으로 타이머를 활성화하지 않습니다. 기존 감사·생성기는 계속 비파괴이며 정리기는 별도입니다.

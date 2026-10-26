@@ -1,0 +1,12 @@
+[Unit]
+Description=WE2DAY reviewed automatic-backup retention
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/we2day-backup
+ExecStart=/usr/bin/docker compose run --rm --no-deps -T --entrypoint python backup -m we2day_api.backup_cleanup run --config /run/config/runtime.env --key /run/keys/archive.key --gate /run/config/cleanup-review.json --directory /copies
+TimeoutStartSec=1800
+NoNewPrivileges=true

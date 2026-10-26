@@ -1,0 +1,11 @@
+[Unit]
+Description=WE2DAY reviewed retention at Seoul 05:10
+
+[Timer]
+OnCalendar=*-*-* 05:10:00 Asia/Seoul
+AccuracySec=1min
+Persistent=true
+Unit=we2day-cleanup.service
+
+[Install]
+WantedBy=timers.target
