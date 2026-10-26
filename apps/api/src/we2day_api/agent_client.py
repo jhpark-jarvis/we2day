@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import httpx
 
-from we2day_api.agents import DraftInput
+from we2day_api.agents import AgentAppointmentChange, AgentPlanChange, DraftInput
 from we2day_api.backup_bundle import json_value
 from we2day_api.plans import PlanContent
 
@@ -75,12 +75,32 @@ class AgentClient:
             raise ValueError("connection_configuration")
         self.base, self.key, self.transport = base.rstrip("/"), key, transport
 
-    def request(self, action, *, start=None, end=None, offset=0, plan_id=None, draft=None):
+    def request(
+        self,
+        action,
+        *,
+        start=None,
+        end=None,
+        offset=0,
+        plan_id=None,
+        draft=None,
+        target_id=None,
+        change=None,
+    ):
         body = None
         if action in {"check", "calendar"}:
             path, method = calendar_path(start, end, offset), "GET"
         elif action == "plan":
             path, method = f"/plans/{UUID(plan_id)}", "GET"
+        elif action == "appointment":
+            path, method = f"/appointments/{UUID(target_id)}", "GET"
+        elif action in {"change-plan", "change-appointment"}:
+            model = AgentPlanChange if action == "change-plan" else AgentAppointmentChange
+            body = model.model_validate(change).model_dump(mode="json")
+            if len(json.dumps(body, ensure_ascii=False).encode()) > 40000:
+                raise ValueError("change_size")
+            entity = "plans" if action == "change-plan" else "appointments"
+            path, method = f"/{entity}/{UUID(target_id)}/changes", "POST"
         elif action == "draft":
             body = DraftInput.model_validate(draft).model_dump(mode="json")
             if (
@@ -123,13 +143,26 @@ class AgentClient:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare-draft", "check", "calendar", "plan", "draft"])
+    parser.add_argument(
+        "action",
+        choices=[
+            "prepare-draft",
+            "check",
+            "calendar",
+            "plan",
+            "draft",
+            "appointment",
+            "change-plan",
+            "change-appointment",
+        ],
+    )
     parser.add_argument("--input", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--start")
     parser.add_argument("--end")
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--plan-id")
+    parser.add_argument("--target-id")
     parser.add_argument("--allow-local", action="store_true")
     args = parser.parse_args()
     try:
@@ -151,6 +184,10 @@ def main():
                 end=args.end,
                 offset=args.offset,
                 plan_id=args.plan_id,
+                target_id=args.target_id,
+                change=read_json(args.input)
+                if args.action.startswith("change-") and args.input
+                else None,
                 draft=read_json(args.input) if args.action == "draft" and args.input else None,
             )
             if args.action == "check":

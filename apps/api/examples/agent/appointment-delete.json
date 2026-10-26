@@ -1,0 +1,8 @@
+{
+  "request_id": "22222222-2222-4222-8222-222222222222",
+  "expected_version": 1,
+  "expected_appointment_version": 0,
+  "confirmed": true,
+  "action": "delete",
+  "content": null
+}

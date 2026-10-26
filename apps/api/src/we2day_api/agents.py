@@ -2,15 +2,16 @@
 
 import re
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from we2day_api.auth import bearer, unauthenticated
+from we2day_api.calendar import AppointmentInput
 from we2day_api.data import DataAPI, require_data
 from we2day_api.plans import PlanContent
 from we2day_api.upstream import upstream_transport
@@ -18,12 +19,13 @@ from we2day_api.upstream import upstream_transport
 router = APIRouter(tags=["agent-connections"])
 Store = Annotated[DataAPI, Depends(require_data)]
 KEY = re.compile(r"w2d_agent_[0-9a-f]{64}")
-FIELDS = "id,label,created_at,expires_at,revoked_at,last_used_at"
+FIELDS = "id,label,created_at,expires_at,revoked_at,last_used_at,can_manage"
 
 
 class ConnectionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: str = Field(min_length=1, max_length=60)
+    can_manage: bool = Field(default=False, strict=True)
 
 
 class DraftInput(BaseModel):
@@ -48,7 +50,9 @@ def list_connections(store: Store):
 
 @router.post("/agent-connections")
 def create_connection(body: ConnectionInput, store: Store):
-    return store.rpc("create_agent_connection", {"p_label": body.label})
+    return store.rpc(
+        "create_managed_agent_connection", {"p_label": body.label, "p_manage": body.can_manage}
+    )
 
 
 @router.delete("/agent-connections/{connection_id}")
@@ -77,14 +81,29 @@ def agent_rpc(request: Request, credentials, function: str, parameters: dict):
             )
         if response.status_code == 401:
             raise unauthenticated()
-        if response.status_code in {404, 409, 422, 429}:
+        if response.status_code in {403, 404, 409, 422, 429}:
             codes = {
+                403: "agent_manage_required",
                 404: "not_found",
                 409: "request_conflict",
                 422: "invalid_request",
                 429: "agent_limit",
             }
-            raise HTTPException(response.status_code, codes[response.status_code])
+            code = codes[response.status_code]
+            try:
+                reason = response.json().get("message")
+                if reason in {
+                    "version_conflict",
+                    "linked_plan_required",
+                    "plan_archived",
+                    "confirmation_required",
+                    "agent_change_limit",
+                    "agent_draft_limit",
+                }:
+                    code = reason
+            except (ValueError, AttributeError):
+                pass
+            raise HTTPException(response.status_code, code)
         if not response.is_success:
             raise HTTPException(503, "Agent gateway unavailable")
         return response.json()
@@ -95,7 +114,45 @@ def agent_rpc(request: Request, credentials, function: str, parameters: dict):
 Credential = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]
 
 
-@router.get("/agent/v1/calendar")
+class AgentAppointmentView(AppointmentInput):
+    id: UUID
+    version: int
+    plan_id: UUID | None = None
+
+
+class AgentPlanView(BaseModel):
+    id: UUID
+    content: PlanContent
+    published_content: PlanContent | None
+    published_revision: int
+    version: int
+    archived: bool = False
+    appointment_id: UUID | None = None
+    appointment_version: int = 0
+
+
+class AgentCalendarView(BaseModel):
+    appointments: list[AgentAppointmentView] = Field(default_factory=list)
+    plans: list[AgentPlanView] = Field(default_factory=list)
+    next_offset: int | None = None
+
+
+class AgentDraftResult(BaseModel):
+    id: UUID
+    created: bool
+
+
+class AgentChangeResult(BaseModel):
+    id: UUID
+    version: int | None = None
+    archived: bool | None = None
+    published_revision: int | None = None
+    appointment_id: UUID | None = None
+    deleted: bool | None = None
+    replayed: bool = False
+
+
+@router.get("/agent/v1/calendar", operation_id="readCalendar", response_model=AgentCalendarView)
 def agent_calendar(
     request: Request,
     credentials: Credential,
@@ -113,12 +170,12 @@ def agent_calendar(
     )
 
 
-@router.get("/agent/v1/plans/{plan_id}")
+@router.get("/agent/v1/plans/{plan_id}", operation_id="readPlan", response_model=AgentPlanView)
 def agent_plan(plan_id: UUID, request: Request, credentials: Credential):
     return agent_rpc(request, credentials, "agent_plan", {"p_id": str(plan_id)})
 
 
-@router.post("/agent/v1/drafts")
+@router.post("/agent/v1/drafts", operation_id="createDraft", response_model=AgentDraftResult)
 def create_draft(body: DraftInput, request: Request, credentials: Credential):
     return agent_rpc(
         request,
@@ -130,3 +187,92 @@ def create_draft(body: DraftInput, request: Request, credentials: Credential):
             "p_content": body.content.model_dump(mode="json"),
         },
     )
+
+
+class AgentChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request_id: UUID
+    expected_version: int = Field(ge=0, le=2_147_483_646, strict=True)
+    expected_appointment_version: int = Field(default=0, ge=0, le=2_147_483_646, strict=True)
+    confirmed: bool = Field(default=False, strict=True)
+
+
+class AgentPlanChange(AgentChange):
+    action: Literal["save", "confirm", "archive", "restore"]
+    content: PlanContent | None = None
+
+    @model_validator(mode="after")
+    def valid_action(self):
+        if (self.action == "save") != (self.content is not None):
+            raise ValueError("Content is required only for save")
+        if self.action in {"confirm", "archive"} and not self.confirmed:
+            raise ValueError("Explicit confirmation required")
+        return self
+
+
+class AgentAppointmentChange(AgentChange):
+    action: Literal["create", "update", "delete"]
+    content: AppointmentInput | None = None
+
+    @model_validator(mode="after")
+    def valid_action(self):
+        if (self.action != "delete") != (self.content is not None):
+            raise ValueError("Content is required for create/update")
+        if self.action == "delete" and not self.confirmed:
+            raise ValueError("Explicit confirmation required")
+        if self.action == "create" and self.expected_version != 0:
+            raise ValueError("New appointment version must be zero")
+        return self
+
+
+def mutate(entity, id, body, request, credentials):
+    return agent_rpc(
+        request,
+        credentials,
+        "agent_change",
+        {
+            "p_entity": entity,
+            "p_id": str(id),
+            **{f"p_{k}": v for k, v in body.model_dump(mode="json").items()},
+        },
+    )
+
+
+@router.get(
+    "/agent/v1/appointments/{appointment_id}",
+    operation_id="readAppointment",
+    response_model=AgentAppointmentView,
+)
+def agent_appointment(appointment_id: UUID, request: Request, credentials: Credential):
+    return agent_rpc(request, credentials, "agent_appointment", {"p_id": str(appointment_id)})
+
+
+@router.post(
+    "/agent/v1/plans/{plan_id}/changes",
+    operation_id="changePlan",
+    response_model=AgentChangeResult,
+    response_model_exclude_none=True,
+)
+def agent_change_plan(
+    plan_id: UUID, body: AgentPlanChange, request: Request, credentials: Credential
+):
+    return mutate("plan", plan_id, body, request, credentials)
+
+
+@router.post(
+    "/agent/v1/appointments/{appointment_id}/changes",
+    operation_id="changeAppointment",
+    response_model=AgentChangeResult,
+    response_model_exclude_none=True,
+)
+def agent_change_appointment(
+    appointment_id: UUID, body: AgentAppointmentChange, request: Request, credentials: Credential
+):
+    return mutate("appointment", appointment_id, body, request, credentials)
+
+
+@router.get("/agent/openapi.json", include_in_schema=False)
+def agent_openapi():
+    from we2day_api.agent_contract import schema
+
+    return schema()

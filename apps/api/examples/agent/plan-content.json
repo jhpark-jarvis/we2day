@@ -1,0 +1,17 @@
+{
+  "title": "주말 산책 초안",
+  "date": "2026-11-08",
+  "budget": null,
+  "transport": "도보",
+  "activities": [
+    {
+      "title": "산책",
+      "time": null,
+      "place": "",
+      "map_url": "",
+      "cost": null,
+      "note": ""
+    }
+  ],
+  "preparation": []
+}
