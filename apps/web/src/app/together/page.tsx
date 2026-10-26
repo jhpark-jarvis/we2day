@@ -9,7 +9,7 @@ const features = [
   {
     href: "/wishlist",
     label: "위시",
-    description: "함께 가고 싶은 곳과 해보고 싶은 일",
+    description: "둘의 버킷리스트",
     icon: Bookmark,
   },
   { href: "/checklists", label: "목록", description: "준비물과 함께 챙길 일", icon: ListChecks },
