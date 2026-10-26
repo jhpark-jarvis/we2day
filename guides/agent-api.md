@@ -67,6 +67,32 @@ WE2DAY의 연결 API는 외부 도우미가 **일정·코스를 조회하고 새
 
 호출자의 권한은 각 SQL 작업에서 재확인합니다. 폐기와 진행 중인 작업은 잠금으로 순서를 보장하며, 폐기 완료 전에 이미 끝난 작업을 되돌리지는 않습니다. 새 키 발급이 외부 AI 공급자에 대한 개인정보 전송 동의를 대신하지 않습니다.
 
+## 공급자 독립 CLI
+
+모델·MCP 없이 기존 API를 사용하는 `agent_client`를 제공합니다. 키는 명령 인자나 URL에 넣지 말고 `WE2DAY_AGENT_KEY` 환경 변수에 비밀 설정으로 주입합니다. `WE2DAY_AGENT_URL`은 본인 서비스의 `https://your-domain.example/api/agent/v1`로 지정합니다. 실제 키 발급·외부 전달은 운영자가 선택합니다.
+
+```sh
+uv run --project apps/api python -m we2day_api.agent_client check --start 2026-11-01 --end 2026-11-30
+```
+
+`check`는 연결 성공·개수만 출력합니다. 조회 결과는 저장소 밖의 보호 디렉터리에서 아직 없는 파일로 저장합니다. 응답의 `next_offset`이 있으면 같은 기간과 그 값을 `--offset`으로 전달해 다음 페이지를 조회합니다.
+
+```sh
+uv run --project apps/api python -m we2day_api.agent_client calendar --start 2026-11-01 --end 2026-11-30 --output /private/agent/calendar.json
+uv run --project apps/api python -m we2day_api.agent_client plan --plan-id 11111111-1111-4111-8111-111111111111 --output /private/agent/plan.json
+```
+
+새 초안은 위 예시의 `content` 객체만 담은 파일에서 요청 파일을 먼저 만듭니다. 이 단계는 키·네트워크가 필요하지 않습니다.
+
+```sh
+uv run --project apps/api python -m we2day_api.agent_client prepare-draft --input /private/agent/content.json --output /private/agent/request.json
+uv run --project apps/api python -m we2day_api.agent_client draft --input /private/agent/request.json --output /private/agent/result.json
+```
+
+응답이 유실되면 같은 request.json을 재사용하고 결과용 새 경로를 지정합니다. 요청 파일을 다시 만들면 다른 UUID가 생겨 별도 초안이 만들어질 수 있습니다. 기존 파일은 덮어쓰지 않습니다. 로컬 합성 환경에서만 `--allow-local`을 사용하며 운영은 HTTPS·인증서 검증·리디렉션 차단을 유지합니다. Windows 출력 디렉터리의 접근 권한도 제한하세요.
+
+키 발급·기존 자료 수정·확정·삭제·모델 호출은 하지 않습니다. 결과 파일은 개인 자료이므로 Git·일반 로그·승인하지 않은 외부 서비스에 올리지 마세요.
+
 ## 구현 경계
 
 웹은 정해진 세 경로만 FastAPI로 전달하고, FastAPI는 기존 Supabase publishable key와 제한된 RPC를 사용합니다. 서비스 역할 키나 새 DB 로그인 계정을 만들지 않습니다. Supabase 키와 에이전트 연결 키는 서로 다릅니다. [Supabase API 키 공식 안내](https://supabase.com/docs/guides/getting-started/api-keys)를 참고하세요.
