@@ -65,6 +65,19 @@ def test_gateway_new_scope_confirmation_and_secret_sanitization():
             client.post(path, headers=headers, json={**body, "confirmed": True}).status_code == 200
         )
         assert calls[-1]["p_entity"] == "plan" and calls[-1]["p_confirmed"] is True
+        appointment_body = {
+            "action": "create",
+            "expected_version": 0,
+            "request_id": str(uuid4()),
+            "content": {"title": "Timed appointment", "date": "2026-11-08", "time": "14:00"},
+        }
+        assert (
+            client.post(
+                f"/agent/v1/appointments/{uuid4()}/changes", headers=headers, json=appointment_body
+            ).status_code
+            == 200
+        )
+        assert calls[-1]["p_content"]["time"] == "14:00"
         status[0] = 403
         response = client.post(path, headers=headers, json={**body, "confirmed": True})
         assert response.status_code == 403 and "no-reflect" not in response.text

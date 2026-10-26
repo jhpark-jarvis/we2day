@@ -226,6 +226,9 @@ class AgentAppointmentChange(AgentChange):
 
 
 def mutate(entity, id, body, request, credentials):
+    fields = body.model_dump(mode="json")
+    if entity == "appointment" and body.content is not None and body.content.time is not None:
+        fields["content"]["time"] = body.content.time.strftime("%H:%M")
     return agent_rpc(
         request,
         credentials,
@@ -233,7 +236,7 @@ def mutate(entity, id, body, request, credentials):
         {
             "p_entity": entity,
             "p_id": str(id),
-            **{f"p_{k}": v for k, v in body.model_dump(mode="json").items()},
+            **{f"p_{k}": v for k, v in fields.items()},
         },
     )
 
