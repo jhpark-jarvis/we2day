@@ -60,6 +60,7 @@ class Candidate(ChosenPlace):
 
 class ModelActivity(Activity):
     place_ref: str = Field(default="", max_length=40)
+    clear_place: bool = False
 
 
 class ModelPlan(PlanContent):
@@ -294,6 +295,7 @@ class ToolSession:
         self.weather_queries: dict[str, dict] = {}
         self.selected_result = None
         self.calls = 0
+        self.previous_places: dict[str, list[Candidate]] = {}
         for item in chosen:
             self.add(item.title, item.address, "user", item.destination)
 
@@ -325,20 +327,38 @@ class ToolSession:
     def seed(self, activity):
         place = activity.place
         if activity.map_url:
-            return self.add(place or activity.title, "", "user", activity.map_url)
-        if " · " in place:
+            candidate = self.add(place or activity.title, "", "user", activity.map_url)
+        elif " · " in place:
             title, address = place.split(" · ", 1)
-            return self.add(title, address, "user")
-        selected = re.fullmatch(r"(.+?)\s+\(([^()]*)\)", place)
-        if selected:
-            return self.add(selected[1], selected[2], "user", place)
-        return self.add(activity.title, place, "user", place)
+            candidate = self.add(title, address, "user")
+        else:
+            selected = re.fullmatch(r"(.+?)\s+\(([^()]*)\)", place)
+            candidate = (
+                self.add(selected[1], selected[2], "user", place)
+                if selected
+                else self.add(activity.title, place, "user", place)
+            )
+        if candidate:
+            self.previous_places.setdefault(activity.title, []).append(candidate)
+        return candidate
 
     def resolve(self, plan: ModelPlan) -> PlanContent:
         result = PlanContent.model_validate(plan.model_dump(exclude={"activities"}))
         for activity in plan.activities:
-            content = activity.model_dump(exclude={"place_ref"})
-            candidate = self.candidates.get(activity.place_ref)
+            content = activity.model_dump(exclude={"place_ref", "clear_place"})
+            candidate = None if activity.clear_place else self.candidates.get(activity.place_ref)
+            if not candidate and not activity.clear_place:
+                matches = [
+                    c
+                    for c in self.candidates.values()
+                    if activity.place and activity.place in (c.destination, c.title)
+                ]
+                if len(matches) == 1:
+                    candidate = matches[0]
+                elif not activity.place and not activity.place_ref:
+                    previous = self.previous_places.get(activity.title, [])
+                    if len(previous) == 1:
+                        candidate = previous[0]
             if candidate:
                 # Canonical server evidence, never model-generated names/addresses/URLs.
                 content["place"] = candidate.destination

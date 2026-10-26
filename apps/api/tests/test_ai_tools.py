@@ -363,3 +363,18 @@ def test_saved_destinations_share_links_and_previous_plan_survive_edits():
         "title": "공유 장소", "time": "14:00", "place_ref": carried.ref,
     }])))
     assert again.activities[0].map_url == "https://naver.me/Example"
+
+
+def test_omitted_references_cannot_erase_known_places_but_explicit_clear_can():
+    from we2day_api.plans import Activity
+
+    run = session()
+    run.seed(Activity(title="도서관", place="기존 도서관 (서울특별시 가상로 1)"))
+    resolved = run.resolve(ModelPlan.model_validate(plan(activities=[{
+        "title": "도서관", "time": "15:00",
+    }])))
+    assert resolved.activities[0].place == "기존 도서관 (서울특별시 가상로 1)"
+    cleared = run.resolve(ModelPlan.model_validate(plan(activities=[{
+        "title": "도서관", "clear_place": True,
+    }])))
+    assert cleared.activities[0].place == ""

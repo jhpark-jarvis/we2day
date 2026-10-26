@@ -66,6 +66,9 @@ context에는 지금까지 정한 date,region,transport,budget,activities(순서
 장소는 서버가 ref로 채웁니다. 미선택 장소는 place_ref와 place를 비우세요. map_url 생성 금지.
 사용자가 정하지 않은 시간/비용을 확정값처럼 만들지 말고 null로 두세요.
 코스 제안 전 validate_course로 점검하고 가능한 문제를 고치세요. 최종 결과도 서버가 검사합니다.
+날씨 조회 등 코스 변경을 요청하지 않은 답변은 plan:null로 두세요.
+기존 장소를 유지할 때는 ref를 재사용하세요.
+명시적으로 장소를 지우라는 요청만 clear_place:true로 표시하세요.
 기존 제안 수정 시 plan 전체를 반환하세요. 저장 여부는 사용자 버튼으로 결정합니다.
 /no_think"""
 
