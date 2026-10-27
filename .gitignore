@@ -32,6 +32,7 @@
 !/assets/diagrams/
 /assets/diagrams/*
 !/assets/diagrams/system-architecture.png
+!/assets/diagrams/system-architecture-ai.png
 /assets/screenshots/*
 !/assets/screenshots/calendar-desktop.png
 !/assets/screenshots/calendar-mobile.png

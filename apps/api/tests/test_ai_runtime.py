@@ -223,7 +223,12 @@ def test_real_async_tool_pipeline_separates_provider_and_caller_credentials():
             if host == "naverapihub.apigw.ntruss.com":
                 assert request.headers["x-ncp-apigw-api-key"] == "naver-secret"
                 return httpx.Response(
-                    200, json={"items": [{"title": "검색 장소", "address": "가상로1"}]}
+                    200,
+                    json={
+                        "items": [
+                            {"title": "검색 장소", "address": "가상로1", "category": "카페,디저트"}
+                        ]
+                    },
                 )
             assert "x-ncp-apigw-api-key" not in request.headers
             if host == "geocoding-api.open-meteo.com":

@@ -38,6 +38,11 @@ def setup(monkeypatch):
         body = json.loads(request.content)
         assert body["max_tokens"] == 2048
         assert body["model"] == ai_planner.MODEL
+        if "tools" in body and replies[0].status_code == 200:
+            # The planning phase is separate from the provider's strict final schema.
+            return httpx.Response(200, json={"choices": [{"message": {"content": "응답 준비"}}]})
+        if "response_format" in body:
+            assert body["response_format"] == ai_planner.ANSWER_FORMAT
         return replies.pop(0)
 
     with TestClient(app) as client:
@@ -77,7 +82,7 @@ def test_validated_plan_and_no_database_write(setup):
     assert response.status_code == 200
     assert response.json()["plan"]["activities"][0]["map_url"] == ""
     assert store.calls == ["reserve_ai_planner_request"]
-    assert len(calls) == 1
+    assert len(calls) == 2
     assert "no-store" in response.headers["cache-control"]
 
 
@@ -99,7 +104,7 @@ def test_quota_stops_call_and_provider_errors_do_not_leak(setup):
     assert client.post("/ai/planner", json=body()).status_code == 429
     assert not calls
     store.allowed = True
-    for status in [429, 401, 500]:
+    for status in [429, 400, 401, 500]:
         replies.append(httpx.Response(status, text="private upstream details synthetic-token"))
         response = client.post("/ai/planner", json=body())
         assert response.status_code in [429, 503]
@@ -117,7 +122,7 @@ def test_invalid_output_and_missing_key_fail_closed(setup):
         assert client.post("/ai/planner", json=body()).status_code == 502
     client.app.state.settings.cloudflare_api_token = None
     assert client.post("/ai/planner", json=body()).status_code == 503
-    assert len(calls) == 6 and len(store.calls) == 3
+    assert len(calls) == 9 and len(store.calls) == 3
 
 
 def test_anonymous_request_denied():
@@ -125,7 +130,7 @@ def test_anonymous_request_denied():
         assert client.post("/ai/planner", json=body()).status_code == 401
 
 
-def test_native_json_object_response(setup):
+def test_native_object_payload_with_final_schema(setup):
     client, _, _, replies = setup
     replies.append(
         httpx.Response(
@@ -152,7 +157,7 @@ def test_no_checkbox_and_recent_context_keeps_latest_request(setup):
         },
     )
     assert response.status_code == 200
-    messages = json.loads(calls[-1].content)["messages"]
+    messages = json.loads(calls[0].content)["messages"]
     assert messages[-1]["content"] == "마지막 질문" and len(messages) == 3
 
 
@@ -265,7 +270,59 @@ def test_successful_turn_persisted_and_conflict_before_provider(setup):
     assert response.json()["prompt_version"] == ai_planner.PROMPT_VERSION
     assert response.json()["prompt_sha256"] == ai_planner.PROMPT_SHA256
     response = client.post("/ai/planner", json={**payload, "version": 1})
-    assert response.status_code == 404 and len(calls) == 1
+    assert response.status_code == 404 and len(calls) == 2
+
+
+def test_restored_server_scope_rejects_outside_plan_and_persists_scope(setup):
+    from uuid import uuid4
+
+    client, store, _, replies = setup
+    saved = []
+
+    def rpc(name, values=None):
+        if name == "begin_ai_planner_turn":
+            return {
+                "context": {
+                    "date": "2030-01-01",
+                    "search_scope": {"kinds": ["library"], "area": "중랑구"},
+                }
+            }
+        if name == "finish_ai_planner_turn":
+            saved.append(values["p_result"])
+            return {"version": 2, "result": values["p_result"]}
+        return True
+
+    store.rpc = rpc
+    replies.append(
+        httpx.Response(
+            200,
+            json={
+                "result": {
+                    "response": {
+                        "reply": "카페 코스를 만들었어요.",
+                        "plan": {
+                            "title": "범위 밖",
+                            "date": "2030-01-01",
+                            "activities": [{"title": "카페"}],
+                        },
+                    }
+                }
+            },
+        )
+    )
+    response = client.post(
+        "/ai/planner",
+        json={
+            "messages": [{"role": "user", "content": "이 조건으로 코스를 만들어줘"}],
+            "conversation_id": str(uuid4()),
+            "request_id": str(uuid4()),
+            "version": 1,
+        },
+    )
+    assert response.status_code == 200 and response.json()["plan"] is None
+    assert "범위 밖" in response.json()["checks"][0]
+    assert saved[0]["context"]["search_scope"]["kinds"] == ["library"]
+    assert saved[0]["context"]["date"] == "2030-01-01"
 
 
 def test_server_conversation_conditions_survive_short_history_and_partial_update(setup):

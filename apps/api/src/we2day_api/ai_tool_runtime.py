@@ -5,6 +5,7 @@ import json
 
 from fastapi import HTTPException
 
+from we2day_api.ai_place_policy import SearchArguments
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_tools import weather_requests
 from we2day_api.places import HUB_URL, SearchInput, SearchResults
@@ -88,7 +89,7 @@ async def execute_batch(session, calls, io):
             if len(arguments.encode()) <= 12000:
                 value = json.loads(arguments)
                 if name == "search_places":
-                    value = SearchInput.model_validate(value).model_dump()
+                    value = SearchArguments.model_validate(value).model_dump()
                 arguments = json.dumps(value, sort_keys=True, ensure_ascii=False)
         except (ValueError, TypeError):
             pass

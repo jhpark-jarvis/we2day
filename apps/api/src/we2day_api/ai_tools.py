@@ -12,7 +12,8 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from we2day_api.places import SearchInput, fetch_places
+from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds
+from we2day_api.places import fetch_places
 from we2day_api.plans import Activity, PlanContent
 
 
@@ -65,6 +66,10 @@ class ModelActivity(Activity):
 
 class ModelPlan(PlanContent):
     activities: list[ModelActivity] = Field(default_factory=list, max_length=8)
+
+
+class StoredContext(PlanningContext):
+    search_scope: SearchScope = Field(default_factory=SearchScope)
 
 
 class ModelAnswer(BaseModel):
@@ -226,8 +231,9 @@ TOOLS = [
     ),
     definition(
         "search_places",
-        "실제 장소 후보를 네이버 검색. 지역과 업종 포함. 영업상태/시간은 알 수 없음.",
-        SearchInput,
+        "장소 검색. exact_name은 고유 이름만(name), "
+        "category/nearby는 한 업종(kind)과 지역(area). 현재 요청 범위만 검색. 영업정보 미확인.",
+        SearchArguments,
     ),
     definition(
         "lookup_selected_places",
@@ -285,8 +291,12 @@ def place_options(store, source: str, offset: int = 0):
 
 
 class ToolSession:
-    def __init__(self, settings, store, selected, chosen):
+    def __init__(self, settings, store, selected, chosen, policy=None):
         self.settings, self.store, self.selected = settings, store, selected
+        self.policy = policy or PlacePolicy()
+        self.candidate_kinds = {}
+        self.previous_plan = None
+        self.direct_final = False
         self.candidates: dict[str, Candidate] = {}
         self.reports: list[dict] = []
         self.searches: dict[str, list[dict]] = {}
@@ -373,6 +383,51 @@ class ToolSession:
             result.activities.append(Activity.model_validate(content))
         return result
 
+    def visible_candidates(self):
+        visible = []
+        for item in self.candidates.values():
+            detected = kinds(item.title)
+            kind = self.candidate_kinds.get(item.ref, detected[0] if len(detected) == 1 else "any")
+            if self.policy.accepts(item.title, kind):
+                visible.append(item)
+        return visible
+
+    def guard_plan(self, model_plan, resolved):
+        scope = self.policy.scope
+        if scope.search_only:
+            return None, ["지금은 장소 후보만 확인하고 있어요."]
+        if not resolved:
+            return resolved, []
+        if scope.single_activity and len(resolved.activities) > 1:
+            return None, ["요청한 활동 개수를 넘는 제안은 반영하지 않았어요."]
+        previous = self.previous_plan.activities if self.previous_plan else []
+        for model, activity in zip(model_plan.activities, resolved.activities, strict=True):
+            if any(
+                (activity.title, activity.place, activity.map_url)
+                == (old.title, old.place, old.map_url)
+                for old in previous
+            ):
+                continue
+            candidate = self.candidates.get(model.place_ref)
+            if not candidate and activity.place:
+                candidate = next(
+                    (c for c in self.candidates.values() if c.destination == activity.place), None
+                )
+            detected = kinds(activity.title)
+            kind = self.candidate_kinds.get(
+                candidate.ref if candidate else model.place_ref,
+                detected[0] if len(detected) == 1 else "any",
+            )
+            if scope.kinds and (
+                kind not in scope.kinds or any(k not in scope.kinds for k in detected)
+            ):
+                return None, ["요청한 활동 범위 밖의 제안은 반영하지 않았어요."]
+            if candidate and not self.policy.accepts(candidate.title, kind):
+                return None, ["요청한 장소와 다른 제안은 반영하지 않았어요."]
+            if not candidate and scope.exact_name and scope.name_kind in {"any", kind}:
+                return None, ["요청한 정확한 장소를 확인한 뒤 코스에 반영할 수 있어요."]
+        return resolved, []
+
     def execute(self, name: str, arguments) -> dict:
         steps = self._execute_steps(name, arguments)
         try:
@@ -422,7 +477,12 @@ class ToolSession:
                 )
                 return result
             if name == "search_places":
-                query = SearchInput.model_validate(arguments).query
+                args, denied = self.policy.prepare(
+                    arguments, [item.address for item in self.candidates.values()]
+                )
+                if denied:
+                    return {"error": denied, "notice": "현재 사용자 요청 범위에 맞게 검색하세요."}
+                query = args.model_dump_json()
                 if query in self.searches:
                     if query in self.search_failures:
                         return {"error": "tool_unavailable"}
@@ -430,15 +490,21 @@ class ToolSession:
                 if len(self.searches) >= 4:
                     return {"error": "search_budget_exhausted"}
                 self.searches[query] = []
-                results = yield ("places", query)
+                results = yield ("places", args.query)
                 items = []
                 for item in results.items:
+                    if not self.policy.relevant(item, args):
+                        continue
                     candidate = self.add(item.title, item.roadAddress or item.address, "naver")
                     if candidate:
+                        self.candidate_kinds[candidate.ref] = args.kind
                         items.append(candidate.model_dump())
                 self.searches[query] = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})
-                return {"items": items, "notice": "검색 후보. 영업 여부/시간·이동시간은 미확인."}
+                return {
+                    "items": items,
+                    "notice": "관련 이름/업종/지역으로 거른 후보. 영업/시간·이동시간 미확인.",
+                }
             if name == "lookup_selected_places":
                 EmptyArguments.model_validate(arguments)
                 if self.selected_result is not None:

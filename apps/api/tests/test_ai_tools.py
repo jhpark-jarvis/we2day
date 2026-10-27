@@ -174,8 +174,9 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
                     ]
                 },
             )
-        assert body["messages"][-1]["role"] == "tool"
-        assert "가상 도서관" in body["messages"][-1]["content"]
+        assert body["messages"][-2]["role"] == "tool"
+        assert "가상 도서관" in body["messages"][-2]["content"]
+        assert body["response_format"] == ai_planner.ANSWER_FORMAT
         return httpx.Response(
             200,
             json={
@@ -238,8 +239,8 @@ def test_endless_tool_requests_stopped_after_three_inferences(monkeypatch):
     settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
     with pytest.raises(HTTPException) as error:
         asyncio.run(ai_planner.complete(settings, [{"role": "user", "content": "조회"}], session()))
-    assert error.value.detail == "ai_invalid_response" and len(calls) == 3
-    assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_object"
+    assert error.value.detail == "ai_invalid_response" and len(calls) == 2
+    assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_schema"
 
 
 def test_weather_fixed_hosts_city_forecast_and_range(monkeypatch):
@@ -304,10 +305,10 @@ def test_weather_fixed_hosts_city_forecast_and_range(monkeypatch):
 
 def test_weather_empty_city_and_failure_do_not_invent_forecast(monkeypatch):
     today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
-    original = httpx.AsyncClient
+    original = httpx.Client
     monkeypatch.setattr(
         ai_tools.httpx,
-        "AsyncClient",
+        "Client",
         lambda **kw: original(
             transport=httpx.MockTransport(lambda _: httpx.Response(200, json={"results": []})), **kw
         ),
@@ -345,11 +346,9 @@ def test_single_format_completion_stays_inside_budget(monkeypatch):
         lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
     )
     settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
-    answer = asyncio.run(
-        ai_planner.complete(settings, [{"role": "user", "content": "조건 유지"}], session())
-    )
+    answer = asyncio.run(ai_planner.complete(settings, [{"role": "user", "content": "조건 유지"}]))
     assert answer.reply == "조건을 유지했어요." and len(calls) == 2
-    assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_object"
+    assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_schema"
 
 
 def test_saved_destinations_share_links_and_previous_plan_survive_edits():
