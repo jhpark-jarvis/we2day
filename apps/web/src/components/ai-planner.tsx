@@ -9,9 +9,20 @@ import {
   LoaderCircle,
   MapPin,
   MessageSquarePlus,
+  RotateCw,
   Send,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { changePlan } from "@/app/actions/plans";
 import { AiIntake, IntakeSummary } from "@/components/ai-intake";
 import Link from "@/components/progress-link";
@@ -42,6 +53,14 @@ type Candidate = {
   address: string;
   destination?: string;
 };
+type Retry = {
+  id: string;
+  text: string;
+  signature: string;
+  brief?: PlanningBrief;
+  candidate?: Candidate;
+};
+
 async function read(view: string, query = "") {
   const response = await fetch(`/api/ai/planner?view=${view}${query}`, { cache: "no-store" });
   const result = await response.json();
@@ -59,27 +78,172 @@ function turnMessages(turns: Turn[]): Message[] {
     },
   ]);
 }
+function reveal(element: HTMLElement | null) {
+  if (!element) return;
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({
+    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start",
+  });
+}
+function ReadFailure({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <div className="we2-read-failure">
+      <p role="alert">{message}</p>
+      <button className="text-button" type="button" onClick={retry}>
+        <RotateCw size={15} aria-hidden="true" />
+        다시 불러오기
+      </button>
+    </div>
+  );
+}
+function AiDialog({
+  id,
+  title,
+  children,
+  onClose,
+  returnFocus,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  returnFocus: HTMLElement | null;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    const trigger = returnFocus;
+    const previousOverflow = document.body.style.overflow;
+    dialog?.showModal();
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      queueMicrotask(() => {
+        if (trigger?.isConnected && !trigger.matches(":disabled"))
+          trigger.focus({ preventScroll: true });
+        else
+          document
+            .querySelector<HTMLTextAreaElement>("#ai-message")
+            ?.focus({ preventScroll: true });
+      });
+    };
+  }, [returnFocus]);
+  return (
+    <dialog
+      ref={ref}
+      id={id}
+      className="we2-dialog"
+      aria-labelledby={`${id}-title`}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <header className="we2-dialog-header">
+        <h2 id={`${id}-title`}>{title}</h2>
+        <button
+          className="icon-button"
+          type="button"
+          aria-label={`${title} 닫기`}
+          title="닫기"
+          onClick={onClose}
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
+      </header>
+      {children}
+    </dialog>
+  );
+}
+function CandidateList({
+  candidates,
+  busy,
+  select,
+}: {
+  candidates: Candidate[];
+  busy: boolean;
+  select: (candidate: Candidate) => void;
+}) {
+  return (
+    <div className="we2-candidate-list">
+      {candidates.map((candidate) => (
+        <article key={candidate.ref}>
+          <div>
+            <strong>{candidate.title}</strong>
+            {candidate.address && <p>{candidate.address}</p>}
+          </div>
+          <button
+            type="button"
+            className="text-button"
+            disabled={busy}
+            aria-label={`${candidate.title} 선택`}
+            onClick={() => select(candidate)}
+          >
+            선택
+          </button>
+        </article>
+      ))}
+    </div>
+  );
+}
+export function AiConnectionRetry() {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      className="text-button"
+      disabled={pending}
+      onClick={() => startTransition(() => router.refresh())}
+    >
+      <RotateCw size={16} className={pending ? "ai-spinner" : undefined} aria-hidden="true" />
+      다시 연결
+    </button>
+  );
+}
+
 export function AiPlanner({ available, today }: { available: boolean; today: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [intakeOpen, setIntakeOpen] = useState(true);
   const [planningContext, setPlanningContext] = useState<IntakeContext | null>(null);
   const [text, setText] = useState("");
+  const textRef = useRef("");
+  // Page-instance memory only. Nothing is written to browser storage or sent until submit.
+  const drafts = useRef(new Map<string, string>());
+  const updateText = useCallback((value: string) => {
+    textRef.current = value;
+    setText(value);
+  }, []);
   const [pendingText, setPendingText] = useState("");
+  const chatRef = useRef<HTMLElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const previousLogHeight = useRef<number | null>(null);
+  const focusRequest = useRef<"start" | "input" | "log" | null>(null);
   const proposalRef = useRef<HTMLElement>(null);
   const historyRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const restoreInputAfterSend = useRef(false);
+  const dialogTrigger = useRef<HTMLButtonElement | null>(null);
   const [activityKeys, setActivityKeys] = useState<string[]>([]);
   const [proposal, setProposal] = useState<PlanContent | null>(null);
   const [pending, setPending] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState("");
   const saveIdentity = useRef({ id: crypto.randomUUID(), request: crypto.randomUUID() });
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const historyRetry = useRef<{ id?: string; before?: number }>({});
+  const historySequence = useRef(0),
+    conversationSequence = useRef(0),
+    placeSequence = useRef(0);
+  const mounted = useRef(true);
   const [oldestTurn, setOldestTurn] = useState(1);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [chosenPlaces, setChosenPlaces] = useState<
@@ -89,100 +253,172 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [placeOptions, setPlaceOptions] = useState<PlaceOption[]>([]);
   const [selectedPlaces, setSelectedPlaces] = useState<PlaceOption[]>([]);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-  const [placesOpen, setPlacesOpen] = useState(false);
+  const [placesError, setPlacesError] = useState("");
+  const [dialog, setDialog] = useState<"places" | "candidates" | null>(null);
   const [placeSource, setPlaceSource] = useState<"favorite" | "wish">("favorite");
   const [placeOffset, setPlaceOffset] = useState(0);
+  const placeRetry = useRef({ source: "favorite" as "favorite" | "wish", offset: 0 });
   const [hasMorePlaces, setHasMorePlaces] = useState(false);
   const conversation = useRef({ id: crypto.randomUUID(), version: 0 });
-  const retry = useRef<{
-    id: string;
-    text: string;
-    signature: string;
-    brief?: PlanningBrief;
-  } | null>(null);
-  const busy = pending || saving || loadingHistory;
-  const openConversation = useCallback(async (id: string, before?: number) => {
-    const older = Boolean(before);
-    setLoadingHistory(true);
-    setError("");
-    try {
-      const data = await read(
-        "history",
-        `&conversation_id=${id}${before ? `&before=${before}` : ""}`,
-      );
-      if (!data) throw new Error("대화 기록을 찾지 못했어요.");
-      const turns: Turn[] = data.turns;
-      setOldestTurn(turns[0]?.version || 1);
-      if (older) {
-        previousLogHeight.current = logRef.current?.scrollHeight || 0;
-        setMessages((previous) => [...turnMessages(turns), ...previous]);
-      } else {
-        conversation.current = { id, version: data.version };
-        retry.current = null;
-        setMessages(turnMessages(turns));
-        setIntakeOpen(false);
-        setPlanningContext(turns[turns.length - 1]?.result.context || null);
-        const plan = data.proposal || null;
-        setProposal(plan);
-        setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
-        setText("");
-        setCandidates([]);
-        setChosenPlaces([]);
-        setSelectedPlaces([]);
-        setChecks(turns[turns.length - 1]?.result.checks || []);
-        setSaved("");
-        saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "기록을 불러오지 못했어요.");
-    } finally {
-      setLoadingHistory(false);
+  const newDraftId = useRef(conversation.current.id);
+  const retry = useRef<Retry | null>(null);
+  const busy = pending || saving || loadingHistory || loadingConversation;
+  const rememberDraft = useCallback(() => {
+    if (textRef.current) drafts.current.set(conversation.current.id, textRef.current);
+    else drafts.current.delete(conversation.current.id);
+    // The server exposes at most 100 records. Keep just one additional unsent conversation.
+    while (drafts.current.size > 101) {
+      const oldest = drafts.current.keys().next().value;
+      if (oldest === undefined) break;
+      drafts.current.delete(oldest);
     }
   }, []);
-  useEffect(() => {
-    let active = true;
-    void read("history")
-      .then(async (items: Conversation[]) => {
-        if (!active) return;
-        setConversations(items);
-        if (items[0]) await openConversation(items[0].id);
-      })
-      .catch(() => {
-        if (active) setError("대화 기록을 불러오지 못했어요. 새로고침해 주세요.");
-      })
-      .finally(() => {
-        if (active) setLoadingHistory(false);
-      });
-    return () => {
-      active = false;
-    };
-    // Initial history is restored once; selecting another record is explicit.
-  }, [openConversation]);
-  useEffect(() => {
-    if (messages.length || pendingText) {
-      const log = logRef.current;
-      if (log) {
-        log.scrollTop =
-          previousLogHeight.current === null
-            ? log.scrollHeight
-            : log.scrollHeight - previousLogHeight.current;
-        previousLogHeight.current = null;
+  const openConversation = useCallback(
+    async (id: string, before?: number, explicit = true) => {
+      const sequence = ++conversationSequence.current;
+      const older = Boolean(before);
+      if (!older) rememberDraft();
+      setLoadingConversation(true);
+      setHistoryError("");
+      historyRetry.current = { id, before };
+      try {
+        const data = await read(
+          "history",
+          `&conversation_id=${id}${before ? `&before=${before}` : ""}`,
+        );
+        if (!mounted.current || sequence !== conversationSequence.current) return;
+        if (!data) throw new Error("대화 기록을 찾지 못했어요.");
+        const turns: Turn[] = data.turns;
+        setOldestTurn(turns[0]?.version || 1);
+        if (older) {
+          previousLogHeight.current = logRef.current?.scrollHeight || 0;
+          if (explicit) focusRequest.current = "log";
+          setMessages((previous) => [...turnMessages(turns), ...previous]);
+        } else {
+          conversation.current = { id, version: data.version };
+          retry.current = null;
+          previousLogHeight.current = null;
+          focusRequest.current = explicit ? "log" : null;
+          setMessages(turnMessages(turns));
+          setIntakeOpen(false);
+          setPlanningContext(turns[turns.length - 1]?.result.context || null);
+          const plan = data.proposal || null;
+          setProposal(plan);
+          setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
+          updateText(drafts.current.get(id) || "");
+          setCandidates([]);
+          setChosenPlaces([]);
+          setSelectedPlaces([]);
+          setChecks(turns[turns.length - 1]?.result.checks || []);
+          setSaved("");
+          setSaveError("");
+          setChatError("");
+          setDialog(null);
+          saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
+        }
+      } catch (error) {
+        if (mounted.current && sequence === conversationSequence.current) {
+          setHistoryError(error instanceof Error ? error.message : "기록을 불러오지 못했어요.");
+          setHistoryOpen(true);
+        }
+      } finally {
+        if (mounted.current && sequence === conversationSequence.current)
+          setLoadingConversation(false);
       }
+    },
+    [rememberDraft, updateText],
+  );
+  const loadHistory = useCallback(
+    async (restore = false) => {
+      const sequence = ++historySequence.current;
+      setLoadingHistory(true);
+      setHistoryError("");
+      historyRetry.current = {};
+      try {
+        const items: Conversation[] = await read("history");
+        if (!mounted.current || sequence !== historySequence.current) return;
+        setConversations(items);
+        if (restore && items[0]) await openConversation(items[0].id, undefined, false);
+      } catch {
+        if (mounted.current && sequence === historySequence.current) {
+          setHistoryError("대화 기록을 불러오지 못했어요.");
+          setHistoryOpen(true);
+        }
+      } finally {
+        if (mounted.current && sequence === historySequence.current) setLoadingHistory(false);
+      }
+    },
+    [openConversation],
+  );
+  useEffect(() => {
+    mounted.current = true;
+    void loadHistory(true);
+    return () => {
+      mounted.current = false;
+      historySequence.current++;
+      conversationSequence.current++;
+      placeSequence.current++;
+      drafts.current.clear();
+      textRef.current = "";
+    };
+  }, [loadHistory]);
+  useLayoutEffect(() => {
+    const log = logRef.current;
+    if (!log) return;
+    log.scrollTop =
+      previousLogHeight.current !== null
+        ? log.scrollHeight - previousLogHeight.current
+        : messages.length || pendingText
+          ? log.scrollHeight
+          : 0;
+    previousLogHeight.current = null;
+    if (focusRequest.current) {
+      if (
+        chatRef.current &&
+        (chatRef.current.getBoundingClientRect().top < 0 ||
+          chatRef.current.getBoundingClientRect().top > innerHeight / 2)
+      )
+        chatRef.current.scrollIntoView({ block: "start", behavior: "auto" });
+      if (focusRequest.current === "start")
+        chatRef.current
+          ?.querySelector<HTMLElement>(".we2-intake h2")
+          ?.focus({ preventScroll: true });
+      else if (focusRequest.current === "input") inputRef.current?.focus({ preventScroll: true });
+      else log.focus({ preventScroll: true });
+      focusRequest.current = null;
     }
   }, [messages, pendingText]);
+  useEffect(() => {
+    if (!pending && restoreInputAfterSend.current) {
+      restoreInputAfterSend.current = false;
+      if (
+        document.activeElement === document.body ||
+        document.activeElement?.closest(".we2-composer, .we2-status, .we2-candidate-list")
+      )
+        inputRef.current?.focus({ preventScroll: true });
+    }
+  }, [pending]);
   async function loadPlaces(source: "favorite" | "wish", offset = 0) {
+    const sequence = ++placeSequence.current;
     setLoadingPlaces(true);
-    setError("");
+    setPlacesError("");
+    setPlaceSource(source);
+    placeRetry.current = { source, offset };
+    if (!offset) {
+      setPlaceOptions([]);
+      setHasMorePlaces(false);
+    }
     try {
       const items: PlaceOption[] = await read("places", `&source=${source}&offset=${offset}`);
-      setPlaceSource(source);
+      if (!mounted.current || sequence !== placeSequence.current) return;
       setPlaceOffset(offset);
       setHasMorePlaces(items.length === 50);
       setPlaceOptions(offset ? (previous) => [...previous, ...items] : items);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "장소를 불러오지 못했어요.");
+      if (mounted.current && sequence === placeSequence.current)
+        setPlacesError(error instanceof Error ? error.message : "장소를 불러오지 못했어요.");
     } finally {
-      setLoadingPlaces(false);
+      if (mounted.current && sequence === placeSequence.current) setLoadingPlaces(false);
     }
   }
   async function send(
@@ -191,7 +427,9 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     submittedBrief?: PlanningBrief,
   ) {
     const content = messageOverride ?? text.trim();
-    if (busy || !content) return;
+    if (busy || !available || !content) return;
+    restoreInputAfterSend.current = true;
+    const preserveInput = Boolean(candidate);
     const chosen = candidate
       ? [
           ...chosenPlaces.filter(
@@ -210,8 +448,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     setChosenPlaces(chosen);
     setPending(true);
     setPendingText(content);
-    setText("");
-    setError("");
+    setChatError("");
+    if (!preserveInput) {
+      updateText("");
+      drafts.current.delete(conversation.current.id);
+    }
     const history = next.slice(-11).map(({ role, content }) => ({ role, content }));
     while (
       history.length > 1 &&
@@ -230,7 +471,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     const signature = JSON.stringify(payload);
     const requestId =
       retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();
-    retry.current = { id: requestId, text: content, signature, brief };
+    retry.current = { id: requestId, text: content, signature, brief, candidate };
     try {
       const response = await fetch("/api/ai/planner", {
         method: "POST",
@@ -241,12 +482,13 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "답변을 받지 못했어요.");
       conversation.current.version = result.version;
+      if (newDraftId.current === conversation.current.id) newDraftId.current = crypto.randomUUID();
       retry.current = null;
       setIntakeOpen(false);
       setPlanningContext(result.context || null);
       setConversations((saved) => {
-        const id = conversation.current.id;
-        const previous = saved.find((item) => item.id === id);
+        const id = conversation.current.id,
+          previous = saved.find((item) => item.id === id);
         return [
           {
             id,
@@ -266,45 +508,86 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           weatherSource: Boolean(result.weather?.length),
         },
       ]);
-      setText("");
+      if (!preserveInput) updateText("");
       setCandidates(result.candidates || []);
       setChecks(result.checks || []);
       if (result.plan) {
         setProposal(result.plan);
         setActivityKeys(result.plan.activities.map(() => crypto.randomUUID()));
         setSaved("");
+        setSaveError("");
         saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
       }
     } catch (error) {
-      setText(next[next.length - 1].content);
-      setError(error instanceof Error ? error.message : "연결하지 못했어요. 다시 시도해 주세요.");
+      if (!preserveInput) updateText(content);
+      setChatError(
+        error instanceof Error ? error.message : "연결하지 못했어요. 다시 시도해 주세요.",
+      );
     } finally {
       setPending(false);
       setPendingText("");
     }
   }
+  function selectCandidate(candidate: Candidate) {
+    setDialog(null);
+    void send(`선택한 장소: ${candidate.title}. 정한 조건에 맞춰 코스에 반영해줘.`, candidate);
+  }
+  function startConversation() {
+    rememberDraft();
+    const id = newDraftId.current,
+      draft = drafts.current.get(id) || "";
+    conversation.current = { id, version: 0 };
+    retry.current = null;
+    previousLogHeight.current = null;
+    focusRequest.current = draft ? "input" : "start";
+    setOldestTurn(1);
+    setMessages([]);
+    setIntakeOpen(!draft);
+    setPlanningContext(null);
+    updateText(draft);
+    setProposal(null);
+    setSaved("");
+    setChatError("");
+    setSaveError("");
+    setActivityKeys([]);
+    setCandidates([]);
+    setChosenPlaces([]);
+    setSelectedPlaces([]);
+    setChecks([]);
+    setDialog(null);
+  }
   async function save() {
     if (!proposal || busy || saved) return;
     setSaving(true);
-    setError("");
+    setSaveError("");
     try {
       const { id, request } = saveIdentity.current;
       const result = await changePlan(id, "save", proposal, 0, 0, request);
       if (result.error) throw new Error(result.error);
       setSaved(id);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "저장하지 못했어요.");
+      setSaveError(error instanceof Error ? error.message : "저장하지 못했어요.");
     } finally {
       setSaving(false);
     }
   }
+  const totalCost =
+    proposal?.activities.reduce((sum, activity) => sum + Math.max(0, activity.cost || 0), 0) || 0;
+  const compactChecks = checks.length > 3 || checks.join("").length > 160;
+  const checksList = (
+    <ul className="we2-checks" aria-label="코스 확인 사항">
+      {checks.map((check) => (
+        <li key={check}>{check}</li>
+      ))}
+    </ul>
+  );
   return (
     <div className="we2-ai">
-      <section className="we2-chat" aria-label="위투 AI 대화">
+      <section ref={chatRef} className="we2-chat" aria-label="위투 AI 대화">
         <header className="we2-chat-header">
           <div>
             <We2AiIcon size={28} />
-            <strong>함께 짜는 데이트</strong>
+            <strong>위투 AI</strong>
           </div>
           <div className="we2-chat-tools">
             <button
@@ -315,65 +598,38 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               disabled={busy}
               onClick={() => {
                 setHistoryOpen(true);
-                historyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                // Scroll after the expanded list has its final height.
+                requestAnimationFrame(() => reveal(historyRef.current));
               }}
             >
               <History size={20} aria-hidden="true" />
             </button>
-            {proposal && (
-              <button
-                type="button"
-                className="icon-button we2-course-jump"
-                title="코스 보기"
-                aria-label="코스 보기"
-                onClick={() =>
-                  proposalRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-              >
-                <ArrowDown size={19} aria-hidden="true" />
-              </button>
-            )}
             <button
               type="button"
               className="icon-button"
               title="새 대화"
               aria-label="새 대화"
-              disabled={busy || messages.length === 0}
-              onClick={() => {
-                conversation.current = { id: crypto.randomUUID(), version: 0 };
-                retry.current = null;
-                setOldestTurn(1);
-                setMessages([]);
-                setIntakeOpen(true);
-                setPlanningContext(null);
-                setText("");
-                setProposal(null);
-                setSaved("");
-                setError("");
-                setActivityKeys([]);
-                setCandidates([]);
-                setChosenPlaces([]);
-                setSelectedPlaces([]);
-                setChecks([]);
-                setPlacesOpen(false);
-              }}
+              disabled={busy || conversation.current.version === 0}
+              onClick={startConversation}
             >
               <MessageSquarePlus size={20} aria-hidden="true" />
             </button>
           </div>
         </header>
         {!available && (
-          <p role="status" className="we2-connection">
-            연결을 준비 중이에요. 잠시 후 다시 확인해 주세요.
-          </p>
+          <div className="we2-connection">
+            <p role="status">연결을 준비 중이에요.</p>
+            <AiConnectionRetry />
+          </div>
         )}
         {planningContext && messages.length > 0 && <IntakeSummary context={planningContext} />}
         <div
           ref={logRef}
+          tabIndex={-1}
           className="we2-messages"
           role="log"
           aria-label="AI 대화"
-          aria-busy={pending}
+          aria-busy={pending || loadingConversation}
         >
           {oldestTurn > 1 && (
             <button
@@ -385,55 +641,73 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               이전 대화
             </button>
           )}
-          {messages.length === 0 && !loadingHistory && (
+          {messages.length === 0 && !loadingHistory && !loadingConversation && (
             <div hidden={!intakeOpen}>
               <AiIntake
                 key={conversation.current.id}
                 disabled={busy || !available}
                 selectedPlaces={selectedPlaces.length}
                 onSubmit={(brief) => void send(briefMessage(brief), undefined, brief)}
-                onFreeChat={() => setIntakeOpen(false)}
+                onFreeChat={() => {
+                  setIntakeOpen(false);
+                  queueMicrotask(() => inputRef.current?.focus({ preventScroll: true }));
+                }}
               />
             </div>
           )}
-          {messages.length === 0 && !intakeOpen && !pending && !loadingHistory && (
-            <div className="we2-welcome">
-              <span className="we2-welcome-icon">
-                <We2AiIcon size={72} />
-              </span>
-              <h2>우리, 어디로 갈까요?</h2>
-              <p>날짜와 하고 싶은 일을 알려주세요.</p>
-              <button type="button" className="text-button" onClick={() => setIntakeOpen(true)}>
-                조건 입력
-              </button>
-              <div className="we2-starters">
-                {[
-                  { label: "산책과 카페", prompt: `${today} 오후 산책과 카페 코스를 같이 짜줘.` },
-                  {
-                    label: "비 오는 날",
-                    prompt: `${today} 비 오는 날 실내 데이트를 계획하고 싶어.`,
-                  },
-                  {
-                    label: "가벼운 하루",
-                    prompt: `${today} 무리하지 않는 가벼운 데이트를 계획하고 싶어.`,
-                  },
-                ].map(({ label, prompt }) => (
-                  <button
-                    type="button"
-                    className="text-button"
-                    key={label}
-                    disabled={busy || !available}
-                    onClick={() => {
-                      setText(prompt);
-                      inputRef.current?.focus();
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
+          {messages.length === 0 &&
+            !intakeOpen &&
+            !pending &&
+            !loadingHistory &&
+            !loadingConversation && (
+              <div className="we2-welcome">
+                <span className="we2-welcome-icon">
+                  <We2AiIcon size={72} />
+                </span>
+                <h2>우리, 어디로 갈까요?</h2>
+                <p>날짜와 하고 싶은 일을 알려주세요.</p>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setIntakeOpen(true);
+                    queueMicrotask(() =>
+                      chatRef.current
+                        ?.querySelector<HTMLElement>(".we2-intake h2")
+                        ?.focus({ preventScroll: true }),
+                    );
+                  }}
+                >
+                  조건 입력
+                </button>
+                <div className="we2-starters">
+                  {[
+                    { label: "산책과 카페", prompt: `${today} 오후 산책과 카페 코스를 같이 짜줘.` },
+                    {
+                      label: "비 오는 날",
+                      prompt: `${today} 비 오는 날 실내 데이트를 계획하고 싶어.`,
+                    },
+                    {
+                      label: "가벼운 하루",
+                      prompt: `${today} 무리하지 않는 가벼운 데이트를 계획하고 싶어.`,
+                    },
+                  ].map(({ label, prompt }) => (
+                    <button
+                      type="button"
+                      className="text-button"
+                      key={label}
+                      disabled={busy || !available}
+                      onClick={() => {
+                        updateText(prompt);
+                        inputRef.current?.focus({ preventScroll: true });
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           {messages.map((message) => (
             <div className={`we2-message we2-${message.role}`} key={message.id}>
               {message.role === "assistant" && (
@@ -463,12 +737,39 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </div>
           )}
         </div>
-        <div className="we2-status" role="status">
-          {(pending || loadingHistory) && (
+        <div className={`we2-status${chatError ? " has-error" : ""}`}>
+          {chatError ? (
             <>
-              <LoaderCircle size={15} className="ai-spinner" aria-hidden="true" />
-              {loadingHistory ? "대화 기록을 불러오고 있어요." : "장소와 코스를 살펴보고 있어요."}
+              <p role="alert">{chatError}</p>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="메시지 다시 전송"
+                title="다시 전송"
+                disabled={busy || !available || !retry.current}
+                onClick={() => {
+                  const item = retry.current;
+                  inputRef.current?.focus({ preventScroll: true });
+                  if (item)
+                    void (item.candidate || text.trim() === item.text
+                      ? send(item.text, item.candidate, item.brief)
+                      : send());
+                }}
+              >
+                <RotateCw size={17} aria-hidden="true" />
+              </button>
             </>
+          ) : (
+            <span role="status">
+              {(pending || loadingHistory || loadingConversation) && (
+                <>
+                  <LoaderCircle size={15} className="ai-spinner" aria-hidden="true" />
+                  {loadingHistory || loadingConversation
+                    ? "대화 기록을 불러오고 있어요."
+                    : "장소와 코스를 살펴보고 있어요."}
+                </>
+              )}
+            </span>
           )}
         </div>
         <div className="we2-input-area">
@@ -476,92 +777,54 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             <button
               type="button"
               className="text-button"
-              disabled={busy || loadingPlaces}
-              aria-expanded={placesOpen}
+              aria-label={`저장한 장소${selectedPlaces.length ? ` · ${selectedPlaces.length}` : ""}`}
+              disabled={busy}
+              aria-haspopup="dialog"
+              aria-expanded={dialog === "places"}
               aria-controls="we2-place-picker"
-              onClick={() => {
-                setPlacesOpen(!placesOpen);
-                if (!placesOpen) void loadPlaces(placeSource);
+              onClick={(event) => {
+                dialogTrigger.current = event.currentTarget;
+                setDialog("places");
+                void loadPlaces(placeSource);
               }}
             >
               <Bookmark size={16} aria-hidden="true" />
-              저장한 장소{selectedPlaces.length ? ` · ${selectedPlaces.length}` : ""}
+              <span>저장 장소</span>
+              {selectedPlaces.length > 0 && <small>{selectedPlaces.length}</small>}
             </button>
+            {candidates.length > 0 && (
+              <button
+                type="button"
+                className="text-button"
+                aria-haspopup="dialog"
+                aria-label={`장소 후보 ${candidates.length}개 보기`}
+                disabled={busy}
+                onClick={(event) => {
+                  dialogTrigger.current = event.currentTarget;
+                  setDialog("candidates");
+                }}
+              >
+                <MapPin size={16} aria-hidden="true" />
+                <span>후보 {candidates.length}</span>
+              </button>
+            )}
+            {proposal && (
+              <button
+                type="button"
+                className="icon-button we2-course-jump"
+                title="코스 보기"
+                aria-label="코스 보기"
+                onClick={() => reveal(proposalRef.current)}
+              >
+                <ArrowDown size={19} aria-hidden="true" />
+              </button>
+            )}
           </div>
-          {placesOpen && (
-            <section
-              className="we2-place-picker"
-              id="we2-place-picker"
-              aria-label="AI에 전달할 장소"
-            >
-              <div className="we2-place-tabs">
-                {(["favorite", "wish"] as const).map((source) => (
-                  <button
-                    key={source}
-                    type="button"
-                    className="text-button"
-                    aria-pressed={placeSource === source}
-                    disabled={loadingPlaces || busy}
-                    onClick={() => void loadPlaces(source)}
-                  >
-                    {source === "favorite" ? "자주 가는 곳" : "위시"}
-                  </button>
-                ))}
-              </div>
-              <p className="settings-hint">선택한 장소만 메시지와 함께 AI에 전달해요. 최대 8개.</p>
-              <div className="we2-place-options" aria-busy={loadingPlaces}>
-                {loadingPlaces && <p role="status">장소를 불러오고 있어요.</p>}
-                {!loadingPlaces && placeOptions.length === 0 && <p>저장한 장소가 없어요.</p>}
-                {placeOptions.map((item) => {
-                  const checked = selectedPlaces.some(
-                    (p) => p.source === item.source && p.id === item.id,
-                  );
-                  return (
-                    <label key={`${item.source}-${item.id}`}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={busy || loadingPlaces || (!checked && selectedPlaces.length >= 8)}
-                        onChange={() =>
-                          setSelectedPlaces(
-                            checked
-                              ? selectedPlaces.filter(
-                                  (p) => p.source !== item.source || p.id !== item.id,
-                                )
-                              : [...selectedPlaces, item],
-                          )
-                        }
-                      />
-                      <span>
-                        {item.title}
-                        {item.address && <small>{item.address}</small>}
-                      </span>
-                    </label>
-                  );
-                })}
-                {hasMorePlaces && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={loadingPlaces}
-                    onClick={() => void loadPlaces(placeSource, placeOffset + 50)}
-                  >
-                    더 보기
-                  </button>
-                )}
-              </div>
-            </section>
-          )}
-          {error && (
-            <p role="alert" className="error-message">
-              {error}
-            </p>
-          )}
           {(!intakeOpen || messages.length > 0) && (
             <form
               className="we2-composer"
-              onSubmit={(e) => {
-                e.preventDefault();
+              onSubmit={(event) => {
+                event.preventDefault();
                 void send();
               }}
             >
@@ -572,15 +835,17 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 ref={inputRef}
                 id="ai-message"
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(event) => updateText(event.target.value)}
                 maxLength={2000}
                 rows={2}
-                disabled={busy || !available}
+                readOnly={busy}
+                disabled={!available}
+                aria-busy={pending}
                 placeholder="어떤 데이트를 하고 싶어요?"
                 enterKeyHint="send"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
                     void send();
                   }
                 }}
@@ -599,8 +864,20 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         </div>
       </section>
       <div className="we2-sidebar">
+        {candidates.length > 0 && (
+          <section className="we2-candidates we2-candidates-inline" aria-label="장소 후보">
+            <header className="we2-proposal-header">
+              <span>
+                <MapPin size={17} aria-hidden="true" />
+                장소 후보 · {candidates.length}
+              </span>
+            </header>
+            <CandidateList candidates={candidates} busy={busy} select={selectCandidate} />
+          </section>
+        )}
         <section
           ref={proposalRef}
+          tabIndex={-1}
           className={`we2-proposal${proposal ? " has-proposal" : ""}`}
           aria-label="코스 초안"
         >
@@ -620,6 +897,16 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   {proposal.date}
                   {proposal.transport && ` · ${proposal.transport}`}
                 </p>
+                {((proposal.budget || 0) > 0 || totalCost > 0) && (
+                  <div className="we2-costs">
+                    {(proposal.budget || 0) > 0 && (
+                      <span>예산 {proposal.budget?.toLocaleString("ko-KR")}원</span>
+                    )}
+                    {totalCost > 0 && (
+                      <span>입력된 예상 비용 {totalCost.toLocaleString("ko-KR")}원</span>
+                    )}
+                  </div>
+                )}
                 <ol className="we2-itinerary">
                   {proposal.activities.map((activity, index) => (
                     <li key={activityKeys[index]}>
@@ -628,7 +915,20 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                         <small>{activity.time || "시간 미정"}</small>
                         <strong>{activity.title}</strong>
                         {activity.place && <p>{activity.place}</p>}
-                        {activity.note && <p className="settings-hint">{activity.note}</p>}
+                        {(activity.cost || 0) > 0 && (
+                          <p className="we2-activity-cost">
+                            예상 {activity.cost?.toLocaleString("ko-KR")}원
+                          </p>
+                        )}
+                        {activity.note &&
+                          (activity.note.length > 80 || activity.note.includes("\n") ? (
+                            <details className="we2-stop-notes">
+                              <summary>메모</summary>
+                              <p>{activity.note}</p>
+                            </details>
+                          ) : (
+                            <p className="settings-hint">{activity.note}</p>
+                          ))}
                       </div>
                     </li>
                   ))}
@@ -636,19 +936,37 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 {proposal.preparation.length > 0 && (
                   <div className="we2-preparation">
                     <strong>준비물</strong>
-                    <p>{proposal.preparation.join(", ")}</p>
+                    {proposal.preparation.join(", ").length > 160 ? (
+                      <details className="we2-stop-notes">
+                        <summary>준비물 보기</summary>
+                        <p>{proposal.preparation.join(", ")}</p>
+                      </details>
+                    ) : (
+                      <p>{proposal.preparation.join(", ")}</p>
+                    )}
                   </div>
                 )}
               </div>
               <footer className="we2-proposal-footer">
-                {checks.length > 0 && (
-                  <ul className="we2-checks" aria-label="코스 확인 사항">
-                    {checks.map((check) => (
-                      <li key={check}>{check}</li>
-                    ))}
-                  </ul>
-                )}
-                <p>저장 후 장소를 확인하고 확정해 주세요.</p>
+                {checks.length > 0 &&
+                  (compactChecks ? (
+                    <details className="we2-stop-notes">
+                      <summary>확인할 내용 · {checks.length}</summary>
+                      {checksList}
+                    </details>
+                  ) : (
+                    checksList
+                  ))}
+                <div className="we2-save-feedback">
+                  <p role={saveError ? "alert" : "status"}>
+                    {saveError ||
+                      (saving
+                        ? "초안을 저장하고 있어요."
+                        : saved
+                          ? "초안을 저장했어요."
+                          : "저장 후 장소를 확인하고 확정해 주세요.")}
+                  </p>
+                </div>
                 {saved ? (
                   <Link className="primary-button" href={`/plans?item=${saved}`}>
                     저장한 초안 열기
@@ -660,7 +978,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                     disabled={busy}
                     onClick={() => void save()}
                   >
-                    {saving ? "저장 중…" : "초안 저장"}
+                    {saving ? "저장 중…" : saveError ? "다시 저장" : "초안 저장"}
                   </button>
                 )}
               </footer>
@@ -678,41 +996,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </div>
           )}
         </section>
-        {candidates.length > 0 && (
-          <section className="we2-candidates" aria-label="장소 후보">
-            <header className="we2-proposal-header">
-              <span>
-                <MapPin size={17} aria-hidden="true" />
-                장소 후보
-              </span>
-            </header>
-            <div className="we2-candidate-list">
-              {candidates.map((candidate) => (
-                <article key={candidate.ref}>
-                  <div>
-                    <strong>{candidate.title}</strong>
-                    {candidate.address && <p>{candidate.address}</p>}
-                  </div>
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy}
-                    aria-label={`${candidate.title} 선택`}
-                    onClick={() =>
-                      void send(
-                        `선택한 장소: ${candidate.title}. 정한 조건에 맞춰 코스에 반영해줘.`,
-                        candidate,
-                      )
-                    }
-                  >
-                    선택
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-        <section ref={historyRef} className="we2-history" aria-label="저장한 대화">
+        <section ref={historyRef} tabIndex={-1} className="we2-history" aria-label="저장한 대화">
           <header className="we2-history-header">
             <span>
               <History size={17} aria-hidden="true" />
@@ -729,29 +1013,175 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               <ChevronDown size={18} aria-hidden="true" />
             </button>
           </header>
-          <div id="we2-history-list" className="we2-history-list" hidden={!historyOpen}>
-            {loadingHistory && <p role="status">기록을 불러오고 있어요.</p>}
-            {!loadingHistory &&
-              (conversations.length ? (
-                conversations.map((item) => (
-                  <button
-                    type="button"
-                    className="we2-history-item"
-                    key={item.id}
-                    disabled={busy}
-                    aria-current={conversation.current.id === item.id ? "true" : undefined}
-                    onClick={() => void openConversation(item.id)}
-                  >
-                    <span>{item.title}</span>
-                    <small>{new Date(item.updated_at).toLocaleDateString("ko-KR")}</small>
-                  </button>
-                ))
-              ) : (
-                <p className="we2-history-empty">저장한 대화가 없어요.</p>
-              ))}
+          <div
+            id="we2-history-list"
+            className="we2-history-list"
+            hidden={!historyOpen}
+            aria-busy={loadingHistory || loadingConversation}
+          >
+            {historyError ? (
+              <ReadFailure
+                message={historyError}
+                retry={() => {
+                  const item = historyRetry.current;
+                  if (item.id) void openConversation(item.id, item.before);
+                  else void loadHistory();
+                }}
+              />
+            ) : (
+              <>
+                {(loadingHistory || loadingConversation) && (
+                  <p role="status" className="we2-read-status we2-history-loading">
+                    <LoaderCircle size={16} className="ai-spinner" aria-hidden="true" />
+                    기록을 불러오고 있어요.
+                  </p>
+                )}
+                {conversations.length
+                  ? conversations.map((item) => (
+                      <button
+                        type="button"
+                        className="we2-history-item"
+                        key={item.id}
+                        disabled={busy}
+                        aria-current={conversation.current.id === item.id ? "true" : undefined}
+                        onClick={() => void openConversation(item.id)}
+                      >
+                        <span title={item.title}>{item.title}</span>
+                        <small>{new Date(item.updated_at).toLocaleDateString("ko-KR")}</small>
+                      </button>
+                    ))
+                  : !loadingHistory &&
+                    !loadingConversation && (
+                      <p className="we2-history-empty">저장한 대화가 없어요.</p>
+                    )}
+              </>
+            )}
           </div>
         </section>
       </div>
+      {dialog === "places" && (
+        <AiDialog
+          id="we2-place-picker"
+          title="저장한 장소"
+          onClose={() => setDialog(null)}
+          returnFocus={dialogTrigger.current}
+        >
+          <div className="we2-dialog-body">
+            <div className="we2-place-tabs">
+              {(["favorite", "wish"] as const).map((source) => (
+                <button
+                  key={source}
+                  type="button"
+                  className="text-button"
+                  aria-pressed={placeSource === source}
+                  disabled={loadingPlaces || busy}
+                  onClick={() => void loadPlaces(source)}
+                >
+                  {source === "favorite" ? "자주 가는 곳" : "위시"}
+                </button>
+              ))}
+            </div>
+            <p className="settings-hint">선택한 장소만 메시지와 함께 AI에 전달해요. 최대 8개.</p>
+            {selectedPlaces.length > 0 && (
+              <div className="we2-selected-places">
+                {selectedPlaces.map((item) => (
+                  <button
+                    key={`${item.source}-${item.id}`}
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    aria-label={`${item.title} 선택 해제`}
+                    onClick={() =>
+                      setSelectedPlaces((previous) =>
+                        previous.filter(
+                          (place) => place.source !== item.source || place.id !== item.id,
+                        ),
+                      )
+                    }
+                  >
+                    <span>{item.title}</span>
+                    <X size={15} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="we2-place-options" aria-busy={loadingPlaces}>
+              {placeOptions.map((item) => {
+                const checked = selectedPlaces.some(
+                  (place) => place.source === item.source && place.id === item.id,
+                );
+                return (
+                  <label key={`${item.source}-${item.id}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={busy || loadingPlaces || (!checked && selectedPlaces.length >= 8)}
+                      onChange={() =>
+                        setSelectedPlaces((previous) =>
+                          checked
+                            ? previous.filter(
+                                (place) => place.source !== item.source || place.id !== item.id,
+                              )
+                            : [...previous, item],
+                        )
+                      }
+                    />
+                    <span>
+                      {item.title}
+                      {item.address && <small>{item.address}</small>}
+                    </span>
+                  </label>
+                );
+              })}
+              {placesError && (
+                <ReadFailure
+                  message={placesError}
+                  retry={() =>
+                    void loadPlaces(placeRetry.current.source, placeRetry.current.offset)
+                  }
+                />
+              )}
+              {loadingPlaces && (
+                <p role="status" className="we2-read-status">
+                  <LoaderCircle size={16} className="ai-spinner" aria-hidden="true" />
+                  장소를 불러오고 있어요.
+                </p>
+              )}
+              {!loadingPlaces && !placesError && placeOptions.length === 0 && (
+                <p>저장한 장소가 없어요.</p>
+              )}
+              {!loadingPlaces && !placesError && hasMorePlaces && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => void loadPlaces(placeSource, placeOffset + 50)}
+                >
+                  더 보기
+                </button>
+              )}
+            </div>
+          </div>
+          <footer className="we2-dialog-footer">
+            <span>{selectedPlaces.length} / 8개 선택</span>
+            <button type="button" className="primary-button" onClick={() => setDialog(null)}>
+              완료
+            </button>
+          </footer>
+        </AiDialog>
+      )}
+      {dialog === "candidates" && (
+        <AiDialog
+          id="we2-candidate-picker"
+          title="장소 후보"
+          onClose={() => setDialog(null)}
+          returnFocus={dialogTrigger.current}
+        >
+          <div className="we2-dialog-body">
+            <CandidateList candidates={candidates} busy={busy} select={selectCandidate} />
+          </div>
+        </AiDialog>
+      )}
     </div>
   );
 }

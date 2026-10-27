@@ -1,4 +1,4 @@
-import { AiPlanner } from "@/components/ai-planner";
+import { AiConnectionRetry, AiPlanner } from "@/components/ai-planner";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { callApi } from "@/lib/api";
@@ -20,7 +20,10 @@ export default async function AiPlannerPage() {
           로그인
         </Link>
       ) : status.error ? (
-        <p role="alert">{status.error}</p>
+        <div className="we2-connection-error">
+          <p role="alert">{status.error}</p>
+          <AiConnectionRetry />
+        </div>
       ) : (
         <AiPlanner available={status.data?.available || false} today={seoulToday()} />
       )}

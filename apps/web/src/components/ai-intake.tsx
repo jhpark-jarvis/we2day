@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, Check, Plus, SlidersHorizontal } from "lucide-react";
-import { useRef, useState } from "react";
+import { ArrowRight, Check, ChevronDown, Plus, SlidersHorizontal } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   briefError,
   currentBrief,
@@ -54,6 +54,7 @@ export function IntakeSummary({ context }: { context: IntakeContext }) {
         <small>
           {brief.date || "날짜 미정"} · {brief.region || "선택 장소"}
         </small>
+        <ChevronDown size={15} className="we2-brief-chevron" aria-hidden="true" />
       </summary>
       <BriefDetails brief={brief} />
     </details>
@@ -77,6 +78,18 @@ export function AiIntake({
   const [budget, setBudget] = useState("");
   const [custom, setCustom] = useState("");
   const [error, setError] = useState("");
+  const previousStep = useRef(step);
+  useLayoutEffect(() => {
+    if (step === previousStep.current) return;
+    previousStep.current = step;
+    const form = formRef.current;
+    const log = form?.closest(".we2-messages");
+    if (log) log.scrollTop = 0;
+    form?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+    const chat = form?.closest(".we2-chat");
+    if (chat && chat.getBoundingClientRect().top < 0)
+      chat.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [step]);
   function goToStep(value: number) {
     setStep(value);
     setError("");
@@ -130,7 +143,7 @@ export function AiIntake({
       aria-label="코스 조건 입력"
     >
       <div className="we2-intake-heading">
-        <h2>{step === 3 ? "조건 요약" : "어떤 하루를 보낼까요?"}</h2>
+        <h2 tabIndex={-1}>{step === 3 ? "조건 요약" : "어떤 하루를 보낼까요?"}</h2>
         <button type="button" className="text-button" disabled={disabled} onClick={onFreeChat}>
           바로 대화
         </button>
