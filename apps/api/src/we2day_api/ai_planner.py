@@ -501,7 +501,7 @@ async def _chat(body, settings, store, client, budget, stats):
             {
                 "role": "system",
                 "content": "현재 대화 조건: "
-                + context.model_dump_json(exclude={"search_scope"})
+                + context.model_dump_json(include=set(PlanningContext.model_fields))
                 + "\n서버가 정한 현재 장소 범위: "
                 + scope.model_dump_json()
                 + f"\n명시 선택 저장 장소: {len(body.selected_places)}개."

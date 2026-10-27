@@ -69,6 +69,8 @@ class ModelPlan(PlanContent):
 
 
 class StoredContext(PlanningContext):
+    # Trusted owner-scoped stored data; opaque future fields survive a version rollback.
+    model_config = ConfigDict(extra="allow", strict=True)
     search_scope: SearchScope = Field(default_factory=SearchScope)
 
 
