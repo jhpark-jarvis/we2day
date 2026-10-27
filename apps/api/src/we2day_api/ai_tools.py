@@ -61,6 +61,10 @@ class Candidate(ChosenPlace):
     ref: str = Field(max_length=40)
     source: Literal["naver", "selected", "user"]
 
+    def evidence(self):
+        # Canonical destination is server-only resolution data, duplicated in title/address.
+        return self.model_dump(exclude={"destination"})
+
 
 class ModelActivity(Activity):
     place_ref: str = Field(default="", max_length=40)
@@ -564,7 +568,7 @@ class ToolSession:
                     if candidate:
                         self.fresh_refs.add(candidate.ref)
                         self.candidate_kinds[candidate.ref] = args.kind
-                        items.append(candidate.model_dump())
+                        items.append(candidate.evidence())
                 self.searches[query] = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})
                 return {
@@ -605,9 +609,9 @@ class ToolSession:
                             row.get("destination", ""),
                             "selected",
                         )
-                        if candidate and candidate.model_dump() not in items:
+                        if candidate and candidate.evidence() not in items:
                             self.fresh_refs.add(candidate.ref)
-                            items.append(candidate.model_dump())
+                            items.append(candidate.evidence())
                 self.selected_result = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})
                 return {"items": items}

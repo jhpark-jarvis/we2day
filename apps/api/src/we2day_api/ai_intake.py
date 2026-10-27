@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from we2day_api.ai_dialogue import DialogueState, Directive, clock_value, negative_kinds
+from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_place_policy import SearchScope, requested_scope
 
 CLOCK = r"^(?:[01]\d|2[0-3]):[0-5]\d$"
@@ -116,7 +117,7 @@ def change_window(text, context):
     if multiple:
         stored.pending = None
         reply = "시작 시간 또는 종료 시간을 한 항목씩 알려주세요. 현재 시간대는 그대로 둘게요."
-    elif stored.pending and re.fullmatch(r"\s*취소해?\s*줘?[.!?]?\s*", text):
+    elif stored.pending and cancel_request(text):
         stored.pending = None
         reply = "시간대 변경을 취소했어요."
     else:

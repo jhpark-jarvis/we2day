@@ -234,7 +234,8 @@ async def evaluate(settings, corpus, *, client, minimum_interval=0, progress=Non
                 chosen = step.get("chosen", chosen)
                 body = ai_planner.ChatInput.model_validate(
                     {
-                        "messages": [{"role": "user", "content": step["text"]}],
+                        "messages": step.get("history", [])
+                        + [{"role": "user", "content": step["text"]}],
                         "conversation_id": str(cid),
                         "request_id": str(uuid4()),
                         "version": store.version,

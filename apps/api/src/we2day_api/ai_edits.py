@@ -9,6 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from we2day_api.plans import PlanContent
 
 
+def cancel_request(text):
+    return bool(
+        re.fullmatch(
+            r"\s*(?:아니(?:야|요)?[,.]?\s*)?"
+            r"(?:취소(?:해(?:\s*줘)?|할게(?:요)?)?|그대로\s*둬|변경하지\s*마)[.!?]?\s*",
+            text,
+        )
+    )
+
+
 class ActivityEdit(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     operation: Literal["swap", "shift", "time"]
@@ -80,7 +90,7 @@ def edit_activities(text, proposal, previous, clock_value):
     if not proposal:
         return None
     previous = ActivityEdit.model_validate(previous) if previous else None
-    if previous and re.fullmatch(r"\s*(?:취소해?\s*줘?|그대로\s*둬)[.!?]?\s*", text):
+    if previous and cancel_request(text):
         return EditResult("변경을 취소했어요. 현재 코스는 그대로 둘게요.")
     swap = bool(re.search(r"순서|순번", text) and re.search(r"바꿔|교환|교체", text))
     shift = bool(re.search(r"미뤄|늦춰|당겨|앞당겨", text))

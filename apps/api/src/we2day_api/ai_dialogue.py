@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from we2day_api.ai_edits import edit_activities
+from we2day_api.ai_edits import cancel_request, edit_activities
 from we2day_api.ai_place_policy import (
     WORDS,
     Kind,
@@ -282,9 +282,7 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     if context.get("activity_edit"):
         directive.slots["activity_edit"] = None
         old_pending = None
-    if (old_pending or state.append_pending) and re.fullmatch(
-        r"\s*(?:아니[,.]?\s*)?(?:취소해?\s*줘?|그대로\s*둬|변경하지\s*마)[.!?]?\s*", text
-    ):
+    if (old_pending or state.append_pending) and cancel_request(text):
         state.intent = "chat"
         state.append_pending = False
         directive.reply = "현재 코스는 그대로 둘게요."
