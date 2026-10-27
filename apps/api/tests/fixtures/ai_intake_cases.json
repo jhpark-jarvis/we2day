@@ -1,0 +1,309 @@
+{
+  "version": "intake-2026-10-27-v1",
+  "cases": [
+    {
+      "id": "known-two-in-order",
+      "initial": {},
+      "provider": "normal",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": "2030-01-05",
+            "start_time": "13:00",
+            "end_time": "19:00",
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [
+              "도서관",
+              "카페"
+            ],
+            "recommend": false,
+            "budget": 0,
+            "requirements": "걷기 적게"
+          },
+          "expect": {
+            "plan": "required",
+            "needs_search": true,
+            "activity_max": 2,
+            "slots": {
+              "date": "2030-01-05",
+              "budget": 0,
+              "activities": [
+                "도서관",
+                "카페"
+              ]
+            },
+            "initial_order": [
+              "library",
+              "cafe"
+            ],
+            "unknown_cost_time": true
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "unknown-date-candidates",
+      "initial": {},
+      "provider": "normal",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": null,
+            "start_time": "13:00",
+            "end_time": "19:00",
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [
+              "도서관"
+            ],
+            "recommend": false,
+            "budget": 0,
+            "requirements": "걷기 적게"
+          },
+          "expect": {
+            "plan": "absent",
+            "needs_search": true,
+            "candidate_min": 1,
+            "slots": {
+              "date": null
+            },
+            "candidate_not": [
+              "샘플도서관카페"
+            ]
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "known-one-null-budget",
+      "initial": {},
+      "provider": "normal",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": "2030-01-05",
+            "start_time": null,
+            "end_time": null,
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [
+              "도서관"
+            ],
+            "recommend": false,
+            "budget": null,
+            "requirements": "걷기 적게"
+          },
+          "expect": {
+            "plan": "required",
+            "needs_search": true,
+            "activity_max": 1,
+            "unknown_cost_time": true,
+            "plan_budget": null
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "contradictory-condition",
+      "initial": {},
+      "provider": "normal",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": "2030-01-05",
+            "start_time": "13:00",
+            "end_time": "19:00",
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [
+              "도서관",
+              "카페"
+            ],
+            "recommend": false,
+            "budget": 0,
+            "requirements": "카페 제외"
+          },
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "reply_any": [
+              "겹쳐"
+            ]
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "empty-results",
+      "initial": {},
+      "provider": "empty",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": "2030-01-05",
+            "start_time": "13:00",
+            "end_time": "19:00",
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [
+              "도서관"
+            ],
+            "recommend": false,
+            "budget": 0,
+            "requirements": "걷기 적게"
+          },
+          "expect": {
+            "plan": "absent",
+            "needs_search": true,
+            "candidate_max": 0
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "unavailable-results",
+      "initial": {},
+      "provider": "failed",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": "2030-01-05",
+            "start_time": "13:00",
+            "end_time": "19:00",
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [
+              "도서관"
+            ],
+            "recommend": false,
+            "budget": 0,
+            "requirements": "걷기 적게"
+          },
+          "expect": {
+            "plan": "absent",
+            "needs_search": true,
+            "candidate_max": 0
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "free-recommend-date-unknown",
+      "initial": {},
+      "provider": "normal",
+      "steps": [
+        {
+          "text": "초기 조건",
+          "brief": {
+            "date": null,
+            "start_time": "13:00",
+            "end_time": "19:00",
+            "region": "중랑구",
+            "transport": "도보",
+            "activities": [],
+            "recommend": true,
+            "budget": 0,
+            "requirements": "걷기 적게"
+          },
+          "expect": {
+            "plan": "absent",
+            "slots": {
+              "date": null
+            }
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    },
+    {
+      "id": "window-edit-reload",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "도보",
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "budget": 0,
+          "requirements": "걷기 적게",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "도보",
+              "activities": [
+                "도서관",
+                "카페"
+              ],
+              "recommend": false,
+              "budget": 0,
+              "requirements": "걷기 적게"
+            },
+            "pending": null,
+            "turn_version": 0
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "종료 시간 바꿔줘",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "reply_any": [
+              "시간"
+            ]
+          }
+        },
+        {
+          "text": "20:00",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "window": {
+              "start_time": "13:00",
+              "end_time": "20:00"
+            }
+          }
+        },
+        {
+          "text": "시작 시간 14:00",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "window": {
+              "start_time": "14:00",
+              "end_time": "20:00"
+            }
+          }
+        }
+      ],
+      "split": "extension",
+      "category": "guided-intake"
+    }
+  ]
+}

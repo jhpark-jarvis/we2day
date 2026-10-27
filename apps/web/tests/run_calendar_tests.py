@@ -18,6 +18,7 @@ from database_fixture import temporary_database  # noqa: E402
 
 def main():
     screenshots = "--screenshots" in sys.argv
+    ai = "--ai" in sys.argv
     photos = "--photos" in sys.argv or screenshots or "--organizer" in sys.argv
     places = "--places" in sys.argv
     plans = "--plans" in sys.argv
@@ -115,7 +116,9 @@ def main():
                     "playwright",
                     "test",
                     "--config",
-                    "playwright.screenshots.config.ts"
+                    "playwright.ai.config.ts"
+                    if ai
+                    else "playwright.screenshots.config.ts"
                     if screenshots
                     else "playwright.organizer.config.ts"
                     if organizer
@@ -139,6 +142,7 @@ def main():
                             "--journey",
                             "--organizer",
                             "--screenshots",
+                            "--ai",
                         }
                     ],
                 ],

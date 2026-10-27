@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { changePlan } from "@/app/actions/plans";
+import { AiIntake, IntakeSummary } from "@/components/ai-intake";
 import Link from "@/components/progress-link";
 import { We2AiIcon } from "@/components/we2-ai-icon";
+import { briefMessage, type IntakeContext, type PlanningBrief } from "@/lib/ai-intake";
 import type { PlanContent } from "@/lib/plans";
 
 type Conversation = { id: string; title: string; version: number; updated_at: string };
@@ -22,7 +24,13 @@ type Turn = {
   request_id: string;
   version: number;
   user_text: string;
-  result: { reply: string; plan: PlanContent | null; checks?: string[]; weather?: unknown[] };
+  result: {
+    reply: string;
+    plan: PlanContent | null;
+    checks?: string[];
+    weather?: unknown[];
+    context?: IntakeContext;
+  };
   prompt_version: string;
 };
 type Message = { id: string; role: "user" | "assistant"; content: string; weatherSource?: boolean };
@@ -53,6 +61,8 @@ function turnMessages(turns: Turn[]): Message[] {
 }
 export function AiPlanner({ available, today }: { available: boolean; today: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [intakeOpen, setIntakeOpen] = useState(true);
+  const [planningContext, setPlanningContext] = useState<IntakeContext | null>(null);
   const [text, setText] = useState("");
   const [pendingText, setPendingText] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
@@ -84,7 +94,12 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [placeOffset, setPlaceOffset] = useState(0);
   const [hasMorePlaces, setHasMorePlaces] = useState(false);
   const conversation = useRef({ id: crypto.randomUUID(), version: 0 });
-  const retry = useRef<{ id: string; text: string } | null>(null);
+  const retry = useRef<{
+    id: string;
+    text: string;
+    signature: string;
+    brief?: PlanningBrief;
+  } | null>(null);
   const busy = pending || saving || loadingHistory;
   const openConversation = useCallback(async (id: string, before?: number) => {
     const older = Boolean(before);
@@ -105,6 +120,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         conversation.current = { id, version: data.version };
         retry.current = null;
         setMessages(turnMessages(turns));
+        setIntakeOpen(false);
+        setPlanningContext(turns[turns.length - 1]?.result.context || null);
         const plan = data.proposal || null;
         setProposal(plan);
         setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
@@ -168,7 +185,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       setLoadingPlaces(false);
     }
   }
-  async function send(messageOverride?: string, candidate?: Candidate) {
+  async function send(
+    messageOverride?: string,
+    candidate?: Candidate,
+    submittedBrief?: PlanningBrief,
+  ) {
     const content = messageOverride ?? text.trim();
     if (busy || !content) return;
     const chosen = candidate
@@ -184,8 +205,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         ].slice(-8)
       : chosenPlaces;
     const next: Message[] = [...messages, { id: crypto.randomUUID(), role: "user", content }];
-    const requestId = retry.current?.text === content ? retry.current.id : crypto.randomUUID();
-    retry.current = { id: requestId, text: content };
+    const brief =
+      submittedBrief || (retry.current?.text === content ? retry.current.brief : undefined);
     setChosenPlaces(chosen);
     setPending(true);
     setPendingText(content);
@@ -197,25 +218,32 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       new TextEncoder().encode(JSON.stringify({ messages: history, proposal })).length > 18000
     )
       history.splice(0, 2);
+    const payload = {
+      messages: history,
+      proposal,
+      conversation_id: conversation.current.id,
+      version: conversation.current.version,
+      selected_places: selectedPlaces.map(({ source, id }) => ({ source, id })),
+      chosen_places: chosen,
+      ...(brief ? { brief } : {}),
+    };
+    const signature = JSON.stringify(payload);
+    const requestId =
+      retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();
+    retry.current = { id: requestId, text: content, signature, brief };
     try {
       const response = await fetch("/api/ai/planner", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: history,
-          proposal,
-          conversation_id: conversation.current.id,
-          version: conversation.current.version,
-          request_id: requestId,
-          selected_places: selectedPlaces.map(({ source, id }) => ({ source, id })),
-          chosen_places: chosen,
-        }),
+        body: JSON.stringify({ ...payload, request_id: requestId }),
         signal: AbortSignal.timeout(110000),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "답변을 받지 못했어요.");
       conversation.current.version = result.version;
       retry.current = null;
+      setIntakeOpen(false);
+      setPlanningContext(result.context || null);
       setConversations((saved) => {
         const id = conversation.current.id;
         const previous = saved.find((item) => item.id === id);
@@ -316,6 +344,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 retry.current = null;
                 setOldestTurn(1);
                 setMessages([]);
+                setIntakeOpen(true);
+                setPlanningContext(null);
                 setText("");
                 setProposal(null);
                 setSaved("");
@@ -337,6 +367,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             연결을 준비 중이에요. 잠시 후 다시 확인해 주세요.
           </p>
         )}
+        {planningContext && messages.length > 0 && <IntakeSummary context={planningContext} />}
         <div
           ref={logRef}
           className="we2-messages"
@@ -354,13 +385,27 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               이전 대화
             </button>
           )}
-          {messages.length === 0 && !pending && !loadingHistory && (
+          {messages.length === 0 && !loadingHistory && (
+            <div hidden={!intakeOpen}>
+              <AiIntake
+                key={conversation.current.id}
+                disabled={busy || !available}
+                selectedPlaces={selectedPlaces.length}
+                onSubmit={(brief) => void send(briefMessage(brief), undefined, brief)}
+                onFreeChat={() => setIntakeOpen(false)}
+              />
+            </div>
+          )}
+          {messages.length === 0 && !intakeOpen && !pending && !loadingHistory && (
             <div className="we2-welcome">
               <span className="we2-welcome-icon">
                 <We2AiIcon size={72} />
               </span>
               <h2>우리, 어디로 갈까요?</h2>
               <p>날짜와 하고 싶은 일을 알려주세요.</p>
+              <button type="button" className="text-button" onClick={() => setIntakeOpen(true)}>
+                조건 입력
+              </button>
               <div className="we2-starters">
                 {[
                   { label: "산책과 카페", prompt: `${today} 오후 산책과 카페 코스를 같이 짜줘.` },
@@ -512,43 +557,45 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               {error}
             </p>
           )}
-          <form
-            className="we2-composer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send();
-            }}
-          >
-            <label htmlFor="ai-message" className="sr-only">
-              위투 AI에게 보낼 내용
-            </label>
-            <textarea
-              ref={inputRef}
-              id="ai-message"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={2000}
-              rows={2}
-              disabled={busy || !available}
-              placeholder="어떤 데이트를 하고 싶어요?"
-              enterKeyHint="send"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void send();
-                }
+          {(!intakeOpen || messages.length > 0) && (
+            <form
+              className="we2-composer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send();
               }}
-            />
-            <button
-              className="icon-button we2-send"
-              type="submit"
-              aria-label="메시지 전송"
-              title="전송"
-              disabled={busy || !available || !text.trim()}
             >
-              <Send size={19} aria-hidden="true" />
-            </button>
-          </form>
+              <label htmlFor="ai-message" className="sr-only">
+                위투 AI에게 보낼 내용
+              </label>
+              <textarea
+                ref={inputRef}
+                id="ai-message"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={2000}
+                rows={2}
+                disabled={busy || !available}
+                placeholder="어떤 데이트를 하고 싶어요?"
+                enterKeyHint="send"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+              />
+              <button
+                className="icon-button we2-send"
+                type="submit"
+                aria-label="메시지 전송"
+                title="전송"
+                disabled={busy || !available || !text.trim()}
+              >
+                <Send size={19} aria-hidden="true" />
+              </button>
+            </form>
+          )}
         </div>
       </section>
       <div className="we2-sidebar">

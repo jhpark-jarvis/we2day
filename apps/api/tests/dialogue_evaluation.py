@@ -175,6 +175,31 @@ def grade(case, step, result, events, before):
             bool(plan) and any(name in p["place"] for p in plan["activities"]),
             "lost_selected_place",
         )
+    if expected.get("unknown_cost_time"):
+        require(
+            bool(plan)
+            and all(a.get("time") is None and a.get("cost") is None for a in plan["activities"]),
+            "invented_time_or_cost",
+        )
+    if "plan_budget" in expected:
+        require(bool(plan) and plan.get("budget") == expected["plan_budget"], "invented_budget")
+    if "initial_order" in expected:
+        from we2day_api.ai_place_policy import kinds
+
+        require(
+            bool(plan)
+            and len(plan["activities"]) == len(expected["initial_order"])
+            and all(
+                k in kinds(a["place"])
+                for k, a in zip(expected["initial_order"], plan["activities"], strict=True)
+            ),
+            "initial_activity_order",
+        )
+    for name, value in expected.get("window", {}).items():
+        require(
+            result.get("context", {}).get("intake", {}).get("data", {}).get(name) == value,
+            "window:" + name,
+        )
     return failures
 
 
@@ -214,6 +239,7 @@ async def evaluate(settings, corpus, *, client, minimum_interval=0, progress=Non
                         "request_id": str(uuid4()),
                         "version": store.version,
                         "chosen_places": chosen,
+                        **({"brief": step["brief"]} if "brief" in step else {}),
                     }
                 )
                 stats = RunStats(ai_planner.PROMPT_VERSION)

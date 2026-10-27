@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from we2day_api.ai_dialogue import DialogueState
 from we2day_api.ai_edits import ActivityEdit, PendingFields
+from we2day_api.ai_intake import IntakeState
 from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds
 from we2day_api.places import fetch_places
 from we2day_api.plans import Activity, PlanContent
@@ -77,6 +78,7 @@ class StoredContext(PlanningContext):
     dialogue: DialogueState = Field(default_factory=DialogueState)
     activity_edit: ActivityEdit | None = None
     pending_fields: PendingFields | None = None
+    intake: IntakeState | None = None
 
 
 class ModelAnswer(BaseModel):
@@ -332,6 +334,8 @@ class ToolSession:
         self.previous_places: dict[str, list[Candidate]] = {}
         self.chosen_candidate = None
         self.fresh_refs: set[str] = set()
+        self.activity_limit: int | None = None
+        self.initial_activities: list[str] | None = None
         for item in chosen:
             self.chosen_candidate = self.add(item.title, item.address, "user", item.destination)
 
@@ -428,15 +432,26 @@ class ToolSession:
             return None, ["지금은 장소 후보만 확인하고 있어요."]
         if not resolved:
             return resolved, []
+        if self.activity_limit and (
+            len(resolved.activities) != self.activity_limit
+            or any(not a.place for a in resolved.activities)
+        ):
+            return None, ["선택한 활동에 맞는 장소를 모두 확인한 뒤 코스에 반영할 수 있어요."]
         if scope.single_activity and len(resolved.activities) > 1:
             return None, ["요청한 활동 개수를 넘는 제안은 반영하지 않았어요."]
         previous = self.previous_plan.activities if self.previous_plan else []
-        for model, activity in zip(model_plan.activities, resolved.activities, strict=True):
+        for index, (model, activity) in enumerate(
+            zip(model_plan.activities, resolved.activities, strict=True)
+        ):
             candidate = self.candidates.get(model.place_ref)
             detected = kinds(activity.title)
             actual_kind = self.candidate_kinds.get(
                 model.place_ref, detected[0] if len(detected) == 1 else "any"
             )
+            if self.initial_activities:
+                expected = kinds(self.initial_activities[index])
+                if expected and actual_kind not in expected:
+                    return None, ["선택한 활동 순서와 맞지 않는 제안은 반영하지 않았어요."]
             if self.policy.forbidden(
                 candidate.title if candidate else re.split(r"\s+\(", activity.place)[0], actual_kind
             ):
@@ -470,6 +485,10 @@ class ToolSession:
                 return None, ["요청한 장소와 다른 제안은 반영하지 않았어요."]
             if not candidate and scope.exact_name and scope.name_kind in {"any", kind}:
                 return None, ["요청한 정확한 장소를 확인한 뒤 코스에 반영할 수 있어요."]
+        if self.initial_activities is not None:
+            # A time window is not an activity timestamp or a provider price quote.
+            for activity in resolved.activities:
+                activity.time, activity.cost = None, None
         return resolved, []
 
     def execute(self, name: str, arguments) -> dict:
