@@ -152,6 +152,17 @@ def test_relative_shift_rejects_signed_and_fractional_ambiguity():
         assert result.plan is None and "몇 분" in result.reply
 
 
+@pytest.mark.parametrize(
+    "text", ["1번과 2번 시간을 14:00, 16:00로 바꿔줘", "1번과 2번 시간을 25:00, 15:00로 바꿔줘"]
+)
+def test_multiple_different_or_invalid_clocks_are_never_collapsed_into_one(text):
+    plan = PlanContent.model_validate(CORPUS["cases"][0]["initial"]["proposal"])
+    before = plan.model_dump()
+    result = analyze(text, {}, plan, [], date(2026, 10, 27))
+    assert result.plan is None and "활동별 시간" in result.reply
+    assert plan.model_dump() == before
+
+
 def test_existing_twenty_activity_contract_remains_bounded_in_small_context():
     plan = PlanContent.model_validate(CORPUS["cases"][0]["initial"]["proposal"])
     plan.activities = [plan.activities[0].model_copy(deep=True) for _ in range(20)]

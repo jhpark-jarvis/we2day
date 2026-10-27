@@ -110,6 +110,16 @@ def edit_activities(text, proposal, previous, clock_value):
         elif operation:
             pending.minutes = None
     if pending.operation == "time":
+        clocks = re.findall(
+            r"(?<!\d)\d{1,2}:\d{2}(?!\d)|(?:오전|오후)?\s*\d{1,2}시(?:\s*\d{1,2}분)?", text
+        )
+        values = [clock_value(token)[0] for token in clocks]
+        if len(values) > 1 and (None in values or len(set(values)) > 1):
+            pending.clock = None
+            return EditResult(
+                "활동별 시간이 서로 달라요. 한 활동씩 지정하거나 공통 시간 하나를 알려주세요.",
+                pending=pending,
+            )
         clock, question = clock_value(text)
         if clock:
             pending.clock = clock
