@@ -16,7 +16,7 @@ from we2day_api.ai_dialogue import DialogueState, Directive
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_place_policy import SearchScope
 from we2day_api.ai_runtime import Budget, RunStats
-from we2day_api.ai_tools import StoredContext, ToolSession
+from we2day_api.ai_tools import ModelPlan, StoredContext, ToolSession
 from we2day_api.plans import PlanContent
 
 CORPUS = json.loads(
@@ -112,6 +112,17 @@ def test_schema_template_has_no_request_values_and_is_compiled_once(monkeypatch)
     )
     assert "const" not in base["json_schema"]["schema"]["$defs"]["ModelPlan"]["properties"]["date"]
     assert base == ai_planner.ANSWER_FORMAT
+
+
+def test_generated_punctuation_preparation_is_removed_without_rewriting_existing_plan():
+    session = ToolSession(SimpleNamespace(), None, [], [])
+    session.operation = "plan"
+    generated = ModelPlan(title="합성", date="2030-01-05", preparation=[",", "  ·  ", "물"])
+    result, _ = session.guard_plan(generated, session.resolve(generated))
+    assert result.preparation == ["물"]
+    session.previous_plan = PlanContent.model_validate(generated.model_dump())
+    result, _ = session.guard_plan(generated, session.resolve(generated))
+    assert result.preparation == [",", "  ·  ", "물"]
 
 
 @pytest.mark.parametrize(

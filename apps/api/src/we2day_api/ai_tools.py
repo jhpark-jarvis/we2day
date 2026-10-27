@@ -493,6 +493,9 @@ class ToolSession:
             # A time window is not an activity timestamp or a provider price quote.
             for activity in resolved.activities:
                 activity.time, activity.cost = None, None
+        if self.previous_plan is None:
+            # Punctuation-only model padding is not a preparation item. Preserve user plans.
+            resolved.preparation = [p for p in resolved.preparation if re.search(r"\w", p)]
         return resolved, []
 
     def execute(self, name: str, arguments) -> dict:
