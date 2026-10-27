@@ -18,11 +18,29 @@ class ToolIO:
         self.slots = asyncio.Semaphore(2)
 
     async def perform(self, action):
+        search = action[0] == "places"
+        if search:
+            self.stats.counts["search_calls"] = self.stats.counts.get("search_calls", 0) + 1
         try:
-            return await self._perform(action)
+            result = await self._perform(action)
         except TimeoutError as error:
+            if search:
+                self.stats.counts["search_errors"] = self.stats.counts.get("search_errors", 0) + 1
             self.budget.remaining()  # Overall expiry propagates, per-tool expiry is a failed read.
             raise HTTPException(503, "tool_unavailable") from error
+        except Exception:
+            if search:
+                self.stats.counts["search_errors"] = self.stats.counts.get("search_errors", 0) + 1
+            raise
+        else:
+            if search:
+                for key, value in {
+                    "search_successes": 1,
+                    "search_empty": int(not result.items),
+                    "search_candidates": len(result.items),
+                }.items():
+                    self.stats.counts[key] = self.stats.counts.get(key, 0) + value
+            return result
 
     async def _perform(self, action):
         async with self.slots:

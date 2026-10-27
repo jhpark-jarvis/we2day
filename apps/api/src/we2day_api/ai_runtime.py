@@ -20,6 +20,7 @@ class RunStats:
         self.version = version
         self.durations = {}
         self.counts = {"model_calls": 0, "request_bytes": 0, "response_bytes": 0}
+        self.error_category = None
 
     @contextmanager
     def span(self, label):
@@ -55,7 +56,15 @@ class RunStats:
             "total_ms": round((time.monotonic() - self.started) * 1000, 1),
             **self.counts,
         }
+        if self.error_category:
+            value["error_category"] = self.error_category
         logging.getLogger("uvicorn.error").info("ai_run %s", json.dumps(value))
+
+    def error(self, detail):
+        from we2day_api.ai_metrics import CATEGORIES
+
+        if isinstance(detail, str) and detail in CATEGORIES:
+            self.error_category = detail
 
 
 class Budget:

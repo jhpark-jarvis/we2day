@@ -26,6 +26,49 @@ def backup_health(value, now):
     )
 
 
+def ai_usage(timeout=15):
+    processes = []
+    try:
+        logs = subprocess.Popen(
+            ["docker", "logs", "--since", "24h", "--tail", "10000", "we2day-api-1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        processes.append(logs)
+        summary = subprocess.Popen(
+            [
+                "docker",
+                "exec",
+                "-i",
+                "we2day-api-1",
+                "/app/.venv/bin/python",
+                "-m",
+                "we2day_api.ai_metrics",
+            ],
+            stdin=logs.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        processes.append(summary)
+        logs.stdout.close()
+        output = summary.communicate(timeout=timeout)[0]
+        logs.wait(timeout=1)
+        if summary.returncode or logs.returncode or len(output) > 65536:
+            raise ValueError("AI aggregate unavailable")
+        value = json.loads(output)
+        if set(value) != {"versions", "accepted", "ignored", "truncated"}:
+            raise ValueError("Invalid aggregate")
+        return {"status": "ok", "window_hours": 24, "max_lines": 10000, **value}
+    except Exception:
+        # Older rollback images lack this optional module. Health checks still run.
+        return {"status": "unavailable"}
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()  # Only the CLI children started above, never the API container.
+            process.wait(timeout=2)
+
+
 def inspect(config, now=None):
     now = now or datetime.now(UTC)
     checks = {}
@@ -89,13 +132,16 @@ def inspect(config, now=None):
             )
 
         check(field, fresh_report)
-    return {
+    report = {
         "format": 1,
         "checked_at": now.isoformat(),
         "status": "ok" if all(checks.values()) else "attention",
         "checks": checks,
         "disk_used_percent": round(usage.used / usage.total * 100, 1),
     }
+    if "we2day-api-1" in config["containers"]:
+        report["ai_usage"] = ai_usage()
+    return report
 
 
 def write_report(path, result):

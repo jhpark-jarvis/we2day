@@ -249,6 +249,17 @@ async def complete(
                             for c in normalized
                         ]
                 stats.counts["tool_calls"] = session.calls
+                blocked = sum(
+                    o.get("error")
+                    in {
+                        "outside_requested_scope",
+                        "excluded_activity_kind",
+                        "tool_not_allowed_for_current_request",
+                    }
+                    for o in outcomes
+                )
+                if blocked:
+                    stats.counts["scope_blocks"] = stats.counts.get("scope_blocks", 0) + blocked
                 for call, outcome in zip(normalized, outcomes, strict=True):
                     messages.append(
                         {
@@ -298,6 +309,7 @@ async def complete(
                 # One formatting completion inside the same three-call budget, never a
                 # retry of transport/provider failures or permission errors.
                 format_completion = True
+                stats.counts["schema_repairs"] = stats.counts.get("schema_repairs", 0) + 1
                 messages.append(
                     {
                         "role": "assistant",
@@ -437,6 +449,7 @@ async def chat(body: ChatInput, request: Request, response: Response, store: Sto
         raise HTTPException(503, "ai_timeout") from error
     except HTTPException as error:
         status = error.status_code
+        stats.error(error.detail)
         raise
     except asyncio.CancelledError:
         status = "cancelled"
@@ -480,6 +493,10 @@ async def _chat(body, settings, store, client, budget, stats):
         latest = body.messages[-1].content
         today = datetime.now(ZoneInfo("Asia/Seoul")).date()
         before_context = context.model_dump()
+        if context.activity_edit and context.activity_edit.turn_version != body.version:
+            before_context["activity_edit"] = None
+        if context.pending_fields and context.pending_fields.turn_version != body.version:
+            before_context["pending_fields"] = None
         if context.dialogue.turn_version != body.version:
             # Opaque state can survive an older API writer; never resume a stale pending edit.
             before_context["dialogue"]["pending"] = None
@@ -494,6 +511,10 @@ async def _chat(body, settings, store, client, budget, stats):
             selected=bool(body.selected_places),
         )
         directive.state.turn_version = body.version + 1
+        if directive.slots.get("activity_edit"):
+            directive.slots["activity_edit"]["turn_version"] = body.version + 1
+        if directive.slots.get("pending_fields"):
+            directive.slots["pending_fields"]["turn_version"] = body.version + 1
         scope = directive.scope
         context = StoredContext.model_validate(merge_context(before_context, {}, directive))
         known_date = context.date

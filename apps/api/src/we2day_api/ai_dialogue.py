@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from we2day_api.ai_edits import edit_activities
 from we2day_api.ai_place_policy import (
     WORDS,
     Kind,
@@ -156,18 +157,23 @@ def rejected_names(text, known):
     names += [re.sub(r"(?:활동|일정)?만$", "", n) for n in extracted]
     denied, restored = [], []
     for name in dict.fromkeys(names):
-        if not name or generic_name(name) or name in {
-            "그거",
-            "그곳",
-            "다른곳",
-            "여기",
-            "장소",
-            "코스",
-            "활동",
-            "제목",
-            "날짜",
-            "예산",
-        }:
+        if (
+            not name
+            or generic_name(name)
+            or name
+            in {
+                "그거",
+                "그곳",
+                "다른곳",
+                "여기",
+                "장소",
+                "코스",
+                "활동",
+                "제목",
+                "날짜",
+                "예산",
+            }
+        ):
             continue
         if name not in text:
             continue
@@ -259,6 +265,23 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     state.pending = None
     previous_scope = SearchScope.model_validate(context.get("search_scope") or {})
     directive = Directive(state, previous_scope.model_copy(deep=True))
+    if context.get("pending_fields"):
+        directive.slots["pending_fields"] = None
+    compound = edit_activities(text, proposal, context.get("activity_edit"), clock_value)
+    if compound:
+        state.pending = None
+        state.append_pending = False
+        directive.slots["activity_edit"] = (
+            compound.pending.model_dump() if compound.pending else None
+        )
+        directive.intent = state.intent = "edit" if compound.plan else "clarify"
+        directive.reply, directive.plan = compound.reply, compound.plan
+        if compound.plan:
+            directive.slots["activities"] = [a.title for a in compound.plan.activities][:8]
+        return directive
+    if context.get("activity_edit"):
+        directive.slots["activity_edit"] = None
+        old_pending = None
     if (old_pending or state.append_pending) and re.fullmatch(
         r"\s*(?:아니[,.]?\s*)?(?:취소해?\s*줘?|그대로\s*둬|변경하지\s*마)[.!?]?\s*", text
     ):
@@ -406,6 +429,11 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     if directive.intent == "edit" and not directive.reply:
         updated = proposal.model_copy(deep=True)
         changed = False
+        if old_pending and context.get("pending_fields"):
+            for name, value in context["pending_fields"]["values"].items():
+                setattr(updated, name, value)
+            updated = PlanContent.model_validate(updated.model_dump())
+            changed = True
         pending_field = old_pending.field if old_pending and old_pending.resume == "edit" else ""
         if remove or pending_field == "target" and old_pending.value == "remove":
             index = activity_target(text, proposal)
@@ -478,9 +506,20 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
                 )
             else:
                 updated.activities[index].time, changed = value, True
-        if not directive.reply:
+        fields = {
+            name: getattr(updated, name)
+            for name in ("title", "date", "budget", "transport")
+            if getattr(updated, name) != getattr(proposal, name)
+        }
+        if directive.reply:
+            for name in ("date", "budget", "transport", "activities"):
+                directive.slots.pop(name, None)
+            if fields:
+                directive.slots["pending_fields"] = {"values": fields, "turn_version": 0}
+        else:
             if changed:
                 directive.plan = PlanContent.model_validate(updated.model_dump())
+                directive.slots.update({k: v for k, v in fields.items() if k != "title"})
                 directive.reply = "요청한 항목만 수정했어요. 코스 초안에서 확인해 주세요."
             else:
                 directive.ask("target", "어느 항목을 어떻게 바꿀까요? 변경할 내용을 알려주세요.")

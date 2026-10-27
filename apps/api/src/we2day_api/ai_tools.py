@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from we2day_api.ai_dialogue import DialogueState
+from we2day_api.ai_edits import ActivityEdit, PendingFields
 from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds
 from we2day_api.places import fetch_places
 from we2day_api.plans import Activity, PlanContent
@@ -74,6 +75,8 @@ class StoredContext(PlanningContext):
     model_config = ConfigDict(extra="allow", strict=True)
     search_scope: SearchScope = Field(default_factory=SearchScope)
     dialogue: DialogueState = Field(default_factory=DialogueState)
+    activity_edit: ActivityEdit | None = None
+    pending_fields: PendingFields | None = None
 
 
 class ModelAnswer(BaseModel):
@@ -253,7 +256,7 @@ def clean(value: str, limit: int) -> str:
 
 
 def check_course(plan: PlanContent) -> list[str]:
-    issues, seen, previous = [], set(), None
+    issues, seen, previous, times = [], set(), None, {}
     for index, activity in enumerate(plan.activities, 1):
         if not activity.place.strip():
             issues.append(f"{index}번째 활동의 장소를 선택해 주세요.")
@@ -263,11 +266,21 @@ def check_course(plan: PlanContent) -> list[str]:
                 issues.append(f"{index}번째 활동은 앞선 장소와 같아요.")
             seen.add(key)
         if activity.time:
+            if activity.time in times:
+                issues.append(
+                    f"{index}번째 활동은 {times[activity.time]}번째 활동과 같은 시각이에요."
+                )
+            times.setdefault(activity.time, index)
             if previous and activity.time < previous:
                 issues.append(f"{index}번째 활동 시간이 앞선 활동보다 빨라요.")
             previous = activity.time
     if not plan.activities:
         issues.append("활동을 추가해 주세요.")
+    costs = [a.cost for a in plan.activities if a.cost is not None]
+    if costs and plan.budget is not None and sum(costs) > plan.budget:
+        issues.append(
+            f"입력한 활동비 합계 {sum(costs):,}원이 전체 예산 {plan.budget:,}원을 넘어요."
+        )
     return issues[:16]
 
 
@@ -318,6 +331,7 @@ class ToolSession:
         self.calls = 0
         self.previous_places: dict[str, list[Candidate]] = {}
         self.chosen_candidate = None
+        self.fresh_refs: set[str] = set()
         for item in chosen:
             self.chosen_candidate = self.add(item.title, item.address, "user", item.destination)
 
@@ -398,6 +412,8 @@ class ToolSession:
     def visible_candidates(self):
         visible = []
         for item in self.candidates.values():
+            if self.operation == "search" and item.ref not in self.fresh_refs:
+                continue
             detected = kinds(item.title)
             kind = self.candidate_kinds.get(item.ref, detected[0] if len(detected) == 1 else "any")
             if self.policy.accepts(item.title, kind):
@@ -527,6 +543,7 @@ class ToolSession:
                         continue
                     candidate = self.add(item.title, item.roadAddress or item.address, "naver")
                     if candidate:
+                        self.fresh_refs.add(candidate.ref)
                         self.candidate_kinds[candidate.ref] = args.kind
                         items.append(candidate.model_dump())
                 self.searches[query] = items
@@ -570,6 +587,7 @@ class ToolSession:
                             "selected",
                         )
                         if candidate and candidate.model_dump() not in items:
+                            self.fresh_refs.add(candidate.ref)
                             items.append(candidate.model_dump())
                 self.selected_result = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})
