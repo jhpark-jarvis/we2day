@@ -801,6 +801,8 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-brief-details dd { margin:0; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
 .we2-brief-summary { flex-shrink:0; padding:0 16px; border-bottom:1px solid var(--line); font-size:.8rem; max-height:120px; overflow-y:auto; }
 .we2-brief-summary summary { display:flex; align-items:center; gap:7px; min-height:44px; padding:8px 0; border:0; border-radius:0; background:transparent; cursor:pointer; }
+.we2-chat .we2-brief-summary[open] > summary,
+.we2-chat .we2-brief-summary > summary:hover { background:transparent; border-color:transparent; }
 .we2-brief-chevron { flex-shrink:0; }
 .we2-brief-summary[open] .we2-brief-chevron { transform:rotate(180deg); }
 .we2-brief-summary summary small { margin-left:auto; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }

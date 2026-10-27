@@ -253,6 +253,12 @@ test("place and candidate dialogs preserve composer space, selection and convers
     { width: 393, height: 420 },
   ]) {
     await page.setViewportSize(viewport);
+    const conditions = page.locator(".we2-brief-summary summary");
+    await conditions.click();
+    await expect(conditions).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await conditions.hover();
+    await expect(conditions).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await conditions.click();
     const before = await page.locator(".we2-chat").boundingBox();
     const composer = await page.locator(".we2-composer").boundingBox();
     expect(composer && before && composer.y + composer.height <= before.y + before.height + 1).toBe(
