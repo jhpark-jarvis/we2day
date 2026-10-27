@@ -172,3 +172,29 @@ def test_mcp_valid_json_rpc_without_json_mime():
         assert response.status_code == 200
         assert len(response.json()["result"]["tools"]) == 6
         assert response.json()["result"]["resultType"] == "complete"
+
+
+def test_public_metadata_is_cached_narrow_and_cannot_be_mutated():
+    from we2day_api import agent_oauth
+
+    agent_oauth._tool_document.cache_clear()
+    first = tools()
+    second = tools()
+    assert agent_oauth._tool_document.cache_info().misses == 1
+    assert agent_oauth._tool_document.cache_info().hits >= 1
+    assert first == second
+    first[0]["description"] = "mutation"
+    assert tools()[0]["description"] != "mutation"
+    for entry in second:
+        assert entry["outputSchema"]["type"] == "object"
+        # Every emitted reference resolves locally; unrelated definitions are absent.
+        for section in ["inputSchema", "outputSchema"]:
+            import re
+
+            refs = set(re.findall(r'"\$ref": "#/\$defs/([^"/]+)"', json.dumps(entry[section])))
+            assert refs == set(entry[section].get("$defs", {}))
+    read = next(x for x in second if x["name"] == "readCalendar")
+    assert "$defs" not in read["inputSchema"]
+    create = next(x for x in second if x["name"] == "createDraft")
+    assert not create["annotations"]["destructiveHint"]
+    assert not create["annotations"]["readOnlyHint"]

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime
 from types import SimpleNamespace
@@ -19,7 +20,13 @@ class Store:
 
     def call(self, method, table, params):
         self.reads.append((method, table, params))
-        return [{"label": "선택한 곳", "destination": "가상 주소"}]
+        return [
+            {
+                "id": params["id"].removeprefix("in.(").removesuffix(")").split(",")[0],
+                "label": "선택한 곳",
+                "destination": "가상 주소",
+            }
+        ]
 
 
 def session(selected=()):
@@ -81,10 +88,10 @@ def test_selection_exact_ids_only_and_no_unselected_data():
             "GET",
             "favorite_places",
             {
-                "id": f"eq.{selected.id}",
+                "id": f"in.({selected.id})",
                 "archived": "eq.false",
                 "limit": "1",
-                "select": "label,destination",
+                "select": "id,label,destination",
             },
         )
     ]
@@ -133,7 +140,7 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
         "fetch_places",
         lambda *_: SearchResults(items=[{"title": "가상 도서관", "address": "가상로 1"}]),
     )
-    original = httpx.Client
+    original = httpx.AsyncClient
 
     def handler(request):
         body = json.loads(request.content)
@@ -143,7 +150,6 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
             assert {t["function"]["name"] for t in body["tools"]} == {
                 "search_places",
                 "lookup_selected_places",
-                "validate_course",
                 "get_weather",
             }
             return httpx.Response(
@@ -191,11 +197,13 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
 
     monkeypatch.setattr(
         ai_planner.httpx,
-        "Client",
+        "AsyncClient",
         lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
     )
     settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
-    answer = ai_planner.complete(settings, [{"role": "user", "content": "검색해줘"}], run)
+    answer = asyncio.run(
+        ai_planner.complete(settings, [{"role": "user", "content": "검색해줘"}], run)
+    )
     assert len(calls) == 2 and len(answer.checks) == 3
     assert answer.plan.activities[0].place == "가상 도서관 (가상로 1)"
     assert answer.context.region == "가상동"
@@ -203,7 +211,7 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
 
 
 def test_endless_tool_requests_stopped_after_three_inferences(monkeypatch):
-    original, calls = httpx.Client, []
+    original, calls = httpx.AsyncClient, []
 
     def handler(request):
         calls.append(json.loads(request.content))
@@ -224,12 +232,12 @@ def test_endless_tool_requests_stopped_after_three_inferences(monkeypatch):
 
     monkeypatch.setattr(
         ai_planner.httpx,
-        "Client",
+        "AsyncClient",
         lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
     )
     settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
     with pytest.raises(HTTPException) as error:
-        ai_planner.complete(settings, [{"role": "user", "content": "조회"}], session())
+        asyncio.run(ai_planner.complete(settings, [{"role": "user", "content": "조회"}], session()))
     assert error.value.detail == "ai_invalid_response" and len(calls) == 3
     assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_object"
 
@@ -296,10 +304,10 @@ def test_weather_fixed_hosts_city_forecast_and_range(monkeypatch):
 
 def test_weather_empty_city_and_failure_do_not_invent_forecast(monkeypatch):
     today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
-    original = httpx.Client
+    original = httpx.AsyncClient
     monkeypatch.setattr(
         ai_tools.httpx,
-        "Client",
+        "AsyncClient",
         lambda **kw: original(
             transport=httpx.MockTransport(lambda _: httpx.Response(200, json={"results": []})), **kw
         ),
@@ -319,7 +327,7 @@ def test_weather_empty_city_and_failure_do_not_invent_forecast(monkeypatch):
 
 
 def test_single_format_completion_stays_inside_budget(monkeypatch):
-    calls, original = [], httpx.Client
+    calls, original = [], httpx.AsyncClient
 
     def handler(request):
         body = json.loads(request.content)
@@ -333,11 +341,13 @@ def test_single_format_completion_stays_inside_budget(monkeypatch):
 
     monkeypatch.setattr(
         ai_planner.httpx,
-        "Client",
+        "AsyncClient",
         lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
     )
     settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
-    answer = ai_planner.complete(settings, [{"role": "user", "content": "조건 유지"}], session())
+    answer = asyncio.run(
+        ai_planner.complete(settings, [{"role": "user", "content": "조건 유지"}], session())
+    )
     assert answer.reply == "조건을 유지했어요." and len(calls) == 2
     assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_object"
 
@@ -349,19 +359,35 @@ def test_saved_destinations_share_links_and_previous_plan_survive_edits():
     selected = run.add("별칭", "실제 장소 (서울특별시 가상로 1)", "selected")
     previous = run.seed(Activity(title="활동", place="가상 도서관 · 서울특별시 가상로 2"))
     link = run.add("선택 장소", "https://naver.me/Example", "selected")
-    resolved = run.resolve(ModelPlan.model_validate(plan(activities=[
-        {"title": "첫 활동", "place_ref": selected.ref},
-        {"title": "다음 활동", "place_ref": previous.ref},
-        {"title": "공유 장소", "place_ref": link.ref},
-    ])))
+    resolved = run.resolve(
+        ModelPlan.model_validate(
+            plan(
+                activities=[
+                    {"title": "첫 활동", "place_ref": selected.ref},
+                    {"title": "다음 활동", "place_ref": previous.ref},
+                    {"title": "공유 장소", "place_ref": link.ref},
+                ]
+            )
+        )
+    )
     assert resolved.activities[0].place == "실제 장소 (서울특별시 가상로 1)"
     assert resolved.activities[1].place == "가상 도서관 (서울특별시 가상로 2)"
     assert resolved.activities[2].map_url == "https://naver.me/Example"
     new = session()
     carried = new.seed(resolved.activities[2])
-    again = new.resolve(ModelPlan.model_validate(plan(activities=[{
-        "title": "공유 장소", "time": "14:00", "place_ref": carried.ref,
-    }])))
+    again = new.resolve(
+        ModelPlan.model_validate(
+            plan(
+                activities=[
+                    {
+                        "title": "공유 장소",
+                        "time": "14:00",
+                        "place_ref": carried.ref,
+                    }
+                ]
+            )
+        )
+    )
     assert again.activities[0].map_url == "https://naver.me/Example"
 
 
@@ -370,11 +396,29 @@ def test_omitted_references_cannot_erase_known_places_but_explicit_clear_can():
 
     run = session()
     run.seed(Activity(title="도서관", place="기존 도서관 (서울특별시 가상로 1)"))
-    resolved = run.resolve(ModelPlan.model_validate(plan(activities=[{
-        "title": "도서관", "time": "15:00",
-    }])))
+    resolved = run.resolve(
+        ModelPlan.model_validate(
+            plan(
+                activities=[
+                    {
+                        "title": "도서관",
+                        "time": "15:00",
+                    }
+                ]
+            )
+        )
+    )
     assert resolved.activities[0].place == "기존 도서관 (서울특별시 가상로 1)"
-    cleared = run.resolve(ModelPlan.model_validate(plan(activities=[{
-        "title": "도서관", "clear_place": True,
-    }])))
+    cleared = run.resolve(
+        ModelPlan.model_validate(
+            plan(
+                activities=[
+                    {
+                        "title": "도서관",
+                        "clear_place": True,
+                    }
+                ]
+            )
+        )
+    )
     assert cleared.activities[0].place == ""

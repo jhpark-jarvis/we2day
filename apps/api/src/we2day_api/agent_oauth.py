@@ -2,6 +2,7 @@
 
 import re
 from datetime import date
+from functools import lru_cache
 from urllib.parse import parse_qsl, urlencode, urlsplit
 from uuid import UUID
 
@@ -225,9 +226,44 @@ def _async_transport(request):
     return getattr(request.app.state, "oauth_async_transport", None)
 
 
-def tools():
+def _narrow_schema(value, definitions):
+    """Keep the transitive local-ref closure, never all OpenAPI definitions per tool."""
+    import json
+
+    value = json.loads(json.dumps(value).replace("#/components/schemas/", "#/$defs/"))
+    definitions = json.loads(json.dumps(definitions).replace("#/components/schemas/", "#/$defs/"))
+    pending = re.findall(r'"\$ref": "#/\$defs/([^"/]+)"', json.dumps(value))
+    used = set()
+    while pending:
+        name = pending.pop()
+        if name in used:
+            continue
+        used.add(name)
+        pending.extend(re.findall(r'"\$ref": "#/\$defs/([^"/]+)"', json.dumps(definitions[name])))
+    if used:
+        value["$defs"] = {name: definitions[name] for name in sorted(used)}
+    return value
+
+
+@lru_cache(maxsize=1)
+def _tool_document():
+    """Only public release metadata is cached, serialized to prevent caller mutation."""
+    import json
+
     contract = schema()
     definitions = contract["components"]["schemas"]
+    import copy
+
+    output_definitions = copy.deepcopy(definitions)
+    # MCP responses omit null fields. Required nullable fields may therefore be absent.
+    for definition in output_definitions.values():
+        nullable = {
+            name
+            for name, prop in definition.get("properties", {}).items()
+            if {"type": "null"} in prop.get("anyOf", [])
+        }
+        if "required" in definition:
+            definition["required"] = [n for n in definition["required"] if n not in nullable]
     result = []
     for operations in contract["paths"].values():
         for method, operation in operations.items():
@@ -241,30 +277,41 @@ def tools():
                     "schema"
                 ]
                 required.append("body")
+            output = operation["responses"]["200"]["content"]["application/json"]["schema"]
             result.append(
                 {
                     "name": operation["operationId"],
                     "description": operation["description"],
-                    "inputSchema": {
+                    "inputSchema": _narrow_schema(
+                        {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required,
+                            "additionalProperties": False,
+                        },
+                        contract["components"]["schemas"],
+                    ),
+                    "outputSchema": {
                         "type": "object",
-                        "properties": properties,
-                        "required": required,
-                        "additionalProperties": False,
-                        "$defs": definitions,
+                        **_narrow_schema(output, output_definitions),
                     },
                     "securitySchemes": [{"type": "oauth2", "scopes": [SCOPE]}],
                     "annotations": {
                         "readOnlyHint": method == "get",
-                        "destructiveHint": method != "get",
+                        "destructiveHint": operation["operationId"]
+                        in {"changePlan", "changeAppointment"},
                         "idempotentHint": True,
                         "openWorldHint": False,
                     },
                 }
             )
-    # OpenAPI refs become local JSON Schema refs without duplicating recursive definitions.
+    return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+
+
+def tools():
     import json
 
-    return json.loads(json.dumps(result).replace("#/components/schemas/", "#/$defs/"))
+    return json.loads(_tool_document())
 
 
 def call_tool(name, args, request, credentials):

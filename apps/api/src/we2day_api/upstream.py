@@ -18,3 +18,15 @@ class BorrowedTransport(httpx.BaseTransport):
 
 def upstream_transport(request: Request) -> httpx.BaseTransport:
     return BorrowedTransport(request.app.state.upstream_pool)
+
+
+class BorrowedAsyncTransport(httpx.AsyncBaseTransport):
+    def __init__(self, pool: httpx.AsyncBaseTransport):
+        self.pool = pool
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        return await self.pool.handle_async_request(request)
+
+    async def aclose(self):
+        # Lifespan alone owns socket pool shutdown. Clients never share headers/cookies.
+        pass

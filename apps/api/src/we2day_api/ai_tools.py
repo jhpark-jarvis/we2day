@@ -97,7 +97,7 @@ class WeatherSummary(BaseModel):
     rain_probability_percent: float | None = Field(default=None, ge=0, le=100)
 
 
-def fetch_weather(arguments: WeatherArguments) -> dict:
+def weather_requests(arguments: WeatherArguments):
     target = date.fromisoformat(arguments.date)
     days = (target - datetime.now(ZoneInfo("Asia/Seoul")).date()).days
     if not 0 <= days <= 15:
@@ -105,17 +105,6 @@ def fetch_weather(arguments: WeatherArguments) -> dict:
             "error": "forecast_out_of_range",
             "notice": "오늘부터 15일 뒤까지만 예보 조회 가능.",
         }
-
-    def get(client, url, params):
-        with client.stream("GET", url, params=params) as response:
-            if not response.is_success:
-                raise HTTPException(503, "weather_unavailable")
-            raw = bytearray()
-            for chunk in response.iter_bytes():
-                raw.extend(chunk)
-                if len(raw) > 24000:
-                    raise HTTPException(503, "weather_unavailable")
-            return json.loads(raw)
 
     # GeoNames does not index every Korean alias; use public names, never guessed coordinates.
     aliases = {
@@ -151,39 +140,36 @@ def fetch_weather(arguments: WeatherArguments) -> dict:
     city_name = re.sub(r"(?:특별자치시|특별시|광역시|시)$", "", arguments.city.strip())
     query = aliases.get(city_name, arguments.city)
     # Public city lookup only; no arbitrary URLs, user JWT, provider keys or house coordinates.
-    with httpx.Client(timeout=4, trust_env=False, follow_redirects=False) as client:
-        geo = get(
-            client,
-            "https://geocoding-api.open-meteo.com/v1/search",
-            {
-                "name": query,
-                "countryCode": "KR",
-                "language": "ko",
-                "count": 5,
-            },
-        )
-        cities = [c for c in geo.get("results", []) if c.get("country_code") == "KR"]
-        if not cities:
-            return {
-                "error": "city_not_found",
-                "notice": "시/군 이름을 확인해 주세요. 주소 검색이 아닙니다.",
-            }
-        city = cities[0]
-        latitude, longitude = float(city["latitude"]), float(city["longitude"])
-        if not (32 <= latitude <= 40 and 124 <= longitude <= 133):
-            raise ValueError("Invalid city coordinates")
-        result = get(
-            client,
-            "https://api.open-meteo.com/v1/forecast",
-            {
-                "latitude": latitude,
-                "longitude": longitude,
-                "start_date": arguments.date,
-                "end_date": arguments.date,
-                "timezone": "Asia/Seoul",
-                "daily": "temperature_2m_min,temperature_2m_max,precipitation_probability_max",
-            },
-        )
+    geo = yield (
+        "https://geocoding-api.open-meteo.com/v1/search",
+        {
+            "name": query,
+            "countryCode": "KR",
+            "language": "ko",
+            "count": 5,
+        },
+    )
+    cities = [c for c in geo.get("results", []) if c.get("country_code") == "KR"]
+    if not cities:
+        return {
+            "error": "city_not_found",
+            "notice": "시/군 이름을 확인해 주세요. 주소 검색이 아닙니다.",
+        }
+    city = cities[0]
+    latitude, longitude = float(city["latitude"]), float(city["longitude"])
+    if not (32 <= latitude <= 40 and 124 <= longitude <= 133):
+        raise ValueError("Invalid city coordinates")
+    result = yield (
+        "https://api.open-meteo.com/v1/forecast",
+        {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": arguments.date,
+            "end_date": arguments.date,
+            "timezone": "Asia/Seoul",
+            "daily": "temperature_2m_min,temperature_2m_max,precipitation_probability_max",
+        },
+    )
     daily = result["daily"]
     if daily["time"] != [arguments.date]:
         raise ValueError("Invalid forecast date")
@@ -200,6 +186,25 @@ def fetch_weather(arguments: WeatherArguments) -> dict:
         "source": "https://open-meteo.com/",
         "license": "CC BY 4.0",
     }
+
+
+def fetch_weather(arguments: WeatherArguments) -> dict:
+    steps = weather_requests(arguments)
+    try:
+        action = next(steps)
+        with httpx.Client(timeout=4, trust_env=False, follow_redirects=False) as client:
+            while True:
+                with client.stream("GET", action[0], params=action[1]) as response:
+                    if not response.is_success:
+                        raise HTTPException(503, "weather_unavailable")
+                    raw = bytearray()
+                    for chunk in response.iter_bytes():
+                        raw.extend(chunk)
+                        if len(raw) > 24000:
+                            raise HTTPException(503, "weather_unavailable")
+                action = steps.send(json.loads(raw))
+    except StopIteration as done:
+        return done.value
 
 
 def definition(name, description, arguments):
@@ -228,11 +233,6 @@ TOOLS = [
         "lookup_selected_places",
         "사용자가 이 요청에 명시 선택한 자주 가는 곳/위시만 읽기. 다른 DB 조회 불가.",
         EmptyArguments,
-    ),
-    definition(
-        "validate_course",
-        "제안 코스의 시간 순서·중복 장소·장소 누락 검사. 저장/확정하지 않음.",
-        CheckArguments,
     ),
 ]
 
@@ -374,6 +374,25 @@ class ToolSession:
         return result
 
     def execute(self, name: str, arguments) -> dict:
+        steps = self._execute_steps(name, arguments)
+        try:
+            action = next(steps)
+            while True:
+                try:
+                    if action[0] == "places":
+                        result = fetch_places(self.settings, action[1])
+                    elif action[0] == "weather":
+                        result = fetch_weather(action[1])
+                    else:
+                        result = self.store.call("GET", action[1], params=action[2])
+                except Exception as error:
+                    action = steps.throw(error)
+                else:
+                    action = steps.send(result)
+        except StopIteration as done:
+            return done.value
+
+    def _execute_steps(self, name: str, arguments):
         self.calls += 1
         if self.calls > 8:
             return {"error": "tool_budget_exhausted"}
@@ -390,7 +409,7 @@ class ToolSession:
                 if len(self.weather_queries) >= 2:
                     return {"error": "weather_budget_exhausted"}
                 self.weather_queries[key] = {"error": "weather_unavailable"}
-                result = fetch_weather(args)
+                result = yield ("weather", args)
                 self.weather_queries[key] = result
                 if result.get("forecast"):
                     self.weather.append(WeatherSummary.model_validate(result["forecast"]))
@@ -411,7 +430,7 @@ class ToolSession:
                 if len(self.searches) >= 4:
                     return {"error": "search_budget_exhausted"}
                 self.searches[query] = []
-                results = fetch_places(self.settings, query)
+                results = yield ("places", query)
                 items = []
                 for item in results.items:
                     candidate = self.add(item.title, item.roadAddress or item.address, "naver")
@@ -424,27 +443,37 @@ class ToolSession:
                 EmptyArguments.model_validate(arguments)
                 if self.selected_result is not None:
                     return {"items": self.selected_result}
-                items = []
-                for item in self.selected:
-                    favorite = item.source == "favorite"
+                items, rows_by_id = [], {}
+                for source in ("favorite", "wish"):
+                    ids = list(
+                        dict.fromkeys(
+                            str(item.id) for item in self.selected if item.source == source
+                        )
+                    )
+                    if not ids:
+                        continue
+                    favorite = source == "favorite"
                     params = {
-                        "id": f"eq.{item.id}",
+                        "id": "in.(" + ",".join(ids) + ")",
                         "archived": "eq.false",
-                        "limit": "1",
-                        "select": "label,destination" if favorite else "title",
+                        "limit": str(len(ids)),
+                        "select": "id,label,destination" if favorite else "id,title",
                     }
                     if not favorite:
                         params.update(kind="eq.place", done="eq.false")
-                    rows = self.store.call(
-                        "GET", "favorite_places" if favorite else "wishes", params=params
-                    )
+                    rows = yield ("data", "favorite_places" if favorite else "wishes", params)
                     for row in rows:
+                        if row.get("id") in ids:
+                            rows_by_id[(source, row["id"])] = row
+                for item in self.selected:
+                    row = rows_by_id.get((item.source, str(item.id)))
+                    if row:
                         candidate = self.add(
                             row.get("label", row.get("title", "")),
                             row.get("destination", ""),
                             "selected",
                         )
-                        if candidate:
+                        if candidate and candidate.model_dump() not in items:
                             items.append(candidate.model_dump())
                 self.selected_result = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})

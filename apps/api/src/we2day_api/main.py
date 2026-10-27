@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from we2day_api.agent_oauth import router as agent_oauth_router
+from we2day_api.agent_oauth import tools as agent_tools
 from we2day_api.agents import router as agents_router
 from we2day_api.ai_planner import router as ai_planner_router
 from we2day_api.anniversaries import router as anniversaries_router
@@ -61,10 +62,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 max_connections=20, max_keepalive_connections=10, keepalive_expiry=30
             )
         )
+        ai_pool = httpx.AsyncHTTPTransport(
+            limits=httpx.Limits(
+                max_connections=4, max_keepalive_connections=4, keepalive_expiry=30
+            ),
+            retries=0,
+        )
+        agent_tools()  # Build only fixed public metadata once per release.
         try:
+            application.state.ai_pool = ai_pool
             application.state.upstream_pool = pool
             yield
         finally:
+            await ai_pool.aclose()
             pool.close()
 
     application = FastAPI(title="WE2DAY API", version="0.1.0", lifespan=lifespan)

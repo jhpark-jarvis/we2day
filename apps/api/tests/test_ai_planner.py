@@ -29,7 +29,6 @@ def setup(monkeypatch):
     app.dependency_overrides[require_data] = lambda: store
     calls = []
     replies = []
-    original_client = httpx.Client
 
     def handler(request):
         calls.append(request)
@@ -41,12 +40,8 @@ def setup(monkeypatch):
         assert body["model"] == ai_planner.MODEL
         return replies.pop(0)
 
-    monkeypatch.setattr(
-        ai_planner.httpx,
-        "Client",
-        lambda **kw: original_client(transport=httpx.MockTransport(handler), **kw),
-    )
     with TestClient(app) as client:
+        app.state.ai_pool = httpx.MockTransport(handler)
         yield client, store, calls, replies
 
 
@@ -189,7 +184,23 @@ def test_history_replay_does_not_call_provider_and_prompt_is_not_exposed(setup):
     }
 
     def rpc(name, values=None):
-        if name == "read_ai_conversations":
+        if name == "begin_ai_planner_turn":
+            if "turns" in stored:
+                turn = stored["turns"][-1]
+                if turn["request_id"] == values["p_request"]:
+                    if turn["user_text"] != values["p_user"]:
+                        from fastapi import HTTPException
+
+                        raise HTTPException(409, "request_conflict")
+                    return {"replay": turn}
+                if stored["version"] != values["p_version"]:
+                    from fastapi import HTTPException
+
+                    raise HTTPException(409, "version_conflict")
+                return {
+                    "context": turn["result"].get("context", {}),
+                    "proposal": stored.get("proposal"),
+                }
             return stored
         return True
 
@@ -227,9 +238,13 @@ def test_successful_turn_persisted_and_conflict_before_provider(setup):
     writes = []
 
     def rpc(name, values=None):
-        if name == "read_ai_conversations":
-            return None
-        if name == "append_ai_conversation":
+        if name == "begin_ai_planner_turn":
+            if values["p_version"]:
+                from fastapi import HTTPException
+
+                raise HTTPException(404, "ai_conversation_not_found")
+            return {}
+        if name == "finish_ai_planner_turn":
             writes.append(values)
             return {"version": 1, "result": values["p_result"]}
         return True
@@ -280,9 +295,25 @@ def test_server_conversation_conditions_survive_short_history_and_partial_update
     saved = []
 
     def rpc(name, values=None):
-        if name == "read_ai_conversations":
+        if name == "begin_ai_planner_turn":
+            if "turns" in stored:
+                turn = stored["turns"][-1]
+                if turn["request_id"] == values["p_request"]:
+                    if turn["user_text"] != values["p_user"]:
+                        from fastapi import HTTPException
+
+                        raise HTTPException(409, "request_conflict")
+                    return {"replay": turn}
+                if stored["version"] != values["p_version"]:
+                    from fastapi import HTTPException
+
+                    raise HTTPException(409, "version_conflict")
+                return {
+                    "context": turn["result"].get("context", {}),
+                    "proposal": stored.get("proposal"),
+                }
             return stored
-        if name == "append_ai_conversation":
+        if name == "finish_ai_planner_turn":
             saved.append(values)
             return {"version": 3, "result": values["p_result"]}
         return True

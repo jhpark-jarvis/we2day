@@ -216,9 +216,19 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       if (!response.ok) throw new Error(result.error || "답변을 받지 못했어요.");
       conversation.current.version = result.version;
       retry.current = null;
-      void read("history")
-        .then(setConversations)
-        .catch(() => {});
+      setConversations((saved) => {
+        const id = conversation.current.id;
+        const previous = saved.find((item) => item.id === id);
+        return [
+          {
+            id,
+            title: previous?.title || Array.from(content).slice(0, 80).join(""),
+            version: result.version,
+            updated_at: new Date().toISOString(),
+          },
+          ...saved.filter((item) => item.id !== id),
+        ].slice(0, 100);
+      });
       setMessages([
         ...next,
         {
