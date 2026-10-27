@@ -50,6 +50,7 @@ class Directive:
     reply: str = ""
     plan: PlanContent | None = None
     allowed_tools: set[str] = field(default_factory=set)
+    place_followup: str = ""
 
     def ask(self, name, reply, *, value="", resume="edit"):
         self.intent = self.state.intent = "clarify"
@@ -287,6 +288,33 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         state.append_pending = False
         directive.reply = "현재 코스는 그대로 둘게요."
         return directive
+    short = re.sub(r"[\s.!?？。]", "", text)
+    status_question = re.fullmatch(
+        r"(?:그게|이게|지금|이미)?(?:추천된|추천한|추천해준|검색된|검색한|찾은|확인한)(?:거야|건가|거지|거맞아|건가요|거예요|거에요)(?:요)?",
+        short,
+    )
+    location_question = re.fullmatch(
+        r"(?:그게|그곳|장소가|그장소가|추천한곳이|추천장소가|그러면)?(?:어디야|어딘데|어디인데|어디에있어|어디있어|어느장소야|장소어디야|어디인지알려줘|어디인지보여줘)(?:요)?",
+        short,
+    )
+    if status_question or location_question:
+        if context.get("region") or previous_scope.kinds or proposal or selected:
+            directive.place_followup = "status" if status_question else "details"
+            directive.state.pending = old_pending
+            directive.scope.area = directive.scope.area or context.get("region", "")
+            directive.scope.kinds = directive.scope.kinds or kinds(
+                " ".join(context.get("activities", []))
+            )
+            directive.allowed_tools.add("search_places")
+            directive.state.intent = "chat"
+        else:
+            directive.ask(
+                "region", "아직 확인한 장소가 없어요. 어느 지역에서 찾아볼까요?", resume="search"
+            )
+        return directive
+    if re.search(r"(?:추천|검색).*기능.*(?:뭐|무엇|어떤|설명)", text):
+        directive.reply = "장소 후보를 찾고, 조건을 정리해서 코스 초안을 함께 만들 수 있어요."
+        return directive
     denied_kinds = negative_kinds(text)
     positive = positive_text(text, denied_kinds)
     active = kinds(positive)
@@ -312,10 +340,14 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
             ["park"] if chosen[-1].title.endswith("숲") else []
         )
         state.excluded_kinds = [k for k in state.excluded_kinds if k not in selected_kind]
-    searching = re.sub(r"검색하지\s*(?:마|말)|검색\s*말고|찾지\s*(?:마|말)", "", positive)
-    search = bool(re.search(r"검색|찾아|찾아봐|찾아줄|후보|추천", searching))
+    searching = re.sub(r"(?:검색|추천)하지\s*(?:마|말)|검색\s*말고|찾지\s*(?:마|말)", "", positive)
+    search = bool(re.search(r"검색|찾아|찾아봐|찾아줄|후보|추천|알아\s*봐|살펴\s*봐", searching))
     search = search or bool(active and re.search(r"보여\s*줘", searching))
     search = search or bool(active and re.search(r"보고\s*싶|찾자", searching))
+    search = search or bool(
+        (context.get("region") or previous_scope.kinds)
+        and re.search(r"(?:근처|주변|인근|주위).*(?:볼\s*거|만날|저장.*있)", searching)
+    )
     search = search or bool(
         denied_kinds
         and active
@@ -350,7 +382,7 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         edit_request or remove and not search or old_pending and old_pending.resume == "edit"
     ):
         directive.intent = "edit"
-    elif plan_request or old_pending and old_pending.resume in {"plan", "select"}:
+    elif plan_request or old_pending and old_pending.resume in {"plan", "select"} and not search:
         directive.intent = old_pending.resume if old_pending else "plan"
     elif search:
         directive.intent = "search"

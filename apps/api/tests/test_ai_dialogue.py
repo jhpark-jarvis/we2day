@@ -336,8 +336,8 @@ def test_selected_saved_place_needs_no_guessed_region_or_unrelated_search():
                             {"role": "user", "content": "선택한 저장 장소로 코스를 만들어줘"}
                         ],
                         "selected_places": [{"source": "favorite", "id": selected_id}],
-                    "conversation_id": str(uuid4()),
-                    "request_id": str(uuid4()),
+                        "conversation_id": str(uuid4()),
+                        "request_id": str(uuid4()),
                     }
                 ),
                 SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic"),
@@ -349,5 +349,417 @@ def test_selected_saved_place_needs_no_guessed_region_or_unrelated_search():
         assert result.plan.activities[0].place == "샘플선택장소 (서울 중랑구 신내로1)"
         assert len(calls) == 2 and reads[0][1] == "favorite_places"
         assert reads[0][2]["id"] == f"in.({selected_id})"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "text", ["그럼 양주 덕계 근처로 알아봐줘", "양주 덕계 근처로 알아봐 줄래?"]
+)
+def test_place_followup_explicit_area_replaces_previous_alias(text):
+    context = {
+        "date": "2030-01-05",
+        "region": "샘플 집",
+        "activities": ["카페", "식사"],
+        "search_scope": {"area": "샘플 집", "kinds": ["cafe", "restaurant"]},
+    }
+    result = analyze(text, context, None, [], date(2026, 10, 27))
+    assert result.intent == "search" and "search_places" in result.allowed_tools
+    assert result.scope.area == result.slots["region"] == "양주 덕계"
+    merged = merge_context(context, {}, result)
+    assert merged["date"] == context["date"] and merged["activities"] == context["activities"]
+
+
+@pytest.mark.parametrize(
+    "text", ["추천된거야?", "추천된 거야?", "어디야?", "어딘데?", "어느 장소야?"]
+)
+def test_place_confirmation_and_location_questions_keep_existing_scope(text):
+    context = {
+        "region": "양주 덕계",
+        "activities": ["카페", "식사"],
+        "search_scope": {"area": "양주 덕계", "kinds": ["cafe", "restaurant"]},
+    }
+    result = analyze(text, context, None, [], date(2026, 10, 27))
+    assert getattr(result, "place_followup", "") in {"status", "details"}
+    assert result.scope.area == "양주 덕계" and result.scope.kinds == ["cafe", "restaurant"]
+    assert not result.plan and not result.slots.get("activities")
+
+
+@pytest.mark.parametrize(
+    "text", ["검색하지 마", "찾지 말고 고마워", "추천 기능이 뭐야?", "어디야?"]
+)
+def test_place_words_without_request_or_context_do_not_trigger_search(text):
+    result = analyze(text, {}, None, [], date(2026, 10, 27))
+    assert "search_places" not in result.allowed_tools
+
+
+@pytest.mark.parametrize("mode", ["normal", "empty", "failed", "partial", "legacy"])
+def test_recent_five_turn_place_flow_is_grounded_without_business_writes(monkeypatch, mode):
+    from uuid import uuid4
+
+    from fastapi import HTTPException
+
+    from we2day_api import ai_planner
+    from we2day_api.places import SearchResults
+
+    async def run():
+        store = MemoryStore({"initial": {}})
+        reads = []
+
+        class Reads:
+            def __init__(self, *args):
+                pass
+
+            async def perform(self, action):
+                reads.append(action)
+                assert action[0] == "places", "Unselected saved records must never be read"
+                if mode == "failed" or mode == "partial" and "카페" in action[1]:
+                    raise HTTPException(503, "place_search_unavailable")
+                cafe = "카페" in action[1]
+                return SearchResults.model_validate(
+                    {
+                        "items": []
+                        if mode == "empty"
+                        else [
+                            {
+                                "title": "샘플덕계카페" if cafe else "샘플덕계식당",
+                                "category": "카페,디저트" if cafe else "음식점>한식",
+                                "roadAddress": "경기도 양주시 덕계동 1",
+                            },
+                            {
+                                "title": "다른지역카페" if cafe else "다른지역식당",
+                                "category": "카페,디저트" if cafe else "음식점>한식",
+                                "roadAddress": "경기도 남양주시 덕계동 1",
+                            },
+                        ]
+                    }
+                )
+
+        monkeypatch.setattr(ai_planner, "ToolIO", Reads)
+        brief = {
+            "date": "2030-01-05",
+            "start_time": "19:00",
+            "region": "샘플 집",
+            "activities": ["카페", "식사"],
+            "requirements": "추울 것 같음",
+        }
+        utterances = [
+            "입력한 조건으로 코스를 만들어줘.",
+            "샘플 집 근처에서 볼거야 저장된 장소에 있어",
+            "추천된거야?",
+            "그럼 양주 덕계 근처로 알아봐줘",
+            "어디야?",
+        ]
+        history, outputs = [], []
+        conversation_id = str(uuid4())
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _: pytest.fail("No model call needed for a bounded candidate read")
+            )
+        ) as client:
+            for index, text in enumerate(utterances):
+                history.append({"role": "user", "content": text})
+                body = ChatInput.model_validate(
+                    {
+                        "messages": history[-11:],
+                        "version": store.version,
+                        "conversation_id": conversation_id,
+                        "request_id": str(uuid4()),
+                        **({"brief": brief} if index == 0 else {}),
+                    }
+                )
+                stats = RunStats("test")
+                result = await _chat(body, SimpleNamespace(), store, client, Budget(), stats)
+                outputs.append(result)
+                history.append({"role": "assistant", "content": result.reply})
+                assert result.plan is None and stats.counts["model_calls"] == 0
+                assert store.context["date"] == brief["date"]
+                assert store.context["activities"] == brief["activities"]
+                assert store.context["intake"]["data"]["start_time"] == "19:00"
+                if index < 3:
+                    assert not reads and not result.candidates and "체크" in result.reply
+                else:
+                    assert len(reads) == 2 * (index - 2)
+                    assert store.context["region"] == "양주 덕계"
+                    assert store.context["search_scope"]["area"] == "양주 덕계"
+                    assert all("남양주" not in p.address for p in result.candidates)
+                    if mode in {"normal", "legacy"}:
+                        assert {p.title for p in result.candidates} == {
+                            "샘플덕계카페",
+                            "샘플덕계식당",
+                        }
+                        assert "샘플덕계카페" in result.reply and "샘플덕계식당" in result.reply
+                        assert "양주시 덕계동" in result.reply
+                    elif mode == "partial":
+                        assert {p.title for p in result.candidates} == {"샘플덕계식당"}
+                        assert "일부" in result.reply and "완료하지 못" in result.reply
+                    else:
+                        assert not result.candidates and "찾았" not in result.reply
+                        assert (
+                            "완료하지 못" if mode == "failed" else "확인하지 못"
+                        ) in result.reply
+                if mode == "legacy" and index == 3:
+                    # The previous API lost this explicit area while treating it as chat.
+                    store.context["region"] = "샘플 집"
+                    store.context["search_scope"]["area"] = "샘플 집"
+        assert store.proposal is None and len(outputs) == 5
+
+    asyncio.run(run())
+
+
+def test_selected_house_share_url_is_not_treated_as_a_geocoded_address(monkeypatch):
+    from uuid import uuid4
+
+    from we2day_api import ai_planner
+
+    async def run():
+        store = MemoryStore(
+            {
+                "initial": {
+                    "context": {
+                        "region": "샘플 집",
+                        "activities": ["카페"],
+                        "search_scope": {"area": "샘플 집", "kinds": ["cafe"]},
+                    }
+                }
+            }
+        )
+        selected_id = str(uuid4())
+        reads = []
+
+        class Reads:
+            def __init__(self, *args):
+                pass
+
+            async def perform(self, action):
+                reads.append(action)
+                assert action[0] == "data" and action[1] == "favorite_places"
+                assert action[2]["id"] == f"in.({selected_id})"
+                return [
+                    {
+                        "id": selected_id,
+                        "label": "샘플 집",
+                        "destination": "https://naver.me/Example12",
+                    }
+                ]
+
+        monkeypatch.setattr(ai_planner, "ToolIO", Reads)
+        body = ChatInput.model_validate(
+            {
+                "messages": [{"role": "user", "content": "근처 카페 알아봐줘"}],
+                "conversation_id": str(uuid4()),
+                "request_id": str(uuid4()),
+                "selected_places": [{"id": selected_id, "source": "favorite"}],
+            }
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _: pytest.fail("No model"))
+        ) as client:
+            result = await _chat(body, SimpleNamespace(), store, client, Budget(), RunStats("test"))
+        assert len(reads) == 1 and "동네 주소" in result.reply and result.plan is None
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("reply", ["카페와 식사 장소를 찾았어요.", "주변 장소를 검색했어요."])
+def test_chat_cannot_claim_a_search_without_current_provider_evidence(reply):
+    from we2day_api.ai_planner import complete
+    from we2day_api.ai_tools import ToolSession
+
+    async def run():
+        session = ToolSession(SimpleNamespace(), None, [], [])
+        session.operation, session.direct_final, session.allowed_tools = "chat", True, set()
+        answer = {"reply": reply, "plan": None, "context": {}}
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _: httpx.Response(
+                    200, json={"choices": [{"message": {"content": json.dumps(answer)}}]}
+                )
+            )
+        ) as client:
+            result = await complete(
+                SimpleNamespace(
+                    cloudflare_account_id="synthetic", cloudflare_api_token="synthetic"
+                ),
+                [],
+                session,
+                client=client,
+                budget=Budget(),
+                stats=RunStats("test"),
+            )
+        assert (
+            "아직 실제 장소" in result.reply
+            and "찾았" not in result.reply
+            and "검색했" not in result.reply
+        )
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("text", ["추천된거야?", "어디야?"])
+def test_place_followup_preserves_existing_proposal_and_needs_no_search(text):
+    from we2day_api import ai_planner
+
+    async def run():
+        proposal = copy.deepcopy(CORPUS["cases"][0]["initial"]["proposal"])
+        store = MemoryStore({"initial": {"context": {"region": "중랑구"}, "proposal": proposal}})
+        before = copy.deepcopy(store.proposal)
+        body = ChatInput.model_validate(
+            {
+                "messages": [{"role": "user", "content": text}],
+                "conversation_id": "00000000-0000-4000-8000-000000000061",
+                "request_id": "00000000-0000-4000-8000-000000000062",
+            }
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _: pytest.fail("No external I/O"))
+        ) as client:
+            result = await ai_planner._chat(
+                body, SimpleNamespace(), store, client, Budget(), RunStats("test")
+            )
+        assert store.proposal == before and result.plan is None and "코스 제안" in result.reply
+        assert all(a["place"] in result.reply for a in before["activities"] if a["place"])
+
+    asyncio.run(run())
+
+
+def test_selected_house_address_only_uses_its_public_administrative_area(monkeypatch):
+    from uuid import uuid4
+
+    from we2day_api import ai_planner
+    from we2day_api.places import SearchResults
+
+    async def run():
+        store = MemoryStore(
+            {
+                "initial": {
+                    "context": {
+                        "region": "샘플 집",
+                        "activities": ["카페"],
+                        "search_scope": {"area": "샘플 집", "kinds": ["cafe"]},
+                    }
+                }
+            }
+        )
+        selected_id = str(uuid4())
+        reads = []
+
+        class Reads:
+            def __init__(self, *args):
+                pass
+
+            async def perform(self, action):
+                reads.append(action)
+                if action[0] == "data":
+                    assert action[2]["id"] == f"in.({selected_id})"
+                    return [
+                        {
+                            "id": selected_id,
+                            "label": "샘플 집",
+                            "destination": "경기도 양주시 덕계동 비공개로 999",
+                        }
+                    ]
+                assert action[0] == "places" and action[1] == "양주시 덕계동 카페"
+                return SearchResults.model_validate(
+                    {
+                        "items": [
+                            {
+                                "title": "샘플카페",
+                                "category": "카페",
+                                "address": "경기도 양주시 덕계동 1",
+                            }
+                        ]
+                    }
+                )
+
+        monkeypatch.setattr(ai_planner, "ToolIO", Reads)
+        body = ChatInput.model_validate(
+            {
+                "messages": [{"role": "user", "content": "근처 카페 알아봐줘"}],
+                "conversation_id": str(uuid4()),
+                "request_id": str(uuid4()),
+                "selected_places": [{"id": selected_id, "source": "favorite"}],
+            }
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _: pytest.fail("No model"))
+        ) as client:
+            result = await _chat(body, SimpleNamespace(), store, client, Budget(), RunStats("test"))
+        assert len(reads) == 2 and "샘플카페" in result.reply
+        assert result.context.region == "양주시 덕계동" and result.plan is None
+        assert "비공개로" not in result.reply
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "previous,expected",
+    [
+        (
+            [("user", "그럼 양주 덕계 근처로 알아봐줘"), ("assistant", "다른 곳을 찾았어요")],
+            "양주 덕계",
+        ),
+        ([("assistant", "그럼 양주 덕계 근처로 알아봐줘")], "샘플 집"),
+        (
+            [("user", "그럼 양주 덕계 근처로 알아봐줘"), ("user", "다시 샘플 집 근처로 할게")],
+            "샘플 집",
+        ),
+    ],
+)
+def test_followup_can_repair_old_alias_state_only_from_latest_explicit_user_area(
+    previous, expected
+):
+    from we2day_api.ai_place_answers import recover_followup_area
+    from we2day_api.ai_planner import Message as ChatMessage
+
+    context = {
+        "region": "샘플 집",
+        "search_scope": {"area": "샘플 집", "kinds": ["cafe", "restaurant"]},
+    }
+    directive = analyze("어디야?", context, None, [], date(2026, 10, 27))
+    recover_followup_area(
+        directive, [ChatMessage(role=role, content=text) for role, text in previous]
+    )
+    assert directive.scope.area == expected
+    assert directive.slots.get("region", "샘플 집") == expected
+
+
+def test_place_completion_guard_does_not_rewrite_weather_tool_answers():
+    from we2day_api.ai_planner import complete
+    from we2day_api.ai_tools import ToolSession
+
+    async def run():
+        session = ToolSession(SimpleNamespace(), None, [], [])
+        session.operation, session.direct_final, session.allowed_tools = "weather", True, set()
+        reply = "도시 날씨를 검색했어요. 도시 예보를 확인해 주세요."
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _: httpx.Response(
+                    200,
+                    json={
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json.dumps(
+                                        {"reply": reply, "plan": None, "context": {}}
+                                    )
+                                }
+                            }
+                        ]
+                    },
+                )
+            )
+        ) as client:
+            result = await complete(
+                SimpleNamespace(
+                    cloudflare_account_id="synthetic", cloudflare_api_token="synthetic"
+                ),
+                [],
+                session,
+                client=client,
+                budget=Budget(),
+                stats=RunStats("test"),
+            )
+        assert result.reply == reply
 
     asyncio.run(run())

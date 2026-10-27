@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from dialogue_evaluation import MemoryStore
+from dialogue_evaluation import ControlledTools, MemoryStore
 from pydantic import ValidationError
 
 from we2day_api import ai_planner
@@ -196,9 +196,12 @@ def test_full_turn_canonical_input_receipt_preserves_conditions_no_business_writ
         async def complete(settings, messages, session, **kwargs):
             assert messages[-1]["content"] == brief.message()
             assert session.initial_activities == brief.activities
+            assert session.direct_final and len(session.searches) == 2
+            assert set(session.candidate_kinds.values()) == {"library", "cafe"}
             return ai_planner.ChatResult(reply="확인했어요.")
 
         monkeypatch.setattr(ai_planner, "complete", complete)
+        monkeypatch.setattr(ai_planner, "ToolIO", ControlledTools)
         async with httpx.AsyncClient(
             transport=httpx.MockTransport(lambda _: pytest.fail("Network"))
         ) as client:

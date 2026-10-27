@@ -204,3 +204,19 @@ def test_explicit_dates_and_required_plan_schema_are_bound_to_user_input():
     schema = answer_format("2030-01-01")["json_schema"]["schema"]
     assert schema["properties"]["plan"] == {"$ref": "#/$defs/ModelPlan"}
     assert schema["$defs"]["ModelPlan"]["properties"]["date"]["const"] == "2030-01-01"
+
+
+@pytest.mark.parametrize(
+    "area,address,expected",
+    [
+        ("양주 덕계", "경기도 양주시 덕계동 1", True),
+        ("양주 덕계", "경기도 남양주시 덕계동 1", False),
+        ("양주 덕계", "경기도 양주시 옥정동 1", False),
+        ("성수", "서울특별시 성동구 성수동1가 1", True),
+    ],
+)
+def test_user_area_shorthand_matches_whole_administrative_tokens(area, address, expected):
+    scope = SearchScope(area=area, kinds=["cafe"])
+    args = SearchArguments(query=f"{area} 카페", area=area, kind="cafe")
+    item = PlaceResult(title="샘플카페", category="카페,디저트", address=address)
+    assert PlacePolicy(scope).relevant(item, args) is expected

@@ -19,6 +19,12 @@ from we2day_api.ai_context import model_messages
 from we2day_api.ai_dialogue import analyze, merge_context
 from we2day_api.ai_dialogue import explicit_date as explicit_date
 from we2day_api.ai_intake import PlanningBrief, change_window, start_brief, window_checks
+from we2day_api.ai_place_answers import (
+    candidate_reply,
+    claims_place_search,
+    read_candidate_request,
+    recover_followup_area,
+)
 from we2day_api.ai_place_policy import PlacePolicy
 from we2day_api.ai_runtime import (
     AIStore,
@@ -376,12 +382,11 @@ async def complete(
                 and session.policy.scope.search_only
                 or guarded
                 and session.operation not in {"chat", "weather"}
+                or session.operation != "weather"
+                and not plan
+                and claims_place_search(reply)
             ):
-                reply = (
-                    "요청한 범위에 맞는 장소 후보를 확인해 주세요."
-                    if session.visible_candidates()
-                    else "조건에 맞는 장소를 확인하지 못했어요. 정확한 이름이나 지역을 알려주세요."
-                )
+                reply = candidate_reply(session)
             if plan and session:
                 session.reports.append(
                     {"name": "validate_course", "status": "ok", "count": len(checks)}
@@ -551,6 +556,7 @@ async def _chat(body, settings, store, client, budget, stats):
                 today,
                 selected=bool(body.selected_places),
             )
+        recover_followup_area(directive, body.messages[:-1])
         directive.state.turn_version = body.version + 1
         if directive.slots.get("activity_edit"):
             directive.slots["activity_edit"]["turn_version"] = body.version + 1
@@ -625,6 +631,8 @@ async def _chat(body, settings, store, client, budget, stats):
             else:
                 directive.ask("target", "장소 이름을 다시 확인해 주세요.", resume="select")
         io = ToolIO(settings, client, store, budget, stats)
+        await read_candidate_request(directive, session, io)
+        stats.counts["tool_calls"] = session.calls
         if (
             not directive.reply
             and session.append_only

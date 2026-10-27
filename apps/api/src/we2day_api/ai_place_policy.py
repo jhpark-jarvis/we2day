@@ -59,6 +59,63 @@ class SearchScope(BaseModel):
     single_activity: bool = False
 
 
+def explicit_area(text):
+    nearby = re.search(r"근처|주변|인근|주위", text)
+    if nearby:
+        prefix = re.split(r"[,，.!?\n]", text[: nearby.start()])[-1].strip()
+        prefix = re.sub(r"^(?:(?:그럼|그러면|이제|대신|그냥|다시|오늘은|내일은)\s+)+", "", prefix)
+        if (
+            re.fullmatch(r"[가-힣A-Za-z0-9]+(?:\s+[가-힣A-Za-z0-9]+){0,2}", prefix)
+            and len(prefix) <= 50
+            and prefix
+            not in {
+                "이",
+                "그",
+                "저",
+                "여기",
+                "거기",
+                "이곳",
+                "그곳",
+                "그럼",
+                "그러면",
+                "이제",
+                "대신",
+                "그냥",
+                "선택한 장소",
+                "저장한 장소",
+            }
+            and not generic_name(prefix)
+        ):
+            return prefix
+    areas = re.findall(
+        r"(?<![가-힣])([가-힣]{2,10}(?:시|구|군|동|읍|면))(?:에서|에|의)?(?=[\s,.!?]|$)", text
+    )
+    return next(
+        (
+            a
+            for a in areas
+            if not a.endswith(
+                ("다시", "잠시", "혹시", "친구", "도구", "문구", "입구", "출구", "농구", "지구")
+            )
+        ),
+        "",
+    )
+
+
+def area_matches(area, address):
+    # Match administrative tokens, never a substring such as 양주 inside 남양주.
+    tokens = re.findall(r"[가-힣A-Za-z0-9]+", plain(area))
+    words = re.findall(r"[가-힣A-Za-z0-9]+", plain(address))
+    suffix = r"(?:특별자치시|특별시|광역시|특별자치도|시|군|구|읍|면|동|리)(?:\d+가)?"
+    return bool(tokens) and all(
+        any(
+            norm(token) == norm(word) or re.fullmatch(re.escape(token) + suffix, word)
+            for word in words
+        )
+        for token in tokens
+    )
+
+
 def requested_scope(text, previous=None, chosen=()):
     scope = (previous or SearchScope()).model_copy(deep=True)
     # Explicit UI choice is a new user decision, never an automatic selection by the model.
@@ -101,14 +158,11 @@ def requested_scope(text, previous=None, chosen=()):
         scope.single_activity = True
     elif len(active) > 1 or re.search(r"추가해|추가하|함께\s*넣|둘\s*다", text):
         scope.single_activity = False
-    areas = re.findall(
-        r"(?<![가-힣])([가-힣]{2,10}(?:구|군|동|읍|면))(?:에서|에|의)?(?=[\s,.!?]|$)", text
-    )
-    areas = [
-        a for a in areas if not a.endswith(("친구", "도구", "문구", "입구", "출구", "농구", "지구"))
-    ]
-    if areas:
-        scope.area = areas[0]
+    area = explicit_area(text)
+    if area:
+        if norm(area) != norm(scope.area):
+            scope.exact_name, scope.name_kind = "", "any"
+        scope.area = area
     target = None
     if not nearby:
         match = re.search(
@@ -207,7 +261,7 @@ class PlacePolicy:
             name_match = norm(title) in {norm(args.name), norm(args.name) + "공원"}
         if args.mode == "exact_name" and not name_match:
             return False
-        if args.area and norm(args.area) not in norm(item.address + item.roadAddress):
+        if args.area and not area_matches(args.area, item.address + " " + item.roadAddress):
             return False
         if args.kind != "any":
             source = category or title
