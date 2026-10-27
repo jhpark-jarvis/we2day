@@ -351,6 +351,44 @@ def test_single_format_completion_stays_inside_budget(monkeypatch):
     assert "tools" not in calls[-1] and calls[-1]["response_format"]["type"] == "json_schema"
 
 
+@pytest.mark.parametrize("repair_succeeds", [True, False])
+def test_required_plan_cannot_be_replaced_by_a_success_claim(monkeypatch, repair_succeeds):
+    original, calls = httpx.AsyncClient, []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        schema = body["response_format"]["json_schema"]["schema"]
+        assert schema["properties"]["plan"] == {"$ref": "#/$defs/ModelPlan"}
+        assert schema["$defs"]["ModelPlan"]["properties"]["date"]["const"] == "2030-01-01"
+        answer = {"reply": "코스 완성", "plan": None}
+        if len(calls) == 2 and repair_succeeds:
+            answer["plan"] = plan(activities=[{"title": "직접 확인할 활동"}])
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(answer)}}]})
+
+    monkeypatch.setattr(
+        ai_planner.httpx,
+        "AsyncClient",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
+    )
+    current = session()
+    current.direct_final = current.require_plan = True
+    current.plan_date = "2030-01-01"
+    settings = SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic")
+    if repair_succeeds:
+        result = asyncio.run(
+            ai_planner.complete(settings, [{"role": "user", "content": "코스 반영"}], current)
+        )
+        assert result.plan.date == "2030-01-01"
+    else:
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(
+                ai_planner.complete(settings, [{"role": "user", "content": "코스 반영"}], current)
+            )
+        assert error.value.detail == "ai_invalid_response"
+    assert len(calls) == 2 and all("tools" not in call for call in calls)
+
+
 def test_saved_destinations_share_links_and_previous_plan_survive_edits():
     from we2day_api.plans import Activity
 

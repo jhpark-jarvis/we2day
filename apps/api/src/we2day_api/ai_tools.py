@@ -297,6 +297,8 @@ class ToolSession:
         self.candidate_kinds = {}
         self.previous_plan = None
         self.direct_final = False
+        self.require_plan = False
+        self.plan_date = None
         self.candidates: dict[str, Candidate] = {}
         self.reports: list[dict] = []
         self.searches: dict[str, list[dict]] = {}

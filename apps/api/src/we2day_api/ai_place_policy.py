@@ -38,6 +38,10 @@ def kinds(value):
     return [key for key, words in WORDS.items() if any(word in value for word in words)]
 
 
+def generic_name(value):
+    return norm(value) in {norm(word) for words in WORDS.values() for word in words}
+
+
 class SearchArguments(SearchInput):
     mode: Literal["exact_name", "category", "nearby"] = "category"
     name: str = Field(default="", max_length=100)
@@ -121,14 +125,16 @@ def requested_scope(text, previous=None, chosen=()):
                     r"(?<![가-힣])([가-힣A-Za-z0-9]{2,24}(?:숲|공원|도서관|박물관|미술관|수목원))(?:에서|으로|에|로|만|을|를)?(?=[\s,.!?]|$)",
                     positive,
                 )
-                names = [
-                    n
-                    for n in names
-                    if n not in {"공공도서관", "작은도서관", "근린공원", "생태공원"}
-                ]
+                names = list(
+                    dict.fromkeys(
+                        n
+                        for n in names
+                        if n not in {"공공도서관", "작은도서관", "근린공원", "생태공원"}
+                    )
+                )
                 if len(names) == 1:
                     target = names[0]
-    if target:
+    if target and not generic_name(target):
         scope.exact_name = target[:100]
         target_kinds = kinds(target)
         if not target_kinds and target.endswith("숲"):
@@ -158,6 +164,8 @@ class PlacePolicy:
             self.blocked += 1
             return None, "outside_requested_scope"
         target = self.scope.exact_name
+        if args.mode == "exact_name" and generic_name(args.name):
+            args.mode, args.name = "category", ""
         if target and (self.scope.name_kind in {"any", args.kind} or args.kind == "any"):
             args.mode, args.name, args.query = "exact_name", target, target
         elif args.mode == "exact_name":
@@ -176,6 +184,8 @@ class PlacePolicy:
             if norm(args.area) not in norm(evidence):
                 return None, "unconfirmed_area"
             self.scope.area = args.area
+        if args.mode != "exact_name" and args.area and norm(args.area) not in norm(args.query):
+            args.query = f"{args.area} {args.query}"[:100]
         return args, None
 
     def relevant(self, item, args):

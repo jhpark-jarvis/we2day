@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -49,7 +49,7 @@ MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 SYSTEM = PROMPT.system
 
 
-def answer_format():
+def answer_format(plan_date=None):
     # Generated from the parser contract. The provider sees no persistence-only scope fields.
     schema = ModelAnswer.model_json_schema()
 
@@ -68,6 +68,9 @@ def answer_format():
                 strict_object(child)
 
     strict_object(schema)
+    if plan_date:
+        schema["properties"]["plan"] = {"$ref": "#/$defs/ModelPlan"}
+        schema["$defs"]["ModelPlan"]["properties"]["date"]["const"] = plan_date
     return {
         "type": "json_schema",
         "json_schema": {"name": "we2day_answer", "strict": True, "schema": schema},
@@ -75,6 +78,19 @@ def answer_format():
 
 
 ANSWER_FORMAT = answer_format()
+
+
+def explicit_date(text):
+    """Keep an unambiguous, explicitly supplied calendar date; never guess relative dates."""
+    matches = re.findall(r"(?<!\d)(20\d{2}|2100)-(\d{2})-(\d{2})(?!\d)", text)
+    matches += re.findall(r"(20\d{2}|2100)년\s*(\d{1,2})월\s*(\d{1,2})일", text)
+    values = set()
+    for year, month, day in matches:
+        try:
+            values.add(date(int(year), int(month), int(day)).isoformat())
+        except ValueError:
+            continue
+    return values.pop() if len(values) == 1 else None
 
 
 class Message(BaseModel):
@@ -147,7 +163,11 @@ async def complete(
                 "temperature": 0.4,
             }
             if final:
-                inputs["response_format"] = ANSWER_FORMAT
+                inputs["response_format"] = (
+                    answer_format(session.plan_date)
+                    if session and session.require_plan
+                    else ANSWER_FORMAT
+                )
                 if session:
                     inputs["messages"] = messages + [
                         {
@@ -269,7 +289,13 @@ async def complete(
                     model_answer = ModelAnswer.model_validate_json(text)
                 else:
                     model_answer = ModelAnswer.model_validate(text)
-            except ValidationError:
+                if (
+                    session
+                    and session.require_plan
+                    and (not model_answer.plan or model_answer.plan.date != session.plan_date)
+                ):
+                    raise ValueError("Missing requested plan or date mismatch")
+            except (ValidationError, ValueError):
                 if format_completion or step == 2:
                     raise
                 # One formatting completion inside the same three-call budget, never a
@@ -435,6 +461,17 @@ async def _chat(body, settings, store, client, budget, stats):
             proposal = head.get("proposal") or proposal
             proposal = PlanContent.model_validate(proposal) if proposal else None
         scope = requested_scope(body.messages[-1].content, context.search_scope, body.chosen_places)
+        latest = body.messages[-1].content
+        clear_date = bool(
+            re.search(r"날짜(?:는|를|가)?\s*(?:아직\s*)?(?:미정|나중|정하지|취소)", latest)
+        )
+        known_date = (
+            None
+            if clear_date
+            else (explicit_date(latest) or context.date or (proposal.date if proposal else None))
+        )
+        if known_date or clear_date:
+            context.date = known_date
         policy = PlacePolicy(scope, "\n".join(m.content for m in body.messages if m.role == "user"))
         session = ToolSession(settings, store, body.selected_places, body.chosen_places, policy)
         session.previous_plan = proposal
@@ -445,6 +482,15 @@ async def _chat(body, settings, store, client, budget, stats):
             r"(?:제목|시간|비용|예산).*만.*(?:바꿔|수정)", body.messages[-1].content
         ):
             session.direct_final = True
+        session.plan_date = known_date
+        session.require_plan = bool(
+            known_date
+            and not scope.search_only
+            and (
+                session.direct_final
+                or re.search(r"(?:코스|플랜).*(?:짜|만들|제안|반영|수정)", latest)
+            )
+        )
         if proposal:
             for activity in proposal.activities:
                 if activity.place:
@@ -489,6 +535,8 @@ async def _chat(body, settings, store, client, budget, stats):
                 "search_scope": scope.model_dump(),
             }
         )
+        if known_date or clear_date:
+            answer.context.date = known_date
         if not answer.plan and proposal:
             answer.checks = list(dict.fromkeys(answer.checks + check_course(proposal)))
         candidates = session.visible_candidates()

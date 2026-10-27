@@ -42,7 +42,7 @@ def setup(monkeypatch):
             # The planning phase is separate from the provider's strict final schema.
             return httpx.Response(200, json={"choices": [{"message": {"content": "응답 준비"}}]})
         if "response_format" in body:
-            assert body["response_format"] == ai_planner.ANSWER_FORMAT
+            assert body["response_format"]["type"] == "json_schema"
         return replies.pop(0)
 
     with TestClient(app) as client:
@@ -137,7 +137,7 @@ def test_native_object_payload_with_final_schema(setup):
             200, json={"result": {"response": {"reply": "날짜를 알려주세요.", "plan": None}}}
         )
     )
-    response = client.post("/ai/planner", json=body())
+    response = client.post("/ai/planner", json=body("조건을 안내해줘"))
     assert response.status_code == 200 and response.json()["plan"] is None
 
 
@@ -323,6 +323,30 @@ def test_restored_server_scope_rejects_outside_plan_and_persists_scope(setup):
     assert "범위 밖" in response.json()["checks"][0]
     assert saved[0]["context"]["search_scope"]["kinds"] == ["library"]
     assert saved[0]["context"]["date"] == "2030-01-01"
+
+
+def test_explicit_date_survives_search_only_null_model_context(setup):
+    client, _, _, replies = setup
+    replies.append(
+        httpx.Response(
+            200,
+            json={
+                "result": {
+                    "response": {
+                        "reply": "후보 안내",
+                        "plan": None,
+                        "context": {"date": None},
+                    }
+                }
+            },
+        )
+    )
+    response = client.post(
+        "/ai/planner", json=body("날짜는 2030-01-01 서울숲 후보만 검색. 카페는 나중에")
+    )
+    assert response.status_code == 200
+    assert response.json()["context"]["date"] == "2030-01-01"
+    assert response.json()["plan"] is None
 
 
 def test_server_conversation_conditions_survive_short_history_and_partial_update(setup):

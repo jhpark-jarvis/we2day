@@ -21,10 +21,10 @@ def resource_copy(tmp_path):
 
 
 def test_immutable_release_and_cross_platform_digest(resource_copy):
-    assert PROMPT.version == "we2-ai-2026-10-27-v5"
-    assert PROMPT.sha256 == "b11fce941c97317959d6760d97bab8490a2e7f6a4f19f139cc04dd73f7309ca2"
+    assert PROMPT.version == "we2-ai-2026-10-27-v6"
+    assert PROMPT.sha256 == "7ebcfeb3507747998b9baf5450211fe4d21a0ee76b22e6f3c4d701cbb1948a49"
     for path in (resource_copy / PROMPT.version).iterdir():
-        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
     assert read_bundle(resource_copy) == PROMPT
     with pytest.raises(FrozenInstanceError):
         PROMPT.system = "replacement"

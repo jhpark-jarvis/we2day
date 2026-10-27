@@ -6,14 +6,20 @@ import pytest
 from pydantic import ValidationError
 
 from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, requested_scope
-from we2day_api.ai_planner import ANSWER_FORMAT
+from we2day_api.ai_planner import ANSWER_FORMAT, answer_format, explicit_date
 from we2day_api.ai_tools import ModelAnswer, ModelPlan, ToolSession
 from we2day_api.places import PlaceResult, SearchResults
 from we2day_api.plans import PlanContent
 
 
 @pytest.mark.parametrize(
-    "text", ["서울숲 산책 검색해줘", "검색어는 서울숲 한 단어로 다시 검색", "'서울숲'을 찾아줘"]
+    "text",
+    [
+        "서울숲 산책 검색해줘",
+        "검색어는 서울숲 한 단어로 다시 검색",
+        "'서울숲'을 찾아줘",
+        "서울숲에서 산책하고 싶어. 정확히 서울숲 후보만 검색해줘.",
+    ],
 )
 def test_exact_name_removes_activity_words(text):
     policy = PlacePolicy(requested_scope(text), text)
@@ -88,6 +94,17 @@ def test_unsupported_invented_name_or_area_is_not_a_search_input():
         {"query": "망우동 카페", "area": "망우동"}, ["서울 중랑구 망우동 1"]
     )
     assert error is None and args.area == "망우동"
+
+
+def test_generic_kind_is_not_an_exact_venue_and_area_is_in_query():
+    policy = PlacePolicy(requested_scope("중랑구 도서관 후보만 검색"))
+    args, error = policy.prepare({"query": "도서관", "mode": "exact_name", "name": "도서관"})
+    assert error is None and args.mode == "category" and args.name == ""
+    assert args.query == "중랑구 도서관"
+    assert policy.relevant(
+        PlaceResult(title="중랑구립정보도서관", category="군구립도서관", address="서울 중랑구"),
+        args,
+    )
 
 
 def run(scope):
@@ -176,3 +193,14 @@ def test_schema_is_recursive_strict_nullable_and_excludes_server_scope():
         ModelAnswer.model_validate(
             {"reply": "확인", "plan": {"title": "합성", "date": "2030-02-30"}}
         )
+
+
+def test_explicit_dates_and_required_plan_schema_are_bound_to_user_input():
+    assert explicit_date("합성 2030-01-01 검색만") == "2030-01-01"
+    assert explicit_date("2030년 1월 1일") == "2030-01-01"
+    assert explicit_date("2030-02-30") is None
+    assert explicit_date("2030-01-01 또는 2030-01-02") is None
+    assert explicit_date("내일") is None
+    schema = answer_format("2030-01-01")["json_schema"]["schema"]
+    assert schema["properties"]["plan"] == {"$ref": "#/$defs/ModelPlan"}
+    assert schema["$defs"]["ModelPlan"]["properties"]["date"]["const"] == "2030-01-01"
