@@ -1,0 +1,1828 @@
+{
+  "version": "korean-dialogue-2026-10-27-a",
+  "cases": [
+    {
+      "id": "E01",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "제목만 '조용한 하루'로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "title": "조용한 하루"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E02",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "날짜만 2030-01-06으로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "date": "2030-01-06"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E03",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산만 5만원으로 수정해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "budget": 50000
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E04",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "첫 번째 활동 시간만 15:00로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.0.time": "15:00"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E05",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "두 번째 활동 시간만 오후 5시로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.1.time": "17:00"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E06",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "이동수단만 대중교통으로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "transport": "대중교통"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E07",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "마지막 활동 시간만 17시로 수정해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.1.time": "17:00"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "E08",
+      "split": "core",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "코스 제목을 따뜻한 오후로 변경해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "title": "따뜻한 오후"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "C01",
+      "split": "core",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "시간만 15:00로 바꿔줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "어느 활동",
+              "몇 번째",
+              "어떤 활동"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "C02",
+      "split": "core",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "제목만 바꿔줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "어떤 제목",
+              "새 제목",
+              "제목을 알려"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "C03",
+      "split": "core",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "그거 빼줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "어느",
+              "어떤",
+              "이름"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "C04",
+      "split": "core",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "2030-01-06 또는 2030-01-07로 코스를 만들어줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "날짜",
+              "언제"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "C05",
+      "split": "core",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "첫 활동 시간을 3시로 바꿔줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "오전",
+              "오후"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "C06",
+      "split": "core",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "region": "중랑구",
+          "activities": [
+            "카페"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "코스에 반영해줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "날짜"
+            ]
+          }
+        }
+      ],
+      "provider": "normal",
+      "chosen": [
+        {
+          "title": "샘플카페A",
+          "address": "서울 중랑구 망우로 3",
+          "destination": "샘플카페A (서울특별시 중랑구 망우로 3)"
+        }
+      ]
+    },
+    {
+      "id": "S01",
+      "split": "core",
+      "category": "search",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "중랑구에서 도서관 후보만 찾아줘. 카페는 나중에.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_min": 1,
+            "scope": {
+              "kinds": [
+                "library"
+              ],
+              "search_only": true
+            },
+            "candidate_not": [
+              "샘플카페A"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "S02",
+      "split": "core",
+      "category": "search",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게",
+          "search_scope": {
+            "kinds": [
+              "library"
+            ],
+            "area": "중랑구",
+            "search_only": true
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "성수동 카페 후보만 보여줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_min": 1,
+            "scope": {
+              "kinds": [
+                "cafe"
+              ],
+              "area": "성수동"
+            }
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "S03",
+      "split": "core",
+      "category": "search",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게",
+          "search_scope": {
+            "kinds": [
+              "library"
+            ],
+            "area": "중랑구"
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "도서관 말고 중랑구 카페만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_min": 1,
+            "scope": {
+              "kinds": [
+                "cafe"
+              ]
+            },
+            "candidate_not": [
+              "샘플도서관A"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "S04",
+      "split": "core",
+      "category": "search",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "서울숲에서 산책하고 싶어. 서울숲 후보만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_min": 1,
+            "candidate_not": [
+              "서울숲카페"
+            ],
+            "scope": {
+              "exact_name": "서울숲"
+            }
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "S05",
+      "split": "core",
+      "category": "search",
+      "initial": {
+        "context": {
+          "region": "중랑구",
+          "search_scope": {
+            "area": "중랑구"
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "카페 검색하지 마. 도서관 후보만 보여줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "scope": {
+              "kinds": [
+                "library"
+              ]
+            },
+            "candidate_not": [
+              "샘플카페A"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "S06",
+      "split": "core",
+      "category": "search",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "중랑구 도서관만 먼저 보고 싶어. 아직 코스는 만들지 마.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_min": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "R01",
+      "split": "core",
+      "category": "rejection",
+      "initial": {
+        "context": {
+          "region": "중랑구",
+          "search_scope": {
+            "area": "중랑구",
+            "kinds": [
+              "cafe"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "'샘플카페A'는 빼고 중랑구의 다른 카페만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_not": [
+              "샘플카페A"
+            ],
+            "candidate_min": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "R02",
+      "split": "core",
+      "category": "rejection",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "샘플카페A는 별로야. 중랑구 카페 후보 다시 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_not": [
+              "샘플카페A"
+            ],
+            "candidate_min": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "R03",
+      "split": "core",
+      "category": "rejection",
+      "initial": {
+        "context": {
+          "region": "중랑구"
+        }
+      },
+      "steps": [
+        {
+          "text": "'샘플카페A'는 제외해줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true
+          }
+        },
+        {
+          "text": "중랑구 카페 후보를 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_not": [
+              "샘플카페A"
+            ],
+            "candidate_min": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "R04",
+      "split": "core",
+      "category": "rejection",
+      "initial": {
+        "context": {
+          "region": "중랑구"
+        }
+      },
+      "steps": [
+        {
+          "text": "카페는 제외하고 도서관만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true
+          }
+        },
+        {
+          "text": "이제 카페도 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "scope": {
+              "kinds": [
+                "cafe"
+              ]
+            },
+            "candidate_min": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "M01",
+      "split": "core",
+      "category": "context",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        }
+      },
+      "steps": [
+        {
+          "text": "중랑구 도서관 후보만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "slots": {
+              "date": "2030-01-05",
+              "budget": 80000,
+              "transport": "자동차",
+              "requirements": "걷기 적게"
+            }
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "M02",
+      "split": "core",
+      "category": "context",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게",
+          "search_scope": {
+            "kinds": [
+              "library"
+            ],
+            "area": "중랑구",
+            "search_only": true
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "고마워!",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_not": [
+              "정확한 이름이나 지역",
+              "장소 후보를 확인"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "M03",
+      "split": "core",
+      "category": "context",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게",
+          "search_scope": {
+            "kinds": [
+              "cafe"
+            ],
+            "search_only": true
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "넌 어떤 도움을 줄 수 있어?",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_not": [
+              "정확한 이름이나 지역",
+              "장소 후보를 확인"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "M04",
+      "split": "core",
+      "category": "context",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "시간만 15:00로 바꿔줘.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "어느 활동",
+              "몇 번째",
+              "어떤 활동"
+            ]
+          }
+        },
+        {
+          "text": "두 번째 활동이야.",
+          "expect": {
+            "plan": "required",
+            "no_search": true,
+            "patch": {
+              "activities.1.time": "15:00"
+            }
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "F01",
+      "split": "core",
+      "category": "failure",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "중랑구 도서관 후보만 검색해줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_max": 0,
+            "reply_not": [
+              "찾았어요",
+              "준비했어요"
+            ]
+          }
+        }
+      ],
+      "provider": "empty"
+    },
+    {
+      "id": "F02",
+      "split": "core",
+      "category": "failure",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "중랑구 카페 후보만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_max": 0,
+            "reply_not": [
+              "찾았어요",
+              "준비했어요"
+            ]
+          }
+        }
+      ],
+      "provider": "failed"
+    },
+    {
+      "id": "P01",
+      "split": "core",
+      "category": "selection",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "search_scope": {
+            "single_activity": true
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "선택한 장소: 샘플카페A. 정한 조건에 맞춰 코스에 반영해줘.",
+          "expect": {
+            "plan": "required",
+            "no_search": true,
+            "slots": {
+              "date": "2030-01-05"
+            },
+            "plan_places": [
+              "샘플카페A"
+            ],
+            "activity_max": 1
+          }
+        }
+      ],
+      "provider": "normal",
+      "chosen": [
+        {
+          "title": "샘플카페A",
+          "address": "서울특별시 중랑구 망우로 3",
+          "destination": "샘플카페A (서울특별시 중랑구 망우로 3)"
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "split": "core",
+      "category": "selection",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "2030-01-05 서울숲 후보만 찾아줘.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "slots": {
+              "date": "2030-01-05"
+            }
+          }
+        },
+        {
+          "text": "선택한 장소: 서울숲. 코스에 반영해줘.",
+          "chosen": [
+            {
+              "title": "서울숲",
+              "address": "서울특별시 성동구 뚝섬로 273",
+              "destination": "서울숲 (서울특별시 성동구 뚝섬로 273)"
+            }
+          ],
+          "expect": {
+            "plan": "required",
+            "no_search": true,
+            "plan_places": [
+              "서울숲"
+            ],
+            "activity_max": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X01",
+      "split": "expression",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "코스 이름만 비 오는 날로 바꿔줄래?",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "title": "비 오는 날"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X02",
+      "split": "expression",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산은 80,000원 말고 30,000원으로 해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "budget": 30000
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X03",
+      "split": "expression",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "첫번째 일정 시간만 오후 2시 30분으로 변경해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.0.time": "14:30"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X04",
+      "split": "expression",
+      "category": "partial_edit",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "일자는 2030년 1월 8일로 변경해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "date": "2030-01-08"
+            },
+            "no_search": true
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X05",
+      "split": "expression",
+      "category": "clarification",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "둘 중 한 날짜로 잡아줘. 2030-01-06 아니면 2030-01-07.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_any": [
+              "날짜",
+              "언제"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X06",
+      "split": "expression",
+      "category": "rejection",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        },
+        "proposal": {
+          "title": "합성 데이트",
+          "date": "2030-01-05",
+          "budget": 80000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "도서관",
+              "time": "14:00",
+              "place": "샘플도서관A (서울특별시 중랑구 신내로 1)",
+              "cost": null,
+              "note": "조용히 읽기"
+            },
+            {
+              "title": "카페",
+              "time": "16:00",
+              "place": "샘플카페A (서울특별시 중랑구 망우로 3)",
+              "cost": 20000,
+              "note": "대화"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "샘플카페A 말고 다른 카페를 중랑구에서 찾아줄래?",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_not": [
+              "샘플카페A"
+            ],
+            "candidate_min": 1
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X07",
+      "split": "expression",
+      "category": "context",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게",
+          "search_scope": {
+            "kinds": [
+              "library"
+            ],
+            "search_only": true
+          }
+        }
+      },
+      "steps": [
+        {
+          "text": "좋아. 설명 고마워.",
+          "expect": {
+            "plan": "none",
+            "no_search": true,
+            "reply_not": [
+              "정확한 이름이나 지역",
+              "장소 후보를 확인"
+            ]
+          }
+        }
+      ],
+      "provider": "normal"
+    },
+    {
+      "id": "X08",
+      "split": "expression",
+      "category": "search",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 80000,
+          "activities": [
+            "도서관",
+            "카페"
+          ],
+          "requirements": "걷기 적게"
+        }
+      },
+      "steps": [
+        {
+          "text": "중랑구 카페는 나중에 하고 우선 도서관만 검색하자.",
+          "expect": {
+            "plan": "none",
+            "needs_search": true,
+            "candidate_min": 1,
+            "candidate_not": [
+              "샘플카페A"
+            ],
+            "scope": {
+              "kinds": [
+                "library"
+              ]
+            }
+          }
+        }
+      ],
+      "provider": "normal"
+    }
+  ]
+}

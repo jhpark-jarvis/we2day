@@ -12,6 +12,7 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from we2day_api.ai_dialogue import DialogueState
 from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds
 from we2day_api.places import fetch_places
 from we2day_api.plans import Activity, PlanContent
@@ -72,6 +73,7 @@ class StoredContext(PlanningContext):
     # Trusted owner-scoped stored data; opaque future fields survive a version rollback.
     model_config = ConfigDict(extra="allow", strict=True)
     search_scope: SearchScope = Field(default_factory=SearchScope)
+    dialogue: DialogueState = Field(default_factory=DialogueState)
 
 
 class ModelAnswer(BaseModel):
@@ -301,6 +303,11 @@ class ToolSession:
         self.direct_final = False
         self.require_plan = False
         self.plan_date = None
+        self.operation = None
+        self.allowed_tools = None
+        self.append_only = False
+        self.plan_updates = {}
+        self.needs_place_search = False
         self.candidates: dict[str, Candidate] = {}
         self.reports: list[dict] = []
         self.searches: dict[str, list[dict]] = {}
@@ -310,8 +317,9 @@ class ToolSession:
         self.selected_result = None
         self.calls = 0
         self.previous_places: dict[str, list[Candidate]] = {}
+        self.chosen_candidate = None
         for item in chosen:
-            self.add(item.title, item.address, "user", item.destination)
+            self.chosen_candidate = self.add(item.title, item.address, "user", item.destination)
 
     def add(self, title, address, source, destination=""):
         title, address = clean(title, 100), clean(address, 180)
@@ -398,6 +406,8 @@ class ToolSession:
 
     def guard_plan(self, model_plan, resolved):
         scope = self.policy.scope
+        if self.operation in {"search", "reject", "clarify", "chat", "weather"}:
+            return None, ["요청하지 않은 코스 변경은 반영하지 않았어요."] if resolved else []
         if scope.search_only:
             return None, ["지금은 장소 후보만 확인하고 있어요."]
         if not resolved:
@@ -406,6 +416,20 @@ class ToolSession:
             return None, ["요청한 활동 개수를 넘는 제안은 반영하지 않았어요."]
         previous = self.previous_plan.activities if self.previous_plan else []
         for model, activity in zip(model_plan.activities, resolved.activities, strict=True):
+            candidate = self.candidates.get(model.place_ref)
+            detected = kinds(activity.title)
+            actual_kind = self.candidate_kinds.get(
+                model.place_ref, detected[0] if len(detected) == 1 else "any"
+            )
+            if self.policy.forbidden(
+                candidate.title if candidate else re.split(r"\s+\(", activity.place)[0], actual_kind
+            ):
+                return None, ["제외한 장소나 활동은 새 제안에 반영하지 않았어요."]
+            if self.append_only and any(
+                activity.place and (activity.place, activity.map_url) == (old.place, old.map_url)
+                for old in previous
+            ):
+                continue
             if any(
                 (activity.title, activity.place, activity.map_url)
                 == (old.title, old.place, old.map_url)
@@ -455,6 +479,8 @@ class ToolSession:
         self.calls += 1
         if self.calls > 8:
             return {"error": "tool_budget_exhausted"}
+        if self.allowed_tools is not None and name not in self.allowed_tools:
+            return {"error": "tool_not_allowed_for_current_request"}
         try:
             if isinstance(arguments, str):
                 if len(arguments.encode()) > 12000:

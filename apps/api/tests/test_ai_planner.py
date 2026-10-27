@@ -158,7 +158,8 @@ def test_no_checkbox_and_recent_context_keeps_latest_request(setup):
     )
     assert response.status_code == 200
     messages = json.loads(calls[0].content)["messages"]
-    assert messages[-1]["content"] == "마지막 질문" and len(messages) == 3
+    assert [m for m in messages if m["role"] == "user"][-1]["content"] == "마지막 질문"
+    assert len(messages) == 4 and "tools" not in json.loads(calls[0].content)
 
 
 def test_free_exhaustion_and_capacity_are_distinct(setup):
@@ -270,7 +271,7 @@ def test_successful_turn_persisted_and_conflict_before_provider(setup):
     assert response.json()["prompt_version"] == ai_planner.PROMPT_VERSION
     assert response.json()["prompt_sha256"] == ai_planner.PROMPT_SHA256
     response = client.post("/ai/planner", json={**payload, "version": 1})
-    assert response.status_code == 404 and len(calls) == 2
+    assert response.status_code == 404 and len(calls) == 1
 
 
 def test_restored_server_scope_rejects_outside_plan_and_persists_scope(setup):

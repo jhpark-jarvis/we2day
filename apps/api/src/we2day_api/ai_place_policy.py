@@ -65,6 +65,8 @@ def requested_scope(text, previous=None, chosen=()):
     if text.startswith("선택한 장소:") and chosen:
         scope.exact_name = chosen[-1].title
         scope.kinds = kinds(scope.exact_name)
+        if not scope.kinds and scope.exact_name.endswith("숲"):
+            scope.kinds = ["park"]
         scope.name_kind = scope.kinds[0] if len(scope.kinds) == 1 else "any"
         scope.search_only = False
         return scope
@@ -146,10 +148,15 @@ def requested_scope(text, previous=None, chosen=()):
 
 
 class PlacePolicy:
-    def __init__(self, scope=None, user_text=""):
+    def __init__(self, scope=None, user_text="", *, rejected=(), excluded=()):
         self.scope = scope or SearchScope()
         self.user_text = user_text
         self.blocked = 0
+        self.rejected = {norm(name) for name in rejected}
+        self.excluded = set(excluded)
+
+    def forbidden(self, title, kind="any"):
+        return norm(title) in self.rejected or kind in self.excluded
 
     def prepare(self, values, evidence_addresses=()):
         args = SearchArguments.model_validate(values).model_copy()
@@ -163,6 +170,8 @@ class PlacePolicy:
         if self.scope.kinds and args.kind not in self.scope.kinds:
             self.blocked += 1
             return None, "outside_requested_scope"
+        if args.kind in self.excluded:
+            return None, "excluded_activity_kind"
         target = self.scope.exact_name
         if args.mode == "exact_name" and generic_name(args.name):
             args.mode, args.name = "category", ""
@@ -190,6 +199,8 @@ class PlacePolicy:
 
     def relevant(self, item, args):
         title, category = plain(item.title), plain(item.category)
+        if self.forbidden(title, args.kind):
+            return False
         name_match = not args.name or norm(title) == norm(args.name)
         # A park suffix is an explicit name variant, never a café/office with the name as prefix.
         if args.name and args.kind == "park":
@@ -228,6 +239,8 @@ class PlacePolicy:
         scope = self.scope
         if kind == "any" and scope.exact_name and norm(title) == norm(scope.exact_name):
             kind = scope.name_kind
+        if self.forbidden(title, kind):
+            return False
         if scope.exact_name and scope.name_kind in {"any", kind}:
             return norm(title) in {norm(scope.exact_name), norm(scope.exact_name) + "공원"}
         return not scope.kinds or kind in scope.kinds
