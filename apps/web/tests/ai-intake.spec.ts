@@ -93,6 +93,9 @@ test("guided conditions, failed retry, restore and free chat across narrow scree
   await form.getByLabel("예산").fill("0");
   await form.getByLabel("추가 조건").fill("걷기 적게");
   await form.getByRole("button", { name: "요약", exact: true }).click();
+  const headingTop = (await form.getByRole("heading").boundingBox())?.y;
+  const logTop = (await page.locator(".we2-messages").boundingBox())?.y;
+  expect(headingTop !== undefined && logTop !== undefined && headingTop >= logTop).toBe(true);
   await expect(form.locator("dl")).toContainText("도서관 → 카페");
   await expect(form.locator("dl")).toContainText("0원");
   expect(requests).toHaveLength(0);

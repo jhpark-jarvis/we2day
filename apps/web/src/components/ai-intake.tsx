@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Check, Plus, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   briefError,
   currentBrief,
@@ -71,11 +71,18 @@ export function AiIntake({
   onSubmit: (brief: PlanningBrief) => void;
   onFreeChat: () => void;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
   const [brief, setBrief] = useState<PlanningBrief>(emptyBrief);
   const [budget, setBudget] = useState("");
   const [custom, setCustom] = useState("");
   const [error, setError] = useState("");
+  function goToStep(value: number) {
+    setStep(value);
+    setError("");
+    // Keep the new group's heading visible after a taller previous group.
+    formRef.current?.closest(".we2-messages")?.scrollTo({ top: 0 });
+  }
   function update(values: Partial<PlanningBrief>) {
     setBrief((previous) => ({ ...previous, ...values }));
     setError("");
@@ -92,7 +99,7 @@ export function AiIntake({
     setError(problem);
     if (problem) return;
     setBrief(prepared);
-    if (step < 3) setStep(step + 1);
+    if (step < 3) goToStep(step + 1);
     else onSubmit(prepared);
   }
   function addActivity(activity: string) {
@@ -113,6 +120,7 @@ export function AiIntake({
   }
   return (
     <form
+      ref={formRef}
       className="we2-intake"
       noValidate
       onSubmit={(e) => {
@@ -135,8 +143,7 @@ export function AiIntake({
             disabled={disabled || index > step}
             aria-current={step === index ? "step" : undefined}
             onClick={() => {
-              setStep(index);
-              setError("");
+              goToStep(index);
             }}
           >
             <span>{step > index ? <Check size={13} aria-hidden="true" /> : index + 1}</span>
@@ -315,7 +322,7 @@ export function AiIntake({
             type="button"
             className="text-button"
             disabled={disabled}
-            onClick={() => setStep(0)}
+            onClick={() => goToStep(0)}
           >
             조건 수정
           </button>
