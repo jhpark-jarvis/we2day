@@ -41,7 +41,7 @@ from we2day_api.ai_tools import (
     place_options,
 )
 from we2day_api.calendar import Store
-from we2day_api.plans import PlanContent
+from we2day_api.plans import Activity, PlanContent
 from we2day_api.prompt_bundle import PROMPT
 
 router = APIRouter(tags=["ai-planner"])
@@ -604,15 +604,65 @@ async def _chat(body, settings, store, client, budget, stats):
         messages.extend(history)
         if len(json.dumps(messages, ensure_ascii=False).encode()) > 24000:
             raise HTTPException(422, "ai_context_too_long")
+        io = ToolIO(settings, client, store, budget, stats)
+        if (
+            not directive.reply
+            and session.append_only
+            and scope.exact_name
+            and len(scope.kinds) == 1
+            and not body.selected_places
+            and not re.search(r"시간|\d시|\d:\d|비용|가격|예산|원|날짜|제목|교통|이동수단", latest)
+        ):
+            call = {
+                "function": {
+                    "name": "search_places",
+                    "arguments": json.dumps(
+                        {
+                            "mode": "exact_name",
+                            "name": scope.exact_name,
+                            "query": scope.exact_name,
+                            "kind": scope.kinds[0],
+                            "area": scope.area,
+                        },
+                        ensure_ascii=False,
+                    ),
+                }
+            }
+            outcome = (await execute_batch(session, [call], io))[0]
+            stats.counts["tool_calls"] = session.calls
+            candidates = [c for c in session.visible_candidates() if c.ref in session.fresh_refs]
+            existing = {a.place for a in proposal.activities}
+            new_candidates = [c for c in candidates if c.destination not in existing]
+            if len(candidates) == len(new_candidates) == 1 and len(proposal.activities) < 8:
+                directive.plan = proposal.model_copy(deep=True)
+                candidate = candidates[0]
+                directive.plan.activities.append(
+                    Activity(title=candidate.title, place=candidate.destination)
+                )
+                for name, value in session.plan_updates.items():
+                    setattr(directive.plan, name, value)
+                directive.plan = PlanContent.model_validate(directive.plan.model_dump())
+                directive.reply = "지정한 장소를 확인해 기존 코스에 추가했어요."
+            else:
+                if outcome.get("error"):
+                    directive.reply = "장소 검색을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
+                elif candidates and not new_candidates:
+                    directive.reply = "이미 코스에 포함된 장소예요. 기존 활동을 확인해 주세요."
+                elif not candidates:
+                    directive.reply = (
+                        "지정한 이름과 일치하는 장소를 확인하지 못했어요. 이름을 확인해 주세요."
+                    )
+                else:
+                    directive.reply = "추가할 장소 후보를 선택해 주세요. 활동은 최대 8개예요."
         if not directive.reply and not await store.rpc("reserve_ai_planner_request"):
             raise HTTPException(429, "ai_rate_limited")
-        io = ToolIO(settings, client, store, budget, stats)
         if directive.reply:
             stats.counts["server_responses"] = 1
             answer = ChatResult(
                 reply=directive.reply,
                 plan=directive.plan,
                 checks=check_course(directive.plan) if directive.plan else [],
+                tools=session.reports,
                 prompt_version=PROMPT_VERSION,
                 prompt_sha256=PROMPT_SHA256,
             )

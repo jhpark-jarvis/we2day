@@ -78,6 +78,77 @@ def test_search_does_not_relabel_old_course_places_as_new_results():
     assert session.visible_candidates() == []
 
 
+@pytest.mark.parametrize("matches", [0, 1, 2])
+def test_explicit_named_append_executes_search_without_model_and_requires_unique_match(matches):
+    import asyncio
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    import httpx
+    from dialogue_evaluation import CAFE, MemoryStore
+
+    from we2day_api.ai_planner import ChatInput, _chat
+    from we2day_api.ai_runtime import Budget, RunStats
+
+    async def run():
+        initial = copy.deepcopy(CORPUS["cases"][0])
+        store = MemoryStore(initial)
+        before = PlanContent.model_validate(initial["initial"]["proposal"])
+        original_rpc = store.rpc
+
+        async def rpc(name, values=None):
+            assert name != "reserve_ai_planner_request"
+            return await original_rpc(name, values)
+
+        store.rpc = rpc
+        records = [copy.deepcopy(CAFE[1]) for _ in range(matches)]
+        for i, row in enumerate(records):
+            row["roadAddress"] += str(i)
+
+        def search(request):
+            assert request.method == "GET" and request.url.params["query"] == "샘플카페B"
+            return httpx.Response(200, json={"items": records})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(search)) as client:
+            stats = RunStats("synthetic")
+            result = await _chat(
+                ChatInput.model_validate(
+                    {
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": (
+                                    "기존 활동 유지하고 중랑구 '샘플카페B' 활동 하나 추가해줘"
+                                ),
+                            }
+                        ],
+                        "conversation_id": str(uuid4()),
+                        "request_id": str(uuid4()),
+                    }
+                ),
+                SimpleNamespace(
+                    naver_search_enabled=True,
+                    naver_search_client_id="synthetic",
+                    naver_search_client_secret="synthetic",
+                ),
+                store,
+                client,
+                Budget(),
+                stats,
+            )
+        assert stats.counts["model_calls"] == 0 and stats.counts["search_calls"] == 1
+        assert bool(result.plan) == (matches == 1)
+        if result.plan:
+            assert (
+                result.plan.activities[:3] == before.activities and len(result.plan.activities) == 4
+            )
+            assert (
+                result.plan.title == before.title and result.plan.preparation == before.preparation
+            )
+
+    asyncio.run(run())
+
+
 def test_multiple_fields_wait_for_clarification_and_apply_together():
     plan = PlanContent.model_validate(CORPUS["cases"][0]["initial"]["proposal"])
     first = analyze(

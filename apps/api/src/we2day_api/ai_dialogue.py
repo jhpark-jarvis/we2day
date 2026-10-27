@@ -384,6 +384,11 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
                 directive.scope.kinds = new_kinds
             if norm(directive.scope.exact_name) in {norm(n) for n in known}:
                 directive.scope.exact_name, directive.scope.name_kind = "", "any"
+            named = re.findall(r"[\"'‘“]([^\"'’”]{2,60})[\"'’”]", positive)
+            if len(named) == 1 and not generic_name(named[0]) and "제목" not in text:
+                directive.scope.exact_name = named[0]
+                detected = kinds(named[0]) or directive.scope.kinds
+                directive.scope.name_kind = detected[0] if len(detected) == 1 else "any"
             directive.scope.single_activity = False
         if directive.scope.exact_name and norm(directive.scope.exact_name) in {
             norm(n) for n in state.rejected_places
