@@ -524,3 +524,36 @@ def test_initial_optional_preparation_padding_cannot_invalidate_required_plan():
 )
 def test_numbered_legal_neighborhoods_match_only_their_parent(area, address, expected):
     assert area_matches(area, address) == expected
+
+
+def test_social_turn_keeps_window_clarification_basis_current(monkeypatch):
+    async def run():
+        store = MemoryStore({"initial": {"context": context()}})
+
+        async def no_model(*args, **kwargs):
+            pytest.fail("A known pending time must not become a model turn")
+
+        monkeypatch.setattr(ai_planner, "complete", no_model)
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _: pytest.fail("No external I/O"))
+        ) as client:
+            for text in ["종료 시간 바꿔줘", "고마워요", "20:00"]:
+                result = await ai_planner._chat(
+                    ai_planner.ChatInput.model_validate(
+                        {
+                            "messages": [{"role": "user", "content": text}],
+                            "conversation_id": str(uuid4()),
+                            "request_id": str(uuid4()),
+                            "version": store.version,
+                        }
+                    ),
+                    SimpleNamespace(),
+                    store,
+                    client,
+                    Budget(),
+                    RunStats("test"),
+                )
+        assert result.context.intake.data.end_time == "20:00"
+        assert result.context.intake.pending is None
+
+    asyncio.run(run())

@@ -353,4 +353,11 @@ def reduce_context(before, incoming, directive, body, session, reason):
         }
         current["data"]["recommend"] = not bool(current["data"].get("activities"))
         result["intake"] = current
+    if not body.brief and social_turn(body.messages[-1].content):
+        # A social turn preserves an active clarification across every controller;
+        # otherwise its unchanged basis would look like an older API writer next turn.
+        for name in ("intake", "activity_edit", "pending_fields"):
+            value = result.get(name)
+            if isinstance(value, dict) and value.get("turn_version") == body.version:
+                result[name] = {**value, "turn_version": body.version + 1}
     return result
