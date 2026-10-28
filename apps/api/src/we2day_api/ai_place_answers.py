@@ -3,7 +3,7 @@
 import json
 import re
 
-from we2day_api.ai_place_policy import LABELS, explicit_area, kinds, norm, plain
+from we2day_api.ai_place_policy import LABELS, area_matches, explicit_area, kinds, norm, plain
 from we2day_api.ai_tool_runtime import execute_batch
 
 
@@ -159,7 +159,33 @@ async def read_candidate_request(directive, session, io):
                     resume="search",
                 )
                 return
-            session.policy.scope.area = area = areas.pop()
+            area = areas.pop()
+            # A city-only road address is not a neighborhood or a radius lookup.
+            if len(area.split()) == 1 and area.endswith(("시", "군")):
+                fallback = next(
+                    (
+                        value
+                        for value in getattr(session, "area_fallbacks", [])
+                        if value
+                        and not private_anchor(value)
+                        and len(value.split()) > 1
+                        and area_matches(value.split()[0], area)
+                    ),
+                    "",
+                )
+                if not fallback:
+                    session.resolution = "unresolved"
+                    directive.ask(
+                        "region",
+                        "선택한 주소에서 동네를 확인할 수 없어요. 검색할 동네를 알려주세요.",
+                        resume="search",
+                    )
+                    return
+                area = fallback
+                directive.notices.append(
+                    "주소에서 동네를 확인하지 못해, 이미 정한 지역에서 후보를 찾았어요."
+                )
+            session.policy.scope.area = area
             directive.slots["region"] = area
     if private_anchor(area):
         if not session.selected:

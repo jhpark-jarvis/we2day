@@ -25,7 +25,7 @@ from we2day_api.ai_place_answers import (
     claims_place_search,
     read_candidate_request,
 )
-from we2day_api.ai_place_policy import PlacePolicy
+from we2day_api.ai_place_policy import PlacePolicy, explicit_area
 from we2day_api.ai_runtime import (
     AIStore,
     Budget,
@@ -84,7 +84,7 @@ def _answer_schema_json():
     return json.dumps(schema, separators=(",", ":"))
 
 
-def answer_format(plan_date=None, activity_limit=None):
+def answer_format(plan_date=None, activity_limit=None, no_preparation=False):
     # Fresh mutable schema per request, backed by an immutable static JSON template.
     schema = json.loads(_answer_schema_json())
     if plan_date:
@@ -93,6 +93,8 @@ def answer_format(plan_date=None, activity_limit=None):
     if activity_limit:
         schema["$defs"]["ModelPlan"]["properties"]["activities"]["maxItems"] = activity_limit
         schema["$defs"]["ModelPlan"]["properties"]["activities"]["minItems"] = activity_limit
+    if no_preparation:
+        schema["$defs"]["ModelPlan"]["properties"]["preparation"]["maxItems"] = 0
     return {
         "type": "json_schema",
         "json_schema": {"name": "we2day_answer", "strict": True, "schema": schema},
@@ -185,7 +187,11 @@ async def complete(
             }
             if final:
                 inputs["response_format"] = (
-                    answer_format(session.plan_date, session.activity_limit)
+                    answer_format(
+                        session.plan_date,
+                        session.activity_limit,
+                        session.initial_activities is not None and session.previous_plan is None,
+                    )
                     if session and session.require_plan
                     else ANSWER_FORMAT
                 )
@@ -327,9 +333,22 @@ async def complete(
                 if isinstance(text, str):
                     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
                     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
-                    model_answer = ModelAnswer.model_validate_json(text)
-                else:
-                    model_answer = ModelAnswer.model_validate(text)
+                    text = json.loads(text)
+                if (
+                    session
+                    and session.initial_activities is not None
+                    and session.previous_plan is None
+                    and isinstance(text, dict)
+                    and isinstance(text.get("plan"), dict)
+                    and text["plan"].get("preparation")
+                ):
+                    # The initial form has no preparation field; do not invent optional items
+                    # or let decoder padding invalidate otherwise grounded required fields.
+                    text["plan"]["preparation"] = []
+                    stats.counts["optional_normalizations"] = (
+                        stats.counts.get("optional_normalizations", 0) + 1
+                    )
+                model_answer = ModelAnswer.model_validate(text)
                 if (
                     session
                     and session.require_plan
@@ -586,6 +605,11 @@ async def _chat(body, settings, store, client, budget, stats):
         session.allowed_tools = set(directive.allowed_tools)
         session.include_only = decision.include_only
         session.anchor_search = decision.nearby
+        session.area_fallbacks = [scope.area] + [
+            explicit_area(message.content)
+            for message in reversed(body.messages)
+            if message.role == "user"
+        ]
         session.needs_place_search = "search_places" in session.allowed_tools
         session.direct_final = not session.allowed_tools
         session.plan_date = known_date

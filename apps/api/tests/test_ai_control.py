@@ -400,3 +400,112 @@ def test_social_turn_preserves_pending_and_staged_fields(text):
     assert result.intent == "chat" and not result.allowed_tools and not result.plan
     assert after["pending_fields"] == before["pending_fields"]
     assert result.state.pending.resume == "plan"
+
+
+@pytest.mark.parametrize("fallback", [[], ["양주 덕계"]])
+def test_city_only_address_is_not_silently_used_as_nearby(fallback):
+    from we2day_api.ai_place_answers import read_candidate_request
+    from we2day_api.ai_tools import SelectedPlace
+    from we2day_api.places import SearchResults
+
+    async def run():
+        body = ai_planner.ChatInput.model_validate(
+            {
+                "messages": [{"role": "user", "content": "근처 카페 찾아줘"}],
+                "selected_places": [{"source": "favorite", "id": str(uuid4()), "usage": "anchor"}],
+            }
+        )
+        initial = context()
+        initial["region"] = initial["search_scope"]["area"] = "샘플 집"
+        directive = prepare(body, initial, None, date(2026, 10, 28)).directive
+        session = ToolSession(
+            SimpleNamespace(),
+            None,
+            [SelectedPlace.model_validate(body.selected_places[0].model_dump())],
+            [],
+            PlacePolicy(directive.scope),
+        )
+        session.allowed_tools = directive.allowed_tools
+        session.operation = "search"
+        session.anchor_search = True
+        session.area_fallbacks = fallback
+        events = []
+
+        class IO:
+            async def perform(self, action):
+                events.append(action[0])
+                if action[0] == "data":
+                    return [
+                        {
+                            "id": str(body.selected_places[0].id),
+                            "label": "샘플 집",
+                            "destination": "경기도 양주시 평화로 1",
+                        }
+                    ]
+                assert fallback and action[1] == "양주 덕계 카페"
+                return SearchResults(items=[])
+
+        await read_candidate_request(directive, session, IO())
+        if fallback:
+            assert directive.scope.area == "양주 덕계" and directive.notices
+            assert events == ["data", "places"]
+        else:
+            assert directive.intent == "clarify" and session.resolution == "unresolved"
+            assert events == ["data"]
+
+    asyncio.run(run())
+
+
+def test_initial_optional_preparation_padding_cannot_invalidate_required_plan():
+    async def run():
+        session = ToolSession(SimpleNamespace(), None, [], [])
+        session.operation = "plan"
+        session.initial_activities = ["카페"]
+        session.activity_limit = 1
+        session.plan_date = "2030-01-05"
+        session.require_plan = session.direct_final = True
+        place = session.add("합성카페", "서울 중랑구", "naver")
+        session.candidate_kinds[place.ref] = "cafe"
+
+        def model(request):
+            schema = json.loads(request.content)["response_format"]["json_schema"]["schema"]
+            assert schema["$defs"]["ModelPlan"]["properties"]["preparation"]["maxItems"] == 0
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "reply": "합성",
+                                        "plan": {
+                                            "title": "합성",
+                                            "date": "2030-01-05",
+                                            "activities": [
+                                                {"title": "카페", "place_ref": place.ref}
+                                            ],
+                                            "preparation": ["],", "requirements", "   "],
+                                        },
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                },
+            )
+
+        stats = RunStats("test")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(model)) as client:
+            answer = await ai_planner.complete(
+                SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic"),
+                [{"role": "user", "content": "합성"}],
+                session,
+                client=client,
+                stats=stats,
+            )
+        assert answer.plan and answer.plan.preparation == []
+        assert answer.plan.activities[0].place == place.destination
+        assert stats.counts["model_calls"] == 1 and stats.counts["optional_normalizations"] == 1
+
+    asyncio.run(run())

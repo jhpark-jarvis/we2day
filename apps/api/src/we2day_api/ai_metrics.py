@@ -28,6 +28,7 @@ COUNTERS = {
     "planned_tools",
     "executed_tools",
     "control_version",
+    "optional_normalizations",
 }
 CATEGORIES = {
     "ai_timeout",
