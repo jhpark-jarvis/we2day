@@ -10,7 +10,14 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_serializer,
+)
 
 from we2day_api.ai_dialogue import DialogueState
 from we2day_api.ai_edits import ActivityEdit, PendingFields
@@ -24,6 +31,14 @@ class SelectedPlace(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: Literal["favorite", "wish"]
     id: UUID
+    usage: Literal["reference", "anchor", "include"] = "reference"
+
+    @model_serializer(mode="wrap")
+    def legacy_reference(self, handler):
+        value = handler(self)
+        if self.usage == "reference":
+            value.pop("usage", None)
+        return value
 
 
 class ChosenPlace(BaseModel):
@@ -334,6 +349,8 @@ class ToolSession:
         self.weather: list[WeatherSummary] = []
         self.weather_queries: dict[str, dict] = {}
         self.selected_result = None
+        self.selected_usage: dict[str, str] = {}
+        self.resolution = "not_requested"
         self.calls = 0
         self.previous_places: dict[str, list[Candidate]] = {}
         self.chosen_candidate = None
@@ -436,6 +453,13 @@ class ToolSession:
             return None, ["지금은 장소 후보만 확인하고 있어요."]
         if not resolved:
             return resolved, []
+        used = {a.place_ref for a in model_plan.activities}
+        included = {ref for ref, usage in self.selected_usage.items() if usage == "include"}
+        anchors = {ref for ref, usage in self.selected_usage.items() if usage == "anchor"}
+        if included - used:
+            return None, ["코스에 포함한 장소가 빠져 있어요. 선택한 장소를 확인해 주세요."]
+        if anchors & used:
+            return None, ["주변 기준점은 방문지로 자동 추가하지 않았어요."]
         if self.activity_limit and (
             len(resolved.activities) != self.activity_limit
             or any(not a.place for a in resolved.activities)
@@ -520,8 +544,10 @@ class ToolSession:
     def _execute_steps(self, name: str, arguments):
         self.calls += 1
         if self.calls > 8:
+            self.resolution = "budget_exhausted"
             return {"error": "tool_budget_exhausted"}
         if self.allowed_tools is not None and name not in self.allowed_tools:
+            self.resolution = "not_allowed"
             return {"error": "tool_not_allowed_for_current_request"}
         try:
             if isinstance(arguments, str):
@@ -553,6 +579,7 @@ class ToolSession:
                     arguments, [item.address for item in self.candidates.values()]
                 )
                 if denied:
+                    self.resolution = "not_allowed"
                     return {"error": denied, "notice": "현재 사용자 요청 범위에 맞게 검색하세요."}
                 query = args.model_dump_json()
                 if query in self.searches:
@@ -560,6 +587,7 @@ class ToolSession:
                         return {"error": "tool_unavailable"}
                     return {"items": self.searches[query]}
                 if len(self.searches) >= 4:
+                    self.resolution = "budget_exhausted"
                     return {"error": "search_budget_exhausted"}
                 self.searches[query] = []
                 results = yield ("places", args.query)
@@ -614,6 +642,7 @@ class ToolSession:
                         )
                         if candidate and candidate.evidence() not in items:
                             self.fresh_refs.add(candidate.ref)
+                            self.selected_usage[candidate.ref] = item.usage
                             items.append(candidate.evidence())
                 self.selected_result = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})
@@ -625,15 +654,22 @@ class ToolSession:
                 return {"issues": issues, "saved": False}
             return {"error": "unknown_tool"}
         except (ValidationError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+            self.resolution = "invalid_arguments"
             return {"error": "invalid_tool_arguments"}
         except httpx.HTTPError:
             self.reports.append({"name": name, "status": "failed", "count": 0})
-            return {"error": "weather_unavailable"}
+            self.resolution = "failed"
+            if name == "search_places":
+                self.search_failures.add(query)
+            return {
+                "error": "tool_unavailable" if name == "search_places" else "weather_unavailable"
+            }
         except HTTPException as error:
             # Permission and provider exhaustion must not be hidden as empty successful searches.
             if error.status_code in (401, 403):
                 raise
             self.reports.append({"name": name, "status": "failed", "count": 0})
+            self.resolution = "failed"
             if name == "search_places":
                 self.search_failures.add(query)
             return {

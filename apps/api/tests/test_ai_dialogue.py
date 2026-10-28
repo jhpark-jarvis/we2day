@@ -304,28 +304,20 @@ def test_selected_saved_place_needs_no_guessed_region_or_unrelated_search():
             inputs = json.loads(request.content)
             assert "opaque-private-synthetic" not in json.dumps(inputs)
             calls.append(inputs)
-            if len(calls) == 1:
-                assert [t["function"]["name"] for t in inputs["tools"]] == [
-                    "lookup_selected_places"
-                ]
-                message = {
-                    "tool_calls": [
-                        {"function": {"name": "lookup_selected_places", "arguments": "{}"}}
-                    ]
-                }
-            else:
-                message = {
-                    "content": json.dumps(
-                        {
-                            "reply": "선택 장소 코스",
-                            "plan": {
-                                "title": "합성",
-                                "date": "2030-01-05",
-                                "activities": [{"title": "선택 장소", "place_ref": "p1"}],
-                            },
-                        }
-                    )
-                }
+            # The coordinator now resolves the explicit selection before one final call.
+            assert reads and "response_format" in inputs and "tools" not in inputs
+            message = {
+                "content": json.dumps(
+                    {
+                        "reply": "선택 장소 코스",
+                        "plan": {
+                            "title": "합성",
+                            "date": "2030-01-05",
+                            "activities": [{"title": "선택 장소", "place_ref": "p1"}],
+                        },
+                    }
+                )
+            }
             return httpx.Response(200, json={"choices": [{"message": message}]})
 
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
@@ -347,7 +339,7 @@ def test_selected_saved_place_needs_no_guessed_region_or_unrelated_search():
                 RunStats("test"),
             )
         assert result.plan.activities[0].place == "샘플선택장소 (서울 중랑구 신내로1)"
-        assert len(calls) == 2 and reads[0][1] == "favorite_places"
+        assert len(calls) == 1 and reads[0][1] == "favorite_places"
         assert reads[0][2]["id"] == f"in.({selected_id})"
 
     asyncio.run(run())

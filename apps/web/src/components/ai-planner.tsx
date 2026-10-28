@@ -45,7 +45,14 @@ type Turn = {
   prompt_version: string;
 };
 type Message = { id: string; role: "user" | "assistant"; content: string; weatherSource?: boolean };
-type PlaceOption = { source: "favorite" | "wish"; id: string; title: string; address: string };
+type PlaceUsage = "reference" | "anchor" | "include";
+type PlaceOption = {
+  source: "favorite" | "wish";
+  id: string;
+  title: string;
+  address: string;
+  usage?: PlaceUsage;
+};
 type Candidate = {
   ref: string;
   source: "naver" | "selected" | "user";
@@ -59,6 +66,7 @@ type Retry = {
   signature: string;
   brief?: PlanningBrief;
   candidate?: Candidate;
+  preserveDraft?: boolean;
 };
 
 async function read(view: string, query = "") {
@@ -246,6 +254,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const mounted = useRef(true);
   const [oldestTurn, setOldestTurn] = useState(1);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidatesUnavailable, setCandidatesUnavailable] = useState(false);
   const [chosenPlaces, setChosenPlaces] = useState<
     { title: string; address: string; destination?: string }[]
   >([]);
@@ -307,6 +316,12 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
           updateText(drafts.current.get(id) || "");
           setCandidates([]);
+          setCandidatesUnavailable(
+            Boolean(
+              turns[turns.length - 1]?.result.context?.control?.last_action ||
+                turns[turns.length - 1]?.result.context?.activities?.length,
+            ),
+          );
           setChosenPlaces([]);
           setSelectedPlaces([]);
           setChecks(turns[turns.length - 1]?.result.checks || []);
@@ -425,11 +440,12 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     messageOverride?: string,
     candidate?: Candidate,
     submittedBrief?: PlanningBrief,
+    preserveDraft = false,
   ) {
     const content = messageOverride ?? text.trim();
     if (busy || !available || !content) return;
     restoreInputAfterSend.current = true;
-    const preserveInput = Boolean(candidate);
+    const preserveInput = Boolean(candidate) || preserveDraft;
     const chosen = candidate
       ? [
           ...chosenPlaces.filter(
@@ -464,14 +480,18 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       proposal,
       conversation_id: conversation.current.id,
       version: conversation.current.version,
-      selected_places: selectedPlaces.map(({ source, id }) => ({ source, id })),
+      selected_places: selectedPlaces.map(({ source, id, usage }) => ({
+        source,
+        id,
+        ...(usage && usage !== "reference" ? { usage } : {}),
+      })),
       chosen_places: chosen,
       ...(brief ? { brief } : {}),
     };
     const signature = JSON.stringify(payload);
     const requestId =
       retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();
-    retry.current = { id: requestId, text: content, signature, brief, candidate };
+    retry.current = { id: requestId, text: content, signature, brief, candidate, preserveDraft };
     try {
       const response = await fetch("/api/ai/planner", {
         method: "POST",
@@ -509,7 +529,15 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         },
       ]);
       if (!preserveInput) updateText("");
-      setCandidates(result.candidates || []);
+      const hasCandidates = Boolean(result.candidates?.length);
+      const sameScope =
+        JSON.stringify(result.context?.search_scope) ===
+        JSON.stringify(planningContext?.search_scope);
+      const searched = result.tools?.some(
+        (tool: { name: string }) => tool.name === "search_places",
+      );
+      if (hasCandidates || searched || !sameScope) setCandidates(result.candidates || []);
+      setCandidatesUnavailable(result.candidates_available === false && !hasCandidates);
       setChecks(result.checks || []);
       if (result.plan) {
         setProposal(result.plan);
@@ -526,6 +554,13 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     } finally {
       setPending(false);
       setPendingText("");
+    }
+  }
+  function changeSelection(update: (previous: PlaceOption[]) => PlaceOption[]) {
+    setSelectedPlaces(update);
+    if (candidates.length) {
+      setCandidates([]);
+      setCandidatesUnavailable(true);
     }
   }
   function selectCandidate(candidate: Candidate) {
@@ -551,6 +586,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     setSaveError("");
     setActivityKeys([]);
     setCandidates([]);
+    setCandidatesUnavailable(false);
     setChosenPlaces([]);
     setSelectedPlaces([]);
     setChecks([]);
@@ -751,8 +787,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   const item = retry.current;
                   inputRef.current?.focus({ preventScroll: true });
                   if (item)
-                    void (item.candidate || text.trim() === item.text
-                      ? send(item.text, item.candidate, item.brief)
+                    void (item.candidate || item.preserveDraft || text.trim() === item.text
+                      ? send(item.text, item.candidate, item.brief, item.preserveDraft)
                       : send());
                 }}
               >
@@ -806,6 +842,17 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               >
                 <MapPin size={16} aria-hidden="true" />
                 <span>후보 {candidates.length}</span>
+              </button>
+            )}
+            {candidatesUnavailable && candidates.length === 0 && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={busy}
+                onClick={() => void send("다시", undefined, undefined, true)}
+              >
+                <RotateCw size={16} aria-hidden="true" />
+                후보 다시 검색
               </button>
             )}
             {proposal && (
@@ -1081,7 +1128,9 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 </button>
               ))}
             </div>
-            <p className="settings-hint">선택한 장소만 메시지와 함께 AI에 전달해요. 최대 8개.</p>
+            <p className="settings-hint">
+              선택한 장소만 사용해요. 최대 8개 · 새로고침하거나 대화를 바꾸면 선택이 해제돼요.
+            </p>
             {selectedPlaces.length > 0 && (
               <div className="we2-selected-places">
                 {selectedPlaces.map((item) => (
@@ -1092,14 +1141,21 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                     disabled={busy}
                     aria-label={`${item.title} 선택 해제`}
                     onClick={() =>
-                      setSelectedPlaces((previous) =>
+                      changeSelection((previous) =>
                         previous.filter(
                           (place) => place.source !== item.source || place.id !== item.id,
                         ),
                       )
                     }
                   >
-                    <span>{item.title}</span>
+                    <span>
+                      {item.title} ·{" "}
+                      {item.usage === "anchor"
+                        ? "주변 기준"
+                        : item.usage === "include"
+                          ? "코스 포함"
+                          : "참고"}
+                    </span>
                     <X size={15} aria-hidden="true" />
                   </button>
                 ))}
@@ -1111,26 +1167,52 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   (place) => place.source === item.source && place.id === item.id,
                 );
                 return (
-                  <label key={`${item.source}-${item.id}`}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={busy || loadingPlaces || (!checked && selectedPlaces.length >= 8)}
-                      onChange={() =>
-                        setSelectedPlaces((previous) =>
-                          checked
-                            ? previous.filter(
-                                (place) => place.source !== item.source || place.id !== item.id,
-                              )
-                            : [...previous, item],
-                        )
-                      }
-                    />
-                    <span>
-                      {item.title}
-                      {item.address && <small>{item.address}</small>}
-                    </span>
-                  </label>
+                  <div className="we2-place-row" key={`${item.source}-${item.id}`}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={busy || loadingPlaces || (!checked && selectedPlaces.length >= 8)}
+                        onChange={() =>
+                          changeSelection((previous) =>
+                            checked
+                              ? previous.filter(
+                                  (place) => place.source !== item.source || place.id !== item.id,
+                                )
+                              : [...previous, item],
+                          )
+                        }
+                      />
+                      <span>
+                        {item.title}
+                        {item.address && <small>{item.address}</small>}
+                      </span>
+                    </label>
+                    {checked && (
+                      <select
+                        aria-label={`${item.title} 사용 방식`}
+                        value={
+                          selectedPlaces.find(
+                            (place) => place.source === item.source && place.id === item.id,
+                          )?.usage || "reference"
+                        }
+                        disabled={busy}
+                        onChange={(event) =>
+                          changeSelection((previous) =>
+                            previous.map((place) =>
+                              place.source === item.source && place.id === item.id
+                                ? { ...place, usage: event.target.value as PlaceUsage }
+                                : place,
+                            ),
+                          )
+                        }
+                      >
+                        <option value="reference">참고</option>
+                        <option value="anchor">이곳 주변</option>
+                        <option value="include">코스에 포함</option>
+                      </select>
+                    )}
+                  </div>
                 );
               })}
               {placesError && (

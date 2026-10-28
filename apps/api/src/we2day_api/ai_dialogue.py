@@ -51,6 +51,7 @@ class Directive:
     plan: PlanContent | None = None
     allowed_tools: set[str] = field(default_factory=set)
     place_followup: str = ""
+    notices: list[str] = field(default_factory=list)
 
     def ask(self, name, reply, *, value="", resume="edit"):
         self.intent = self.state.intent = "clarify"
@@ -260,12 +261,28 @@ def money_value(text):
     )
 
 
+def social_turn(text):
+    return bool(
+        re.fullmatch(
+            r"\s*(?:응|네|넵|좋아|알겠어|알겠어요|알겠습니다|고마워|고맙습니다|"
+            r"감사해|감사해요|감사합니다|안녕|안녕하세요)(?:요)?[.!?~\s]*",
+            text,
+        )
+    )
+
+
 def analyze(text, context, proposal, chosen, today, *, selected=False):
     state = DialogueState.model_validate(context.get("dialogue") or {}).model_copy(deep=True)
     old_pending = state.pending
     state.pending = None
     previous_scope = SearchScope.model_validate(context.get("search_scope") or {})
     directive = Directive(state, previous_scope.model_copy(deep=True))
+    # Social turns precede every pending-edit controller and preserve all staged values.
+    if social_turn(text):
+        directive.state.pending = old_pending
+        directive.intent = directive.state.intent = "chat"
+        directive.reply = "좋아요. 더 정하거나 바꾸고 싶은 내용이 있으면 알려주세요."
+        return directive
     if context.get("pending_fields"):
         directive.slots["pending_fields"] = None
     compound = edit_activities(text, proposal, context.get("activity_edit"), clock_value)
@@ -312,7 +329,7 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
                 "region", "아직 확인한 장소가 없어요. 어느 지역에서 찾아볼까요?", resume="search"
             )
         return directive
-    if re.search(r"(?:추천|검색).*기능.*(?:뭐|무엇|어떤|설명)", text):
+    if re.search(r"(?:추천|검색).*기능.*(?:뭐|뭘|무엇|어떤|설명|사용법)", text):
         directive.reply = "장소 후보를 찾고, 조건을 정리해서 코스 초안을 함께 만들 수 있어요."
         return directive
     denied_kinds = negative_kinds(text)
@@ -344,6 +361,13 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     search = bool(re.search(r"검색|찾아|찾아봐|찾아줄|후보|추천|알아\s*봐|살펴\s*봐", searching))
     search = search or bool(active and re.search(r"보여\s*줘", searching))
     search = search or bool(active and re.search(r"보고\s*싶|찾자", searching))
+    # A contextual venue list is a request even without an imperative verb.
+    search = search or bool(
+        active
+        and (context.get("region") or selected or previous_scope.kinds)
+        and re.search(r"근처|주변|인근|주위", searching)
+        and not re.search(r"(?:검색|추천|찾)[^.!?]{0,8}(?:말|마|않)|궁금하지", text)
+    )
     search = search or bool(
         (context.get("region") or previous_scope.kinds)
         and re.search(r"(?:근처|주변|인근|주위).*(?:볼\s*거|만날|저장.*있)", searching)
@@ -382,7 +406,9 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         edit_request or remove and not search or old_pending and old_pending.resume == "edit"
     ):
         directive.intent = "edit"
-    elif plan_request or old_pending and old_pending.resume in {"plan", "select"} and not search:
+    elif plan_request:
+        directive.intent = "plan"
+    elif old_pending and old_pending.resume in {"plan", "select"} and not search:
         directive.intent = old_pending.resume if old_pending else "plan"
     elif search:
         directive.intent = "search"
@@ -586,6 +612,7 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     if directive.intent == "reject" and not directive.reply:
         directive.reply = "이번 대화에서는 제외할게요. 다른 후보가 필요하면 알려주세요."
     if directive.intent == "chat":
+        state.pending = old_pending
         if re.search(r"고마워|고맙|감사", text):
             directive.reply = "좋아요. 더 정하거나 바꾸고 싶은 내용이 있으면 알려주세요."
         elif re.search(r"어떤\s*도움|무슨\s*일|뭘\s*할\s*수|어떤\s*기능", text):

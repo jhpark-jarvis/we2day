@@ -839,6 +839,11 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-place-options input { flex:0 0 18px; margin-top:3px; }
 .we2-place-options span { min-width:0; }
 .we2-place-options small { display:block; color:var(--muted); }
+.we2-place-row { display:flex; align-items:center; gap:12px; min-width:0; padding:8px 0; }
+.we2-place-row + .we2-place-row { border-top:1px solid var(--line); }
+.we2-place-row > label { flex:1; min-width:0; padding:0; }
+.we2-place-row > select { flex:0 1 130px; width:130px; min-width:0; font-size:16px; }
+@media (max-width:380px) { .we2-place-row { flex-wrap:wrap; } .we2-place-row > select { margin-left:26px; flex-basis:calc(100% - 26px); width:calc(100% - 26px); } }
 .we2-candidates { min-width:0; border:1px solid var(--line); border-radius:18px; background:var(--surface); overflow:hidden; }
 .we2-candidate-list { max-height:280px; overflow-y:auto; padding:0 16px; }
 .we2-candidate-list article { display:flex; align-items:center; gap:8px; padding:12px 0; }

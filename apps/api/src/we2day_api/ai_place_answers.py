@@ -24,7 +24,9 @@ def address_area(address):
 
 def recover_followup_area(directive, history):
     """Repair an unresolved alias using only a recent explicit user area, never model prose."""
-    if not directive.place_followup or not private_anchor(directive.scope.area):
+    if (
+        directive.intent not in {"search", "plan", "select"} and not directive.place_followup
+    ) or not private_anchor(directive.scope.area):
         return
     for message in reversed(history[-10:]):
         if message.role != "user":
@@ -54,6 +56,8 @@ def candidate_reply(session, followup=""):
     candidates = verified_candidates(session)
     failed = any(r["name"] == "search_places" and r["status"] == "failed" for r in session.reports)
     if not candidates:
+        if session.resolution in {"not_allowed", "invalid_arguments", "budget_exhausted"}:
+            return "이번 요청의 장소 검색을 실행하지 못했어요. 검색 조건을 다시 확인해 주세요."
         if failed:
             return "장소 검색을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
         if not session.searches:
@@ -90,7 +94,7 @@ def claims_place_search(reply):
     # Positive completion claims only; an honest '검색하지 못했어요' must stay intact.
     return bool(
         re.search(
-            r"찾았(?:어요|습니다|어)|찾아봤(?:어요|습니다|어)|검색했(?:어요|습니다|어)|검색(?:을)?\s*완료했|장소(?:를|들을)?\s*확인했",
+            r"찾았(?:어요|습니다|어)|찾아봤(?:어요|습니다|어)|검색했(?:어요|습니다|어)|검색(?:을)?\s*완료했|장소(?:를|들을)?\s*확인했|(?:저장한?\s*장소|장소가|검색\s*결과).{0,25}(?:확인되지|확인할\s*수\s*없|없어요|찾지\s*못)",
             reply,
         )
     )
@@ -116,8 +120,50 @@ async def read_candidate_request(directive, session, io):
         )
         return
     area = session.policy.scope.area
+    if session.selected and "lookup_selected_places" in session.allowed_tools:
+        await execute_batch(
+            session, [{"function": {"name": "lookup_selected_places", "arguments": "{}"}}], io
+        )
+        selected = [p for p in session.candidates.values() if p.source == "selected"]
+        if not selected:
+            if any(r["status"] == "failed" for r in session.reports):
+                session.resolution = "failed"
+                directive.ask(
+                    "target",
+                    "선택한 장소를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+                    resume="search",
+                )
+                return
+            session.resolution = "selection_required" if not session.reports else "unresolved"
+            directive.ask(
+                "region",
+                "선택한 장소를 현재 목록에서 확인할 수 없어요. 다시 선택하거나 동네를 알려주세요.",
+                resume="search",
+            )
+            return
+        if getattr(session, "include_only", False):
+            session.direct_final = True
+            session.resolution = "ready"
+            return
+        if getattr(session, "anchor_search", False):
+            explicit = [p for p in selected if session.selected_usage.get(p.ref) == "anchor"]
+            named = [p for p in selected if norm(p.title) == norm(area)]
+            anchors = explicit or named or (selected if len(selected) == 1 else [])
+            areas = {address_area(p.address) for p in anchors} - {""}
+            if len(anchors) != 1 or len(areas) != 1:
+                session.resolution = "ambiguous" if len(anchors) != 1 else "unresolved"
+                directive.ask(
+                    "region",
+                    "주변을 검색할 기준 장소 한 곳의 동네 주소를 확인해 주세요. "
+                    "공유 링크만으로는 동네를 알 수 없어요.",
+                    resume="search",
+                )
+                return
+            session.policy.scope.area = area = areas.pop()
+            directive.slots["region"] = area
     if private_anchor(area):
         if not session.selected:
+            session.resolution = "selection_required"
             directive.ask(
                 "region",
                 (
@@ -130,10 +176,6 @@ async def read_candidate_request(directive, session, io):
                 resume="plan" if directive.intent == "plan" else "search",
             )
             return
-        session.allowed_tools.add("lookup_selected_places")
-        await execute_batch(
-            session, [{"function": {"name": "lookup_selected_places", "arguments": "{}"}}], io
-        )
         anchors = [
             p
             for p in session.candidates.values()
@@ -141,6 +183,7 @@ async def read_candidate_request(directive, session, io):
         ]
         areas = {address_area(p.address) for p in anchors} - {""}
         if len(areas) != 1:
+            session.resolution = "unresolved"
             directive.ask(
                 "region",
                 "선택한 장소의 동네 주소를 확인할 수 없어요. 검색할 동네나 지역을 알려주세요.",
@@ -182,6 +225,18 @@ async def read_candidate_request(directive, session, io):
             }
         )
     await execute_batch(session, calls, io)
+    failed = any(r["status"] == "failed" for r in session.reports)
+    covered = set(session.candidate_kinds.values())
+    if session.resolution not in {"not_allowed", "invalid_arguments", "budget_exhausted"}:
+        session.resolution = (
+            ("partial" if covered else "failed")
+            if failed
+            else "ready"
+            if set(requested) <= covered
+            else "partial"
+            if covered
+            else "empty"
+        )
     if initial_plan and set(requested) <= set(session.candidate_kinds.values()):
         # Typed intake already determines these reads. Compose once from real evidence
         # instead of asking the model to rediscover the search arguments.

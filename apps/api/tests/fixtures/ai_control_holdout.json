@@ -1,0 +1,15 @@
+{
+  "frozen": "2026-10-28-before-holdout-execution",
+  "cases": [
+    {"text":"인근 카페 두 곳 찾아봐줄래?", "search":true, "kinds":["cafe"]},
+    {"text":"주위 식당하고 카페", "search":true, "kinds":["cafe","restaurant"]},
+    {"text":"먼저 식당만 추천해줄래?", "search":true, "kinds":["restaurant"]},
+    {"text":"카페는 빼고 식사 후보만", "search":true, "kinds":["restaurant"]},
+    {"text":"카페 후보 보여 주세요", "search":true, "kinds":["cafe"]},
+    {"text":"그럼 성수동 근처에서 카페 찾아줘", "search":true, "area":"성수동"},
+    {"text":"아니 카페는 검색하지 마", "search":false},
+    {"text":"고마워요", "search":false},
+    {"text":"안녕하세요", "search":false},
+    {"text":"추천 기능은 뭘 하는 거야?", "search":false}
+  ]
+}

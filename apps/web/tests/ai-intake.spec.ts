@@ -2,6 +2,106 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("selected roles, grounded candidates and reload retry preserve the draft", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await fixtureLogin(page);
+  const posts: Record<string, unknown>[] = [];
+  const identifier = "44444444-4444-4444-8444-444444444444";
+  const candidate = {
+    ref: "p1",
+    source: "naver",
+    title: "합성 카페",
+    address: "서울 중랑구",
+    destination: "합성 카페 (서울 중랑구)",
+  };
+  const state = {
+    date: null,
+    region: "중랑구",
+    activities: ["카페"],
+    search_scope: { area: "중랑구", kinds: ["cafe"], search_only: true },
+    control: { last_action: { operation: "search" }, outcome: "ready" },
+  };
+  let record: { id: string; version: number; turns: unknown[] } | null = null;
+  await page.route("**/api/ai/planner**", async (route) => {
+    const request = route.request(),
+      query = new URL(request.url()).searchParams;
+    if (request.method() === "GET") {
+      const data =
+        query.get("view") === "places"
+          ? [{ source: "favorite", id: identifier, title: "합성 기준점", address: "서울 중랑구" }]
+          : query.has("conversation_id") && record
+            ? { version: record.version, proposal: null, turns: record.turns }
+            : record
+              ? [
+                  {
+                    id: record.id,
+                    title: "합성 장소 대화",
+                    version: record.version,
+                    updated_at: new Date().toISOString(),
+                  },
+                ]
+              : [];
+      return route.fulfill({ json: data });
+    }
+    const body = request.postDataJSON();
+    posts.push(body);
+    const isChat = body.messages.at(-1).content === "고마워";
+    const result = {
+      reply: isChat ? "합성 감사 응답" : `합성 검색 결과 ${posts.length}`,
+      plan: null,
+      context: state,
+      tools: isChat ? [] : [{ name: "search_places", status: "ok", count: 1 }],
+      candidates: isChat ? [] : [candidate],
+      checks: [],
+      version: posts.length,
+    };
+    const turn = {
+      request_id: body.request_id,
+      version: posts.length,
+      user_text: body.messages.at(-1).content,
+      result,
+    };
+    record = {
+      id: body.conversation_id,
+      version: posts.length,
+      turns: [...(record?.turns || []), turn],
+    };
+    return route.fulfill({ json: result });
+  });
+  await page.goto("/plans/ai");
+  await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+  await page.getByRole("button", { name: "저장한 장소", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "저장한 장소" });
+  await dialog.getByRole("checkbox", { name: /합성 기준점/ }).check();
+  await dialog.getByRole("combobox", { name: "합성 기준점 사용 방식" }).selectOption("anchor");
+  await expect(dialog.getByRole("combobox")).toHaveValue("anchor");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await dialog.getByRole("button", { name: "완료", exact: true }).click();
+  const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
+  await input.fill("카페 검색");
+  await input.press("Enter");
+  await expect(page.getByText("합성 검색 결과 1", { exact: true })).toBeVisible();
+  expect(posts[0].selected_places).toEqual([
+    { source: "favorite", id: identifier, usage: "anchor" },
+  ]);
+  await input.fill("고마워");
+  await input.press("Enter");
+  await expect(page.getByText("합성 감사 응답", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "장소 후보 1개 보기", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("합성 감사 응답", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "후보 다시 검색", exact: true })).toBeVisible();
+  await input.fill("아직 보내지 않은 조건");
+  await page.getByRole("button", { name: "후보 다시 검색", exact: true }).click();
+  await expect(page.getByText("합성 검색 결과 3", { exact: true })).toBeVisible();
+  expect(posts[2].selected_places).toEqual([]);
+  await expect(input).toHaveValue("아직 보내지 않은 조건");
+  await page.setViewportSize({ width: 320, height: 568 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 type Request = {
   request_id: string;
   conversation_id: string;

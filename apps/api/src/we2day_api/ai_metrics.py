@@ -24,6 +24,10 @@ COUNTERS = {
     "search_candidates",
     "schema_repairs",
     "scope_blocks",
+    "selected_count",
+    "planned_tools",
+    "executed_tools",
+    "control_version",
 }
 CATEGORIES = {
     "ai_timeout",

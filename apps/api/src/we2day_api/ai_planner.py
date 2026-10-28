@@ -16,14 +16,14 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from we2day_api.ai_context import model_messages
-from we2day_api.ai_dialogue import analyze, merge_context
+from we2day_api.ai_control import interpret, prepare, reduce_context
 from we2day_api.ai_dialogue import explicit_date as explicit_date
-from we2day_api.ai_intake import PlanningBrief, change_window, start_brief, window_checks
+from we2day_api.ai_dialogue import merge_context
+from we2day_api.ai_intake import PlanningBrief, window_checks
 from we2day_api.ai_place_answers import (
     candidate_reply,
     claims_place_search,
     read_candidate_request,
-    recover_followup_area,
 )
 from we2day_api.ai_place_policy import PlacePolicy
 from we2day_api.ai_runtime import (
@@ -147,6 +147,7 @@ class SavedChatResult(ChatResult):
     conversation_id: UUID | None = None
     version: int = 0
     candidates: list[Candidate] = Field(default_factory=list, max_length=64)
+    candidates_available: bool = True
 
 
 async def complete(
@@ -172,9 +173,10 @@ async def complete(
     format_completion = False
     schema_completion = bool(session and session.direct_final)
     try:
-        for step in range(3):
+        steps = max(0, 3 - stats.counts.get("model_calls", 0))
+        for step in range(steps):
             budget.remaining()
-            final = step == 2 or session is None or format_completion or schema_completion
+            final = step == steps - 1 or session is None or format_completion or schema_completion
             inputs = {
                 "model": MODEL,
                 "messages": messages,
@@ -335,7 +337,7 @@ async def complete(
                 ):
                     raise ValueError("Missing requested plan or date mismatch")
             except (ValidationError, ValueError):
-                if format_completion or step == 2:
+                if format_completion or step == steps - 1:
                     raise
                 # One formatting completion inside the same three-call budget, never a
                 # retry of transport/provider failures or permission errors.
@@ -517,7 +519,10 @@ async def _chat(body, settings, store, client, budget, stats):
                 replay.setdefault("prompt_version", turn.get("prompt_version"))
                 stats.counts["replayed"] = 1
                 return SavedChatResult(
-                    **replay, conversation_id=body.conversation_id, version=turn["version"]
+                    **replay,
+                    conversation_id=body.conversation_id,
+                    version=turn["version"],
+                    candidates_available=False,
                 )
             acquired = True
             context = StoredContext.model_validate(head.get("context") or {})
@@ -540,23 +545,15 @@ async def _chat(body, settings, store, client, budget, stats):
             before_context["dialogue"]["pending"] = None
         if proposal and not before_context.get("date") and not context.dialogue.cleared_date:
             before_context["date"] = proposal.date
-        directive = (
-            start_brief(body.brief, before_context)
-            if body.brief
-            else change_window(latest, before_context)
-        )
-        if not directive:
-            if before_context.get("intake"):
-                before_context["intake"]["pending"] = None
-            directive = analyze(
-                latest,
-                before_context,
-                proposal,
-                body.chosen_places,
-                today,
-                selected=bool(body.selected_places),
-            )
-        recover_followup_area(directive, body.messages[:-1])
+        decision = prepare(body, before_context, proposal, today)
+        before_context, directive = decision.context, decision.directive
+        if decision.interpret:
+            if not await store.rpc("reserve_ai_planner_request"):
+                raise HTTPException(429, "ai_rate_limited")
+            decision.model_reserved = True
+            await interpret(decision, latest, settings, client, budget, stats)
+            if body.selected_places and directive.intent in {"search", "plan", "select"}:
+                directive.allowed_tools.add("lookup_selected_places")
         directive.state.turn_version = body.version + 1
         if directive.slots.get("activity_edit"):
             directive.slots["activity_edit"]["turn_version"] = body.version + 1
@@ -587,15 +584,9 @@ async def _chat(body, settings, store, client, budget, stats):
             k: v for k, v in directive.slots.items() if k in {"date", "budget", "transport"}
         }
         session.allowed_tools = set(directive.allowed_tools)
-        if body.selected_places and directive.intent in {"search", "plan", "select"}:
-            session.allowed_tools.add("lookup_selected_places")
-            if not re.search(r"검색|찾아|주변|근처|다른|새로운|추가", latest):
-                session.allowed_tools.discard("search_places")
-            else:
-                session.needs_place_search = True
-            if body.brief and not body.brief.region:
-                session.allowed_tools.discard("search_places")
-                session.needs_place_search = False
+        session.include_only = decision.include_only
+        session.anchor_search = decision.nearby
+        session.needs_place_search = "search_places" in session.allowed_tools
         session.direct_final = not session.allowed_tools
         session.plan_date = known_date
         session.require_plan = bool(known_date and directive.intent in {"plan", "select"})
@@ -686,7 +677,7 @@ async def _chat(body, settings, store, client, budget, stats):
             messages = model_messages(
                 SYSTEM, body, context, scope, directive, session, proposal, today, latest
             )
-            if not await store.rpc("reserve_ai_planner_request"):
+            if not decision.model_reserved and not await store.rpc("reserve_ai_planner_request"):
                 raise HTTPException(429, "ai_rate_limited")
         if directive.reply:
             stats.counts["server_responses"] = 1
@@ -709,11 +700,22 @@ async def _chat(body, settings, store, client, budget, stats):
             answer.plan.date = body.brief.date
             answer.plan.budget = body.brief.budget
             answer.plan.transport = body.brief.transport
+        if directive.notices:
+            answer.reply = "\n".join([*directive.notices, answer.reply])[:4000]
         answer.context = StoredContext.model_validate(
-            merge_context(
-                context.model_dump(), answer.context.model_dump(exclude_unset=True), directive
+            reduce_context(
+                before_context,
+                answer.context.model_dump(exclude_unset=True),
+                directive,
+                body,
+                session,
+                decision.reason,
             )
         )
+        stats.counts["selected_count"] = len(body.selected_places)
+        stats.counts["planned_tools"] = len(directive.allowed_tools)
+        stats.counts["executed_tools"] = len(session.reports)
+        stats.counts["control_version"] = 1
         if not answer.plan and proposal:
             answer.checks = list(dict.fromkeys(answer.checks + check_course(proposal)))
         answer.checks = list(
@@ -721,6 +723,10 @@ async def _chat(body, settings, store, client, budget, stats):
         )[:16]
         candidates = session.visible_candidates()
         if body.conversation_id:
+            stored_result = answer.model_dump(mode="json")
+            # Match the existing PostgreSQL JSONB text limit before attempting a commit.
+            if len(json.dumps(stored_result, ensure_ascii=False).encode()) > 32768:
+                raise HTTPException(422, "ai_context_too_long")
             with stats.span("persist"):
                 saved = await store.rpc(
                     "finish_ai_planner_turn",
@@ -730,7 +736,7 @@ async def _chat(body, settings, store, client, budget, stats):
                         "p_lease": lease,
                         "p_version": body.version,
                         "p_user": latest,
-                        "p_result": answer.model_dump(mode="json"),
+                        "p_result": stored_result,
                         "p_prompt": PROMPT_VERSION,
                     },
                 )

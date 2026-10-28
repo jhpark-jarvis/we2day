@@ -15,6 +15,7 @@ class PromptBundle:
     system: str
     finish: str
     repair: str
+    interpret: str = ""
 
 
 def read_bundle(root: Traversable) -> PromptBundle:
@@ -31,7 +32,10 @@ def read_bundle(root: Traversable) -> PromptBundle:
     if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("Invalid prompt digest")
     sections = {}
-    for name in ("system", "finish", "repair"):
+    names = ["system", "finish", "repair"]
+    if int(version.rsplit("v", 1)[1]) >= 12:
+        names.append("interpret")
+    for name in names:
         content = root.joinpath(version, f"{name}.txt").read_bytes()
         if not content or len(content) > 16384:
             raise ValueError("Invalid prompt section size")

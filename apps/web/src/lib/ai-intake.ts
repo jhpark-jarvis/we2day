@@ -17,6 +17,8 @@ export type IntakeContext = {
   activities?: string[];
   budget?: number | null;
   requirements?: string;
+  search_scope?: Record<string, unknown>;
+  control?: { last_action?: { operation: string } | null; outcome?: string };
   intake?: { data: PlanningBrief } | null;
 };
 
