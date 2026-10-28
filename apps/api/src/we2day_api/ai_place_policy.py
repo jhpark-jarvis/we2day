@@ -111,7 +111,10 @@ def area_matches(area, address):
     suffix = r"(?:특별자치시|특별시|광역시|특별자치도|시|군|구|읍|면|동|리)(?:\d+가)?"
     return bool(tokens) and all(
         any(
-            norm(token) == norm(word) or re.fullmatch(re.escape(token) + suffix, word)
+            norm(token) == norm(word)
+            or re.fullmatch(re.escape(token) + suffix, word)
+            or token.endswith(("동", "로"))
+            and re.fullmatch(re.escape(token) + r"\d+가", word)
             for word in words
         )
         for token in tokens

@@ -16,7 +16,7 @@ from we2day_api import ai_planner
 from we2day_api.ai_control import interpret, prepare, state_at
 from we2day_api.ai_dialogue import analyze, merge_context
 from we2day_api.ai_intake import PlanningBrief, start_brief
-from we2day_api.ai_place_policy import PlacePolicy, SearchScope
+from we2day_api.ai_place_policy import PlacePolicy, SearchScope, area_matches
 from we2day_api.ai_runtime import Budget, RunStats
 from we2day_api.ai_tool_runtime import execute_batch
 from we2day_api.ai_tools import ModelPlan, ToolSession
@@ -509,3 +509,18 @@ def test_initial_optional_preparation_padding_cannot_invalidate_required_plan():
         assert stats.counts["model_calls"] == 1 and stats.counts["optional_normalizations"] == 1
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "area,address,expected",
+    [
+        ("성수동", "서울특별시 성동구 성수동1가 1", True),
+        ("성수동", "서울특별시 성동구 성수동2가 1", True),
+        ("종로", "서울특별시 종로구 종로3가 1", True),
+        ("성수동1가", "서울특별시 성동구 성수동2가 1", False),
+        ("성수동", "서울특별시 성동구 성수동가든 1", False),
+        ("양주", "경기도 남양주시 1", False),
+    ],
+)
+def test_numbered_legal_neighborhoods_match_only_their_parent(area, address, expected):
+    assert area_matches(area, address) == expected
