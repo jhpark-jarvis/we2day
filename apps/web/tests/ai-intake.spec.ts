@@ -179,10 +179,14 @@ test("selected roles, grounded candidates and reload retry preserve the draft", 
   await page.reload();
   await expect(page.getByText("합성 감사 응답", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "후보 다시 검색", exact: true })).toBeVisible();
+  await input.fill("고마워");
+  await input.press("Enter");
+  await expect(page.getByText("합성 감사 응답", { exact: true })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "후보 다시 검색", exact: true })).toBeVisible();
   await input.fill("아직 보내지 않은 조건");
   await page.getByRole("button", { name: "후보 다시 검색", exact: true }).click();
-  await expect(page.getByText("합성 검색 결과 3", { exact: true })).toBeVisible();
-  expect(posts[2].selected_places).toEqual([]);
+  await expect(page.getByText("합성 검색 결과 4", { exact: true })).toBeVisible();
+  expect(posts[3].selected_places).toEqual([]);
   await expect(input).toHaveValue("아직 보내지 않은 조건");
   await page.setViewportSize({ width: 320, height: 568 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

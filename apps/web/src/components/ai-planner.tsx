@@ -540,8 +540,12 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       const searched = result.tools?.some(
         (tool: { name: string }) => tool.name === "search_places",
       );
-      if (hasCandidates || searched || !sameScope) setCandidates(result.candidates || []);
-      setCandidatesUnavailable(result.candidates_available === false && !hasCandidates);
+      if (hasCandidates || searched || !sameScope) {
+        setCandidates(result.candidates || []);
+        setCandidatesUnavailable(result.candidates_available === false && !hasCandidates);
+      } else if (result.candidates_available === false) {
+        setCandidatesUnavailable(true);
+      }
       setChecks(result.checks || []);
       if (result.plan) {
         setProposal(result.plan);
