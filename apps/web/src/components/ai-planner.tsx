@@ -30,6 +30,14 @@ import { We2AiIcon } from "@/components/we2-ai-icon";
 import { briefMessage, type IntakeContext, type PlanningBrief } from "@/lib/ai-intake";
 import type { PlanContent } from "@/lib/plans";
 
+function searchScopeKey(scope: IntakeContext["search_scope"]): string {
+  return JSON.stringify(
+    Object.keys(scope || {})
+      .sort()
+      .map((key) => [key, scope?.[key]]),
+  );
+}
+
 type Conversation = { id: string; title: string; version: number; updated_at: string };
 type Turn = {
   request_id: string;
@@ -535,8 +543,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       if (!preserveInput) updateText("");
       const hasCandidates = Boolean(result.candidates?.length);
       const sameScope =
-        JSON.stringify(result.context?.search_scope) ===
-        JSON.stringify(planningContext?.search_scope);
+        searchScopeKey(result.context?.search_scope) ===
+        searchScopeKey(planningContext?.search_scope);
       const searched = result.tools?.some(
         (tool: { name: string }) => tool.name === "search_places",
       );

@@ -118,7 +118,17 @@ test("selected roles, grounded candidates and reload retry preserve the draft", 
         query.get("view") === "places"
           ? [{ source: "favorite", id: identifier, title: "합성 기준점", address: "서울 중랑구" }]
           : query.has("conversation_id") && record
-            ? { version: record.version, proposal: null, turns: record.turns }
+            ? {
+                version: record.version,
+                proposal: null,
+                turns: JSON.parse(
+                  JSON.stringify(record.turns, (key, value) =>
+                    key === "search_scope"
+                      ? Object.fromEntries(Object.entries(value).reverse())
+                      : value,
+                  ),
+                ),
+              }
             : record
               ? [
                   {
