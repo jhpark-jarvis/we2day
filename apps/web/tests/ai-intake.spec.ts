@@ -2,6 +2,92 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("cleared dates and pending changes cannot save an old proposal after reload", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await fixtureLogin(page);
+  const id = historyIds[0];
+  let version = 1;
+  let context: Record<string, unknown> = {
+    date: "2030-01-05",
+    dialogue: { cleared_date: false, pending: null },
+  };
+  let plan = screenPlan();
+  await page.route("**/api/ai/planner**", async (route) => {
+    const request = route.request(),
+      query = new URL(request.url()).searchParams;
+    if (request.method() === "GET") {
+      return route.fulfill({
+        json: query.has("conversation_id")
+          ? {
+              version,
+              proposal: plan,
+              turns: [
+                {
+                  request_id: id,
+                  version,
+                  user_text: "합성 이전 질문",
+                  result: { reply: "합성 이전 응답", plan, context },
+                },
+              ],
+            }
+          : [{ id, title: "합성 날짜 변경", version, updated_at: "2030-01-05T00:00:00Z" }],
+      });
+    }
+    const latest = request.postDataJSON().messages.at(-1).content;
+    let changed: PlanContent | null = null;
+    if (latest.includes("미정"))
+      context = { date: null, dialogue: { cleared_date: true, pending: null } };
+    else if (latest.includes("2030-02-03")) {
+      context = { date: "2030-02-03", dialogue: { cleared_date: false, pending: null } };
+      plan = changed = { ...plan, date: "2030-02-03" };
+    } else if (latest.includes("제목"))
+      context = { ...context, dialogue: { cleared_date: false, pending: { resume: "edit" } } };
+    else context = { ...context, dialogue: { cleared_date: false, pending: null } };
+    version++;
+    return route.fulfill({
+      json: {
+        version,
+        reply: `합성 조건 변경 ${version}`,
+        context,
+        plan: changed,
+        candidates: [],
+        checks: [],
+      },
+    });
+  });
+  await page.goto("/plans/ai");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
+  const save = page.getByRole("button", { name: "초안 저장", exact: true });
+  await expect(save).toBeEnabled();
+  await input.fill("날짜는 미정으로 바꿔줘");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(save).toBeDisabled();
+  await expect(page.locator(".we2-proposal-date")).toContainText("날짜 미정");
+  await expect(
+    page.getByText("초안을 저장하려면 날짜를 정해 주세요.", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await expect(save).toBeDisabled();
+  await input.fill("날짜는 2030-02-03으로 바꿔줘");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(save).toBeEnabled();
+  await expect(page.locator(".we2-proposal-date")).toContainText("2030-02-03");
+  await input.fill("제목 바꿔줘");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(save).toBeDisabled();
+  await expect(
+    page.getByText("진행 중인 변경을 마치거나 취소한 뒤 저장해 주세요.", { exact: true }),
+  ).toBeVisible();
+  await input.fill("취소해줘");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(save).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("selected roles, grounded candidates and reload retry preserve the draft", async ({
   page,
 }) => {

@@ -25,7 +25,7 @@ from we2day_api.ai_place_answers import (
     claims_place_search,
     read_candidate_request,
 )
-from we2day_api.ai_place_policy import PlacePolicy, explicit_area
+from we2day_api.ai_place_policy import PlacePolicy, explicit_area, kinds
 from we2day_api.ai_runtime import (
     AIStore,
     Budget,
@@ -395,6 +395,37 @@ async def complete(
                         for name, value in session.plan_updates.items():
                             setattr(plan, name, value)
                         plan = PlanContent.model_validate(plan.model_dump())
+            if (
+                session
+                and session.require_plan
+                and model_answer.plan
+                and not plan
+                and guarded
+                and not format_completion
+                and step < steps - 1
+            ):
+                # The same single repair also covers value/grounding failures. It is
+                # final-only, uses the existing evidence and never grants more tools.
+                format_completion = True
+                stats.counts["schema_repairs"] = stats.counts.get("schema_repairs", 0) + 1
+                messages.append({"role": "assistant", "content": model_answer.model_dump_json()})
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": PROMPT.repair
+                        + "\n"
+                        + json.dumps(
+                            {
+                                "validation_errors": guarded,
+                                "requested_activities": session.requested_activities
+                                or session.initial_activities,
+                                "place_kinds": session.candidate_kinds,
+                            },
+                            ensure_ascii=False,
+                        ),
+                    }
+                )
+                continue
             checks = (check_course(plan) if plan else []) + guarded
             reply = model_answer.reply
             if session and (
@@ -600,9 +631,22 @@ async def _chat(body, settings, store, client, budget, stats):
         session.append_only = bool(
             directive.state.append_pending and proposal and directive.intent in {"plan", "select"}
         )
-        session.plan_updates = {
-            k: v for k, v in directive.slots.items() if k in {"date", "budget", "transport"}
-        }
+        if (
+            not body.brief
+            and directive.intent == "plan"
+            and not session.append_only
+            and not scope.exact_name
+            and context.activities
+            and set(scope.kinds) == set(kinds(" ".join(context.activities)))
+            and not re.search(
+                r"\d+\s*(?:곳|개|번)|[한두세네]\s*(?:곳|개|번)|여러|더\s*많|늘려", latest
+            )
+        ):
+            session.activity_limit = len(context.activities)
+            session.requested_activities = context.activities
+        session.plan_updates = {"budget": context.budget, "transport": context.transport}
+        if known_date:
+            session.plan_updates["date"] = known_date
         session.allowed_tools = set(directive.allowed_tools)
         session.include_only = decision.include_only
         session.anchor_search = decision.nearby

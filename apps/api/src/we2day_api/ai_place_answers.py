@@ -218,7 +218,9 @@ async def read_candidate_request(directive, session, io):
             return
         session.policy.scope.area = area = areas.pop()
         directive.slots["region"] = area
-    initial_plan = directive.intent == "plan" and session.initial_activities is not None
+    initial_plan = directive.intent == "plan" and (
+        session.initial_activities is not None or session.requested_activities is not None
+    )
     if directive.intent != "search" and not directive.place_followup and not initial_plan:
         return
     if not area and not session.policy.scope.exact_name:

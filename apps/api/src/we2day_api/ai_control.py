@@ -10,7 +10,8 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from we2day_api.ai_dialogue import Directive, analyze, merge_context, social_turn
+from we2day_api.ai_dialogue import Directive, analyze, merge_context, new_task, social_turn
+from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, change_window, start_brief
 from we2day_api.ai_place_answers import private_anchor, recover_followup_area
 from we2day_api.ai_place_policy import Kind, SearchScope, explicit_area, kinds, norm
@@ -117,6 +118,21 @@ def prepare(body, context, proposal, today):
             directive.slots.update(window.slots)
             directive.notices.append(window.reply)
             reason = "compound"
+    if not body.brief and cancel_request(latest):
+        directive = Directive(
+            directive.state,
+            directive.scope,
+            intent="chat",
+            reply="진행 중인 변경을 취소했어요. 이미 정한 조건과 코스는 유지해요.",
+        )
+        directive.state.intent = "chat"
+        directive.state.pending = None
+        directive.state.append_pending = False
+        directive.slots.update(activity_edit=None, pending_fields=None)
+        if before.get("intake"):
+            directive.slots["intake"] = {**before["intake"], "pending": None}
+    if not window and (before.get("intake") or {}).get("pending") and new_task(latest):
+        directive.slots["intake"] = {**before["intake"], "pending": None}
     short = re.sub(r"[\s.!?]", "", latest)
     retry = bool(
         re.fullmatch(
@@ -140,15 +156,56 @@ def prepare(body, context, proposal, today):
         if retry and previous.get("scope"):
             directive.scope = SearchScope.model_validate(previous["scope"])
         directive.scope.area = directive.scope.area or before.get("region", "")
-        directive.scope.kinds = directive.scope.kinds or kinds(
-            " ".join(before.get("activities", []))
-        )
+        if not directive.scope.kinds and not (retry and previous.get("scope")):
+            directive.scope.kinds = kinds(" ".join(before.get("activities", [])))
         directive.allowed_tools = {"search_places"}
         reason = "retry" if retry else "selection"
+        if retry and control and control.get("last_action") is None:
+            directive.ask(
+                "target",
+                "어떤 작업을 다시 할까요? 원하는 검색이나 변경을 알려주세요.",
+                resume="search",
+            )
+        elif (
+            retry
+            and previous.get("scope")
+            and not directive.scope.kinds
+            and directive.state.excluded_kinds
+        ):
+            directive.ask("target", "남길 활동이나 새로 찾을 활동을 알려주세요.", resume="search")
     if directive.intent in PLACE_INTENTS or directive.place_followup:
         # A selection correction does not erase the user's earlier explicit area.
         if not (private_anchor(explicit_area(latest)) and explicit_area(latest)):
             recover_followup_area(directive, body.messages[:-1])
+    requested_kinds = list(directive.scope.kinds)
+    directive.scope.kinds = [
+        kind for kind in directive.scope.kinds if kind not in directive.state.excluded_kinds
+    ]
+    if (
+        requested_kinds
+        and not directive.scope.kinds
+        and directive.intent in PLACE_INTENTS
+        and not directive.reply
+    ):
+        directive.ask("target", "남길 활동이나 새로 찾을 활동을 알려주세요.", resume="search")
+    if (
+        directive.intent == "search"
+        and not directive.reply
+        and not directive.scope.area
+        and not directive.scope.exact_name
+        and not body.selected_places
+    ):
+        directive.ask(
+            "region", "어느 지역에서 찾아볼까요? 동네나 지역을 알려주세요.", resume="search"
+        )
+    if directive.intent in {"plan", "select"} and not directive.reply:
+        known_date = directive.slots.get("date", before.get("date"))
+        if not known_date and not directive.state.cleared_date and proposal:
+            known_date = proposal.date
+        if not known_date:
+            directive.ask(
+                "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume=directive.intent
+            )
     replacement_area = explicit_area(latest)
     if (
         directive.intent == "chat"
@@ -369,18 +426,21 @@ def reduce_context(before, incoming, directive, body, session, reason):
     result = merge_context(before, incoming, directive)
     old = state_at(before, body.version)
     previous = old.get("last_action")
+    cancelled = not body.brief and cancel_request(body.messages[-1].content)
+    if cancelled:
+        previous = None
     operation = (
         directive.state.pending.resume
         if directive.state.pending and directive.state.pending.resume in PLACE_INTENTS
         else directive.intent
     )
-    if operation in PLACE_INTENTS or directive.place_followup:
+    if not cancelled and (operation in PLACE_INTENTS or directive.place_followup):
         previous = {
             "operation": operation if operation in PLACE_INTENTS else "search",
             "scope": directive.scope.model_dump(),
         }
-    elif previous and directive.slots.get("region"):
-        previous = {**previous, "scope": {**previous["scope"], "area": directive.slots["region"]}}
+    elif previous:
+        previous = {**previous, "scope": directive.scope.model_dump()}
     control = {
         "version": VERSION,
         "basis": body.version + 1,
@@ -409,7 +469,11 @@ def reduce_context(before, incoming, directive, body, session, reason):
         }
         current["data"]["recommend"] = not bool(current["data"].get("activities"))
         result["intake"] = current
-    if not body.brief and social_turn(body.messages[-1].content):
+    if (
+        not body.brief
+        and directive.intent == "chat"
+        and not cancel_request(body.messages[-1].content)
+    ):
         # A social turn preserves an active clarification across every controller;
         # otherwise its unchanged basis would look like an older API writer next turn.
         for name in ("intake", "activity_edit", "pending_fields"):

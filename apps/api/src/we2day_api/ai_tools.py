@@ -357,6 +357,7 @@ class ToolSession:
         self.fresh_refs: set[str] = set()
         self.activity_limit: int | None = None
         self.initial_activities: list[str] | None = None
+        self.requested_activities: list[str] | None = None
         for item in chosen:
             self.chosen_candidate = self.add(item.title, item.address, "user", item.destination)
 
@@ -437,7 +438,7 @@ class ToolSession:
     def visible_candidates(self):
         visible = []
         for item in self.candidates.values():
-            if self.operation == "search" and item.ref not in self.fresh_refs:
+            if item.ref not in self.fresh_refs:
                 continue
             detected = kinds(item.title)
             kind = self.candidate_kinds.get(item.ref, detected[0] if len(detected) == 1 else "any")
@@ -468,6 +469,7 @@ class ToolSession:
         if scope.single_activity and len(resolved.activities) > 1:
             return None, ["요청한 활동 개수를 넘는 제안은 반영하지 않았어요."]
         previous = self.previous_plan.activities if self.previous_plan else []
+        requested_order = self.requested_activities or self.initial_activities
         for index, (model, activity) in enumerate(
             zip(model_plan.activities, resolved.activities, strict=True)
         ):
@@ -476,8 +478,8 @@ class ToolSession:
             actual_kind = self.candidate_kinds.get(
                 model.place_ref, detected[0] if len(detected) == 1 else "any"
             )
-            if self.initial_activities:
-                expected = kinds(self.initial_activities[index])
+            if requested_order:
+                expected = kinds(requested_order[index])
                 if expected and actual_kind not in expected:
                     return None, ["선택한 활동 순서와 맞지 않는 제안은 반영하지 않았어요."]
             if self.policy.forbidden(
@@ -520,6 +522,9 @@ class ToolSession:
         if self.previous_plan is None:
             # Punctuation-only model padding is not a preparation item. Preserve user plans.
             resolved.preparation = [p for p in resolved.preparation if re.search(r"\w", p)]
+        for name, value in self.plan_updates.items():
+            setattr(resolved, name, value)
+        resolved = PlanContent.model_validate(resolved.model_dump())
         return resolved, []
 
     def execute(self, name: str, arguments) -> dict:

@@ -271,6 +271,47 @@ def social_turn(text):
     )
 
 
+def new_task(text):
+    """Explicit operations supersede a question; bare short answers do not."""
+    return bool(
+        (
+            re.search(r"검색|찾아|추천|알아\s*봐|코스.*(?:만들|짜)|플랜.*(?:만들|짜)", text)
+            or re.search(
+                r"제목|날짜|예산|총액|지역|동네|이동\s*수단|추가\s*조건|시작\s*시간|종료\s*시간",
+                text,
+            )
+            and re.search(r"바꿔|바꾸|변경|수정|해줘|할게|미정|없음|초기화|비워|\d", text)
+        )
+        and not re.search(r"어떤\s*기능|어떤\s*도움|사용법|뭘\s*할\s*수", text)
+    )
+
+
+def field_values(text):
+    """Split explicitly named condition clauses before interpreting their values."""
+    pattern = r"추가\s*조건|이동\s*수단|전체\s*비용|제목|명칭|날짜|일자|예산|총액|지역|동네|교통"
+    quoted = [m.span() for m in re.finditer(r"[\"'‘“][^\"'’”]*[\"'’”]", text)]
+    matches = [
+        m
+        for m in re.finditer("(?:" + pattern + r")(?:만|은|는|을|를|이|가)?\s*", text)
+        if not any(start <= m.start() < end for start, end in quoted)
+    ]
+    result = {}
+    for index, match in enumerate(matches):
+        key = re.sub(r"\s", "", re.match(pattern, match[0])[0])
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        result[key] = text[match.end() : end].strip(" ,.!?\n")
+    return result
+
+
+def cleared(value):
+    return bool(re.match(r"(?:아직\s*)?(?:미정|없음|비워|없애|초기화|정하지\s*않)", value))
+
+
+def replacement(value):
+    value = re.split(r"(?:으로|로)\s*(?:바꿔|바꾸|변경|수정|해\s*줘|할게|정해)", value)[0]
+    return re.sub(r"\s*(?:그리고|바꾸고|변경하고|수정하고)$", "", value).strip(" '‘’\"“”,.!?")
+
+
 def analyze(text, context, proposal, chosen, today, *, selected=False):
     state = DialogueState.model_validate(context.get("dialogue") or {}).model_copy(deep=True)
     old_pending = state.pending
@@ -283,9 +324,56 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         directive.intent = directive.state.intent = "chat"
         directive.reply = "좋아요. 더 정하거나 바꾸고 싶은 내용이 있으면 알려주세요."
         return directive
+    help_question = bool(re.search(r"어떤\s*기능|어떤\s*도움|뭘\s*할\s*수|사용법", text))
+    if help_question:
+        directive.state.pending = old_pending
+        directive.reply = "장소 후보를 찾고, 조건을 정리해서 코스 초안을 함께 만들 수 있어요."
+        directive.intent = directive.state.intent = "chat"
+        return directive
+    question = bool(re.search(r"[?？]|얼마|몇\s*시|언제|어디|뭐|무엇|어떻게|충분", text))
+    changes = bool(re.search(r"바꿔|바꾸|변경|수정|검색|찾아|추천|알아\s*봐", text))
+    if question and not changes and (old_pending or field_values(text)):
+        directive.state.pending = old_pending
+        directive.intent = directive.state.intent = "chat"
+        if re.search(r"예산|총액|전체\s*비용", text):
+            value = context.get("budget", proposal.budget if proposal else None)
+            amount = f"{value:,}원" if value is not None else "미정"
+            directive.reply = f"현재 예산은 {amount}이에요. 아직 변경하지 않았어요."
+        elif re.search(r"날짜|일자", text):
+            directive.reply = (
+                f"현재 날짜는 {context.get('date') or '미정'}이에요. 아직 변경하지 않았어요."
+            )
+        elif re.search(r"지역|동네", text):
+            directive.reply = (
+                f"현재 지역은 {context.get('region') or '미정'}이에요. 아직 변경하지 않았어요."
+            )
+        else:
+            directive.reply = (
+                "아직 변경하지 않았어요. 새 값을 알려주거나 진행 중인 변경을 취소할 수 있어요."
+            )
+        return directive
+    fresh = new_task(text)
+    answer_fields = set(field_values(text))
+    pending_labels = {
+        "title": {"제목", "명칭"},
+        "date": {"날짜", "일자"},
+        "budget": {"예산", "총액", "전체비용"},
+        "region": {"지역", "동네"},
+    }
+    if (
+        old_pending
+        and answer_fields
+        and answer_fields <= pending_labels.get(old_pending.field, set())
+        and not re.search(r"검색|찾아|추천|알아\s*봐|코스.*만들", text)
+    ):
+        fresh = False
+    if fresh:
+        old_pending = None
     if context.get("pending_fields"):
         directive.slots["pending_fields"] = None
-    compound = edit_activities(text, proposal, context.get("activity_edit"), clock_value)
+    compound = edit_activities(
+        text, proposal, None if fresh else context.get("activity_edit"), clock_value
+    )
     if compound:
         state.pending = None
         state.append_pending = False
@@ -332,14 +420,19 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     if re.search(r"(?:추천|검색).*기능.*(?:뭐|뭘|무엇|어떤|설명|사용법)", text):
         directive.reply = "장소 후보를 찾고, 조건을 정리해서 코스 초안을 함께 만들 수 있어요."
         return directive
-    denied_kinds = negative_kinds(text)
-    positive = positive_text(text, denied_kinds)
+    unquoted = re.sub(r"[\"'‘“][^\"'’”]*[\"'’”]", "", text)
+    literal_condition = bool(field_values(text)) and bool(
+        re.search(r"바꿔|바꾸|변경|수정|해\s*줘", unquoted)
+    )
+    semantic_text = unquoted if literal_condition else text
+    denied_kinds = negative_kinds(semantic_text)
+    positive = positive_text(semantic_text, denied_kinds)
     active = kinds(positive)
     state.excluded_kinds = list(
         dict.fromkeys([k for k in state.excluded_kinds if k not in active] + sorted(denied_kinds))
     )
     known = place_names(proposal, chosen)
-    rejected, restored = rejected_names(text, known)
+    rejected, restored = rejected_names(semantic_text, known)
     state.rejected_places = [
         n for n in state.rejected_places if norm(n) not in {norm(v) for v in restored}
     ]
@@ -389,11 +482,19 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         and re.search(r"추가|넣어|포함", positive)
         and (active or re.search(r"활동|장소", positive))
     )
-    title_field = bool(re.search(r"제목|(?:코스|플랜)\s*(?:이름|명칭)", text))
-    date_field = bool(re.search(r"날짜|일자", text))
-    time_field = "시간" in text
-    budget_field = bool(re.search(r"예산|총액|전체\s*비용", text))
-    transport_field = bool(re.search(r"이동\s*수단|교통|자동차|자가용|대중교통|도보", text))
+    field_text = re.sub(r"[\"'‘“][^\"'’”]*[\"'’”]", "", text)
+    title_field = bool(re.search(r"제목|(?:코스|플랜)\s*(?:이름|명칭)", field_text))
+    date_field = bool(re.search(r"날짜|일자", field_text))
+    time_field = "시간" in field_text
+    budget_field = bool(re.search(r"예산|총액|전체\s*비용", field_text))
+    transport_field = bool(re.search(r"이동\s*수단|교통|자동차|자가용|대중교통|도보", field_text))
+    fields = field_values(text)
+    region_field = bool("지역" in fields or "동네" in fields)
+    requirement_field = "추가조건" in fields
+    questioning = bool(re.search(r"충분|얼마|무엇|뭐야|어떻게|어떤|왜", text)) and not edit_request
+    condition_request = not questioning and bool(
+        fields and (edit_request or any(cleared(v) for v in fields.values()))
+    )
     weather = bool(re.search(r"날씨|예보|비\s*오|우천", text))
     remove = bool(re.search(r"빼\s*줘|제외해|삭제해|없애", text)) and not bool(
         re.search(r"빼지\s*마|제외하지\s*마", text)
@@ -402,8 +503,21 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         directive.intent = "select"
     elif adding:
         directive.intent = "plan"
+    elif (
+        condition_request
+        and not search
+        and not plan_request
+        and not (old_pending and old_pending.resume in {"plan", "select"})
+    ):
+        directive.intent = "edit"
     elif proposal and (
-        edit_request or remove and not search or old_pending and old_pending.resume == "edit"
+        edit_request
+        and not search
+        or remove
+        and not search
+        or old_pending
+        and old_pending.resume == "edit"
+        and not search
     ):
         directive.intent = "edit"
     elif plan_request:
@@ -433,6 +547,18 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         state.append_pending = False
     if directive.intent in {"search", "plan", "select"}:
         directive.scope = requested_scope(positive, directive.scope, chosen)
+        if (
+            plan_request
+            and not active
+            and not selection
+            and not adding
+            and context.get("activities")
+            and not re.search(r"이걸|그걸|이곳|그곳|선택|방금", text)
+        ):
+            # A one-off cafe lookup is not a replacement of the requested itinerary.
+            directive.scope.kinds = kinds(" ".join(context["activities"]))
+            directive.scope.exact_name, directive.scope.name_kind = "", "any"
+            directive.scope.single_activity = len(context["activities"]) == 1
         if adding:
             old_kinds = {k for activity in proposal.activities for k in kinds(activity.title)}
             new_kinds = [k for k in active if k not in old_kinds]
@@ -469,15 +595,50 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     if re.search(r"날짜(?:는|를|가)?\s*(?:아직\s*)?(?:미정|나중|정하지|취소)", text):
         directive.slots["date"] = None
         state.cleared_date = True
-    if budget_field:
-        value = money_value(text)
+    if budget_field and not questioning:
+        budget_text = fields.get("예산", fields.get("총액", fields.get("전체비용", text)))
+        value = money_value(budget_text)
         if value is not None and 0 <= value <= 1_000_000_000:
             directive.slots["budget"] = value
+        elif cleared(budget_text):
+            directive.slots["budget"] = None
+    if condition_request and region_field:
+        raw_area = fields.get("지역", fields.get("동네", ""))
+        area = "" if cleared(raw_area) else replacement(raw_area)
+        if len(area) <= 100 and not re.search(r"https?://|[\n]", area):
+            directive.scope.area = area
+            directive.scope.exact_name, directive.scope.name_kind = "", "any"
+            directive.slots["region"] = area
+    if condition_request and requirement_field:
+        raw_requirement = fields["추가조건"]
+        value = "" if cleared(raw_requirement) else replacement(raw_requirement)
+        if len(value) <= 300:
+            directive.slots["requirements"] = value
+            inherited = negative_kinds(context.get("requirements", ""))
+            state.excluded_kinds = list(
+                dict.fromkeys(
+                    [kind for kind in state.excluded_kinds if kind not in inherited]
+                    + sorted(negative_kinds(value))
+                )
+            )
+            old_names, _ = rejected_names(context.get("requirements", ""), known)
+            new_names, restored_names = rejected_names(value, known)
+            removed = {norm(name) for name in old_names + restored_names}
+            state.rejected_places = list(
+                dict.fromkeys(
+                    [name for name in state.rejected_places if norm(name) not in removed]
+                    + new_names
+                )
+            )[-24:]
     transports = list(
         re.finditer(r"자동차|자가용|차로|운전|대중교통|버스|지하철|도보|걸어서", text)
     )
-    if transports and not (
-        directive.intent == "edit" and title_field and not re.search(r"이동\s*수단", text)
+    if (
+        transports
+        and not questioning
+        and not (
+            directive.intent == "edit" and title_field and not re.search(r"이동\s*수단", field_text)
+        )
     ):
         last = transports[-1][0]
         directive.slots["transport"] = (
@@ -487,9 +648,41 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
             if last in {"도보", "걸어서"}
             else "자동차"
         )
-    if directive.intent == "edit" and not directive.reply:
+    if (
+        condition_request
+        and transport_field
+        and cleared(fields.get("이동수단", fields.get("교통", "")))
+    ):
+        directive.slots["transport"] = ""
+    if (
+        directive.intent == "edit"
+        and "date" in directive.slots
+        and directive.slots["date"] is None
+        and budget_field
+        and "budget" not in directive.slots
+    ):
+        directive.slots.clear()
+        directive.scope = previous_scope.model_copy(deep=True)
+        directive.state.cleared_date = DialogueState.model_validate(
+            context.get("dialogue") or {}
+        ).cleared_date
+        directive.ask(
+            "target",
+            "미정 변경과 확인이 필요한 조건은 한 항목씩 알려주세요. 아직 변경하지 않았어요.",
+        )
+    if directive.intent == "edit" and not directive.reply and not proposal:
+        if directive.slots:
+            directive.reply = "요청한 조건을 바꿨어요."
+        elif budget_field:
+            directive.ask("budget", "전체 예산을 원 단위로 얼마로 정할까요?")
+        else:
+            directive.ask("target", "변경할 조건과 값을 알려주세요.")
+    if directive.intent == "edit" and not directive.reply and proposal:
         updated = proposal.model_copy(deep=True)
-        changed = False
+        for key in ("budget", "transport"):
+            if key in context:
+                setattr(updated, key, context[key])
+        changed = bool({"region", "requirements"} & directive.slots.keys())
         if old_pending and context.get("pending_fields"):
             for name, value in context["pending_fields"]["values"].items():
                 setattr(updated, name, value)
@@ -537,6 +730,9 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
             else:
                 directive.ask("title", "어떤 제목으로 바꿀까요? 새 제목을 알려주세요.")
         if date_field or pending_field == "date":
+            if "date" in directive.slots and directive.slots["date"] is None:
+                directive.reply = "날짜를 미정으로 바꿨어요. 초안을 저장하려면 날짜를 정해 주세요."
+                return directive
             if directive.slots.get("date"):
                 updated.date, changed = directive.slots["date"], True
             else:
@@ -545,7 +741,12 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
                 )
         if budget_field or pending_field == "budget":
             value = directive.slots.get("budget", money_value(text))
-            if value is not None and 0 <= value <= 1_000_000_000:
+            if (
+                "budget" in directive.slots
+                and value is None
+                or value is not None
+                and 0 <= value <= 1_000_000_000
+            ):
                 updated.budget, changed = value, True
                 directive.slots["budget"] = value
             else:
@@ -576,7 +777,16 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
             for name in ("date", "budget", "transport", "activities"):
                 directive.slots.pop(name, None)
             if fields:
-                directive.slots["pending_fields"] = {"values": fields, "turn_version": 0}
+                if any(value is None for value in fields.values()):
+                    # Existing pending schema cannot stage a nullable clear. Ask without
+                    # applying other clauses or introducing incompatible persisted values.
+                    directive.slots["pending_fields"] = None
+                    directive.reply = (
+                        "미정으로 바꾸는 조건과 확인이 필요한 조건은 한 항목씩 알려주세요. "
+                        "아직 변경하지 않았어요."
+                    )
+                else:
+                    directive.slots["pending_fields"] = {"values": fields, "turn_version": 0}
         else:
             if changed:
                 directive.plan = PlanContent.model_validate(updated.model_dump())
@@ -613,6 +823,9 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         directive.reply = "이번 대화에서는 제외할게요. 다른 후보가 필요하면 알려주세요."
     if directive.intent == "chat":
         state.pending = old_pending
+        if not cancel_request(text):
+            directive.slots.pop("pending_fields", None)
+            directive.slots.pop("activity_edit", None)
         if re.search(r"고마워|고맙|감사", text):
             directive.reply = "좋아요. 더 정하거나 바꾸고 싶은 내용이 있으면 알려주세요."
         elif re.search(r"어떤\s*도움|무슨\s*일|뭘\s*할\s*수|어떤\s*기능", text):
@@ -624,7 +837,16 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
 def merge_context(previous, incoming, directive):
     result = dict(previous)
     for key, value in incoming.items():
-        if key in {"dialogue", "search_scope", "date", "budget", "transport", "region"}:
+        if key in {
+            "dialogue",
+            "search_scope",
+            "date",
+            "budget",
+            "transport",
+            "region",
+            "requirements",
+            "activities",
+        }:
             continue
         # Empty full-schema defaults cannot erase an explicitly known condition.
         if result.get(key) in (None, "", []) and value not in (None, "", []):

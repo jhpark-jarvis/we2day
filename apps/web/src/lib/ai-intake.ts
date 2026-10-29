@@ -19,7 +19,10 @@ export type IntakeContext = {
   requirements?: string;
   search_scope?: Record<string, unknown>;
   control?: { last_action?: { operation: string } | null; outcome?: string };
-  intake?: { data: PlanningBrief } | null;
+  dialogue?: { cleared_date?: boolean; pending?: { resume: string } | null };
+  activity_edit?: unknown;
+  pending_fields?: unknown;
+  intake?: { data: PlanningBrief; pending?: string | null } | null;
 };
 
 export function emptyBrief(): PlanningBrief {

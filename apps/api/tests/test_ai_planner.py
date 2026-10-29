@@ -311,6 +311,8 @@ def test_restored_server_scope_rejects_outside_plan_and_persists_scope(setup):
             },
         )
     )
+    # The bounded value repair must reject the same out-of-scope proposal again.
+    replies.append(httpx.Response(200, json=replies[-1].json()))
     response = client.post(
         "/ai/planner",
         json={

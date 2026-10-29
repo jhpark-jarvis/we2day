@@ -506,6 +506,10 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       retry.current = null;
       setIntakeOpen(false);
       setPlanningContext(result.context || null);
+      if (result.context?.dialogue?.cleared_date) {
+        setSaved("");
+        saveIdentity.current = { id: crypto.randomUUID(), request: crypto.randomUUID() };
+      }
       setConversations((saved) => {
         const id = conversation.current.id,
           previous = saved.find((item) => item.id === id);
@@ -593,7 +597,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     setDialog(null);
   }
   async function save() {
-    if (!proposal || busy || saved) return;
+    if (!proposal || busy || saved || saveBlockedReason) return;
     setSaving(true);
     setSaveError("");
     try {
@@ -609,6 +613,14 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   }
   const totalCost =
     proposal?.activities.reduce((sum, activity) => sum + Math.max(0, activity.cost || 0), 0) || 0;
+  const saveBlockedReason = planningContext?.dialogue?.cleared_date
+    ? "초안을 저장하려면 날짜를 정해 주세요."
+    : planningContext?.activity_edit ||
+        planningContext?.pending_fields ||
+        planningContext?.intake?.pending ||
+        ["edit", "plan", "select"].includes(planningContext?.dialogue?.pending?.resume || "")
+      ? "진행 중인 변경을 마치거나 취소한 뒤 저장해 주세요."
+      : "";
   const compactChecks = checks.length > 3 || checks.join("").length > 160;
   const checksList = (
     <ul className="we2-checks" aria-label="코스 확인 사항">
@@ -941,7 +953,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 <h2>{proposal.title}</h2>
                 <p className="we2-proposal-date">
                   <CalendarDays size={15} aria-hidden="true" />
-                  {proposal.date}
+                  {planningContext?.dialogue?.cleared_date ? "날짜 미정" : proposal.date}
                   {proposal.transport && ` · ${proposal.transport}`}
                 </p>
                 {((proposal.budget || 0) > 0 || totalCost > 0) && (
@@ -1006,7 +1018,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   ))}
                 <div className="we2-save-feedback">
                   <p role={saveError ? "alert" : "status"}>
-                    {saveError ||
+                    {saveBlockedReason ||
+                      saveError ||
                       (saving
                         ? "초안을 저장하고 있어요."
                         : saved
@@ -1022,7 +1035,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   <button
                     className="primary-button"
                     type="button"
-                    disabled={busy}
+                    disabled={busy || Boolean(saveBlockedReason)}
                     onClick={() => void save()}
                   >
                     {saving ? "저장 중…" : saveError ? "다시 저장" : "초안 저장"}

@@ -28,7 +28,10 @@ def model_context(context, scope, directive, session, selected_count, today):
     if selected_count:
         data["selected"] = selected_count
     if session.candidates:
-        data["places"] = [p.evidence() for p in session.candidates.values()]
+        data["places"] = [
+            {**p.evidence(), "kind": session.candidate_kinds.get(p.ref, "any")}
+            for p in session.candidates.values()
+        ]
     if session.selected_usage:
         data["place_roles"] = session.selected_usage
     return "현재 상태(자료): " + json.dumps(data, ensure_ascii=False, separators=(",", ":"))
