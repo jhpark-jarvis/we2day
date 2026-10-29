@@ -20,6 +20,158 @@ from we2day_api.main import create_app
 REAL_COMPLETE = ai_planner.complete
 
 
+async def choose_card(
+    c,
+    kind,
+    text="선택한 장소: 합성 선택점. 정한 조건에 맞춰 코스에 반영해줘.",
+    destination="합성 선택점 (서울 중랑구)",
+):
+    from uuid import uuid4
+
+    if kind:
+        scope = {"area": "중랑구", "kinds": [kind], "search_only": True}
+        c.store.context.update(
+            search_scope=scope,
+            control={
+                "version": 1,
+                "basis": c.store.version,
+                "last_action": {"operation": "search", "scope": scope},
+            },
+        )
+    c.history.append({"role": "user", "content": text})
+    body = ai_planner.ChatInput.model_validate(
+        {
+            "messages": c.history[-11:],
+            "conversation_id": c.id,
+            "request_id": str(uuid4()),
+            "version": c.store.version,
+            "chosen_places": [
+                {"title": "합성 선택점", "address": "서울 중랑구", "destination": destination}
+            ],
+        }
+    )
+    stats = RunStats("test")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(c.provider)) as client:
+        result = await ai_planner._chat(
+            body,
+            SimpleNamespace(
+                naver_search_enabled=True,
+                naver_search_client_id="synthetic",
+                naver_search_client_secret="synthetic",
+            ),
+            c.store,
+            client,
+            Budget(),
+            stats,
+        )
+    assert stats.counts["model_calls"] == 0
+    c.history.append({"role": "assistant", "content": result.reply})
+    return result
+
+
+@pytest.mark.parametrize("kind,index", [("cafe", 0), ("restaurant", 1)])
+def test_card_selection_changes_only_the_destination_without_a_model(monkeypatch, kind, index):
+    async def run():
+        import copy
+
+        c = Conversation(monkeypatch, proposal=True)
+        expected = copy.deepcopy(c.store.proposal)
+        result = await choose_card(c, kind)
+        expected["activities"][index]["place"] = "합성 선택점 (서울 중랑구)"
+        assert result.plan.model_dump() == expected
+        assert result.reply == "선택한 장소를 코스 초안에 반영했어요."
+
+    asyncio.run(run())
+
+
+def test_card_selection_asks_for_an_ambiguous_activity_then_preserves_other_fields(monkeypatch):
+    async def run():
+        import copy
+
+        c = Conversation(monkeypatch, proposal=True)
+        c.store.proposal["activities"][1]["title"] = "카페"
+        expected = copy.deepcopy(c.store.proposal)
+        result = await choose_card(c, "cafe")
+        assert result.plan is None and c.store.proposal == expected
+        assert result.context.dialogue.pending.field == "target"
+        result = await choose_card(c, None, text="2번 활동")
+        expected["activities"][1]["place"] = "합성 선택점 (서울 중랑구)"
+        assert result.plan.model_dump() == expected
+
+    asyncio.run(run())
+
+
+def test_missing_requested_activity_is_added_without_inventing_time_cost_or_metadata(monkeypatch):
+    async def run():
+        import copy
+
+        c = Conversation(monkeypatch, proposal=True)
+        c.store.proposal["activities"] = c.store.proposal["activities"][:1]
+        expected = copy.deepcopy(c.store.proposal)
+        result = await choose_card(c, "restaurant")
+        assert result.plan.activities[0].model_dump() == expected["activities"][0]
+        assert len(result.plan.activities) == 2 and result.plan.activities[1].title == "식사"
+        assert result.plan.activities[1].time is None and result.plan.activities[1].cost is None
+        assert (
+            result.plan.title == expected["title"]
+            and result.plan.preparation == expected["preparation"]
+        )
+
+    asyncio.run(run())
+
+
+def test_first_card_and_shared_link_use_only_the_explicit_choice(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=False)
+        result = await choose_card(c, "restaurant", destination="https://naver.me/EXAMPLE")
+        assert len(result.plan.activities) == 1
+        assert result.plan.activities[0].place == "합성 선택점"
+        assert result.plan.activities[0].map_url == "https://naver.me/EXAMPLE"
+        assert result.plan.activities[0].time is None and result.plan.activities[0].cost is None
+
+    asyncio.run(run())
+
+
+def test_explicit_append_and_full_course_keep_the_original_content(monkeypatch):
+    async def run():
+        import copy
+
+        c = Conversation(monkeypatch, proposal=True)
+        expected = copy.deepcopy(c.store.proposal)
+        c.store.context["dialogue"]["append_pending"] = True
+        result = await choose_card(c, "cafe")
+        assert (
+            result.plan.activities[:2] == ai_planner.PlanContent.model_validate(expected).activities
+        )
+        assert len(result.plan.activities) == 3 and result.plan.title == expected["title"]
+        assert result.plan.activities[2].time is None and result.plan.activities[2].cost is None
+        c.store.proposal["activities"] = [
+            copy.deepcopy(expected["activities"][0]) for _ in range(8)
+        ]
+        c.store.context["dialogue"]["append_pending"] = True
+        original = copy.deepcopy(c.store.proposal)
+        result = await choose_card(c, "cafe")
+        assert result.plan is None and c.store.proposal == original
+        assert "최대 8개" in result.reply
+
+    asyncio.run(run())
+
+
+def test_a_mixed_search_can_be_disambiguated_by_activity_kind(monkeypatch):
+    async def run():
+        import copy
+
+        c = Conversation(monkeypatch, proposal=True)
+        expected = copy.deepcopy(c.store.proposal)
+        result = await choose_card(c, None)
+        assert result.plan is None and c.store.proposal == expected
+        result = await choose_card(c, None, text="식사")
+        expected["activities"][1]["place"] = "합성 선택점 (서울 중랑구)"
+        assert result.plan.model_dump() == expected
+
+    asyncio.run(run())
+
+
 def test_plan_completion_describes_only_the_verified_draft_change():
     async def run():
         session = ToolSession(

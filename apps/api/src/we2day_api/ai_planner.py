@@ -18,15 +18,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from we2day_api.ai_context import model_messages
 from we2day_api.ai_control import interpret, prepare, reduce_context, restore_saved_area
+from we2day_api.ai_dialogue import activity_target, merge_context
 from we2day_api.ai_dialogue import explicit_date as explicit_date
-from we2day_api.ai_dialogue import merge_context
 from we2day_api.ai_intake import PlanningBrief, window_checks
 from we2day_api.ai_place_answers import (
     candidate_reply,
     claims_place_search,
     read_candidate_request,
 )
-from we2day_api.ai_place_policy import PlacePolicy, explicit_area, kinds
+from we2day_api.ai_place_policy import LABELS, PlacePolicy, explicit_area, kinds
 from we2day_api.ai_runtime import (
     AIStore,
     Budget,
@@ -578,6 +578,83 @@ async def _run_chat(body, request, store, progress=None):
         stats.emit(status)
 
 
+def _select_place(directive, session, context, previous_scope, latest):
+    """An explicit card selection changes a destination, not model-owned plan metadata."""
+    chosen = session.chosen_candidate
+    if directive.intent != "select" or directive.reply or not chosen or not context.date:
+        return
+    detected = kinds(chosen.title)
+    previous_kinds = previous_scope.get("kinds", [])
+    specified = kinds(latest) if not latest.startswith("선택한 장소:") else []
+    known = (
+        specified
+        if len(specified) == 1
+        else previous_kinds
+        if len(previous_kinds) == 1
+        else detected
+    )
+    kind = known[0] if len(known) == 1 else "any"
+    previous = session.previous_plan
+    index = None
+    if previous:
+        if not latest.startswith("선택한 장소:"):
+            index = activity_target(latest, previous)
+        if index is None and session.append_only:
+            index = len(previous.activities)
+        if index is None:
+            matches = [
+                i
+                for i, activity in enumerate(previous.activities)
+                if kind != "any" and kind in kinds(activity.title)
+            ]
+            if len(matches) == 1:
+                index = matches[0]
+            elif not matches and kind != "any" and kind in kinds(" ".join(context.activities)):
+                index = len(previous.activities)
+            elif kind == "any" and len(previous.activities) == 1 and len(context.activities) <= 1:
+                index = 0
+        if index is None or index >= 8:
+            directive.ask(
+                "target",
+                "어느 활동의 장소로 반영할까요? 활동 번호나 종류를 알려주세요. "
+                "활동은 최대 8개예요.",
+                resume="select",
+            )
+            return
+        result = previous.model_copy(deep=True)
+    else:
+        index = 0
+        result = PlanContent(
+            title=f"{chosen.title} 코스"[:100],
+            date=context.date,
+            budget=context.budget,
+            transport=context.transport,
+        )
+    label = next(
+        (value for value in context.activities if kind in kinds(value)),
+        LABELS.get(kind, chosen.title),
+    )
+    selected = session.resolve(
+        ModelPlan(
+            title=result.title,
+            date=context.date,
+            activities=[{"title": label, "place_ref": chosen.ref}],
+        )
+    ).activities[0]
+    if index == len(result.activities):
+        result.activities.append(selected)
+    else:
+        result.activities[index].place = selected.place
+        result.activities[index].map_url = selected.map_url
+    for name, value in session.plan_updates.items():
+        setattr(result, name, value)
+    directive.plan = PlanContent.model_validate(result.model_dump())
+    directive.reply = "선택한 장소를 코스 초안에 반영했어요."
+    session.reports.append(
+        {"name": "validate_course", "status": "ok", "count": len(check_course(directive.plan))}
+    )
+
+
 async def _chat(body, settings, store, client, budget, stats):
     lease = str(uuid4())
     acquired, finished = False, False
@@ -706,33 +783,7 @@ async def _chat(body, settings, store, client, budget, stats):
             for activity in proposal.activities:
                 if activity.place:
                     session.seed(activity)
-        if (
-            directive.intent == "select"
-            and known_date
-            and not proposal
-            and (scope.single_activity or len(context.activities) <= 1)
-        ):
-            candidate = session.chosen_candidate
-            if candidate:
-                directive.plan = session.resolve(
-                    ModelPlan(
-                        title=f"{candidate.title} 코스"[:100],
-                        date=known_date,
-                        budget=context.budget,
-                        transport=context.transport,
-                        activities=[
-                            {
-                                "title": context.activities[0]
-                                if context.activities
-                                else candidate.title,
-                                "place_ref": candidate.ref,
-                            }
-                        ],
-                    )
-                )
-                directive.reply = "선택한 장소로 코스 초안을 정리했어요."
-            else:
-                directive.ask("target", "장소 이름을 다시 확인해 주세요.", resume="select")
+        _select_place(directive, session, context, before_context.get("search_scope", {}), latest)
         io = ToolIO(settings, client, store, budget, stats)
         await read_candidate_request(directive, session, io)
         stats.counts["tool_calls"] = session.calls
