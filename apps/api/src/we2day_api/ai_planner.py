@@ -750,7 +750,13 @@ async def _chat(body, settings, store, client, budget, stats):
             excluded=directive.state.excluded_kinds,
             keyword=lexical["query"] if lexical else "",
         )
-        session = ToolSession(settings, store, body.selected_places, body.chosen_places, policy)
+        session = ToolSession(
+            settings,
+            store,
+            body.selected_places,
+            body.chosen_places if directive.intent in {"select", "plan"} else [],
+            policy,
+        )
         session.previous_plan = proposal
         session.operation = directive.intent
         session.followup_of_search = (

@@ -273,6 +273,25 @@ async def choose_card(
     return result
 
 
+def test_browser_retained_choice_is_not_a_new_selection_or_search_result(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.provider = parking_provider(c)
+        await choose_card(c, "restaurant")
+        original = json.loads(json.dumps(c.store.proposal))
+        r = await choose_card(c, None, text="이후 일정에 주변 주차장도 찾아줘")
+        assert "어느 장소" in r.reply and not r.candidates and not c.queries
+        r = await choose_card(c, None, text="식사 장소")
+        assert c.queries == ["중랑구 합성 선택점 주차장"]
+        assert [p.title for p in r.candidates] == ["합성 공영주차장"]
+        assert c.store.proposal == original
+        r = await choose_card(c, None, text="다시")
+        assert [p.title for p in r.candidates] == ["합성 공영주차장"]
+        assert c.store.proposal == original
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("kind,index", [("cafe", 0), ("restaurant", 1)])
 def test_card_selection_changes_only_the_destination_without_a_model(monkeypatch, kind, index):
     async def run():

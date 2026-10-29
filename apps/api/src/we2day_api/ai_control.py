@@ -185,7 +185,7 @@ def prepare(body, context, proposal, today):
         directive.slots["place_search"] = None
     parking = (
         None
-        if body.brief or body.chosen_places
+        if body.brief
         else parking_request(
             latest,
             before.get("place_search")
