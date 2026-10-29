@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { callApi } from "@/lib/api";
+import { callAiStream, callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 
 export const maxDuration = 105;
@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
       chunks.push(value);
     }
     const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (request.headers.get("accept")?.includes("text/event-stream"))
+      return await callAiStream(JSON.stringify(body), request.signal);
     const result = await callApi("/ai/planner", {
       method: "POST",
       body: JSON.stringify(body),

@@ -852,6 +852,11 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-candidate-list strong { font-size:.85rem; }
 .we2-candidate-list p { font-size:.75rem; color:var(--muted); margin:5px 0 0; }
 .we2-candidate-list button { flex-shrink:0; }
+.we2-candidate-list article > .we2-candidate-actions { flex:0 0 auto; display:flex; align-items:center; gap:2px; }
+.we2-message-places { margin-top:12px; border-top:1px solid var(--line); }
+.we2-message-places .we2-candidate-list { padding:0; max-height:none; overflow:visible; }
+.we2-message-places > button { margin-top:8px; }
+.we2-status > span { flex:1; min-width:0; }
 .we2-checks { padding-left:18px; font-size:.8rem; color:var(--muted); line-height:1.8; }
 .we2-composer { display: flex; align-items: flex-end; gap: 10px; padding: 12px; border: 1px solid var(--control-border); border-radius: 14px; background: var(--background); }
 .we2-composer:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }

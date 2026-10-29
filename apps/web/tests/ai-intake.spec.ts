@@ -2,6 +2,82 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("real BFF streams progress before a final card response and keeps failures recoverable", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(180_000);
+  await fixtureLogin(page);
+  await page.goto("/plans/ai");
+  await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+  const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
+  await input.fill("합성 SSE 정상");
+  await input.press("Enter");
+  await expect(page.getByRole("status")).toContainText("네이버에서 장소 후보를 검색하고 있어요.");
+  expect(
+    (await (await request.get("http://127.0.0.1:8101/fixture/state?case=정상")).json()).pending,
+  ).toBe(true);
+  await expect(page.locator(".we2-assistant")).toHaveCount(0);
+  for (const [stage, label] of [
+    ["model", "답변을 구성"],
+    ["validate", "코스 조건을 검사"],
+    ["persist", "결과를 저장"],
+  ]) {
+    await request.post(`http://127.0.0.1:8101/fixture/advance?case=정상&stage=${stage}`);
+    await expect(page.getByRole("status")).toContainText(label);
+  }
+  await request.post("http://127.0.0.1:8101/fixture/finish?case=정상");
+  const cards = page.getByRole("region", { name: "답변의 장소 후보", exact: true });
+  await expect(
+    cards.getByRole("button", { name: "합성 SSE 카페 1 선택", exact: true }),
+  ).toBeVisible();
+  const map = cards.getByRole("link", { name: "합성 SSE 카페 1 네이버 지도", exact: true });
+  await expect(map).toHaveAttribute(
+    "href",
+    /^(?:https:\/\/map\.naver\.com\/p\/search\/|nmap:\/\/search\?)/,
+  );
+  await expect(map).toHaveAttribute("referrerpolicy", "no-referrer");
+  await expect(
+    cards.getByRole("button", { name: "합성 SSE 카페 1 선택", exact: true }),
+  ).toHaveClass("icon-button");
+  await input.fill("후보 선택과 별개인 미전송 입력");
+  await page.getByRole("button", { name: "후보 5개 전체", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "장소 후보", exact: true });
+  await expect(
+    dialog.getByRole("link", { name: "합성 SSE 카페 5 네이버 지도", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 568 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await dialog.getByRole("button", { name: "장소 후보 닫기", exact: true }).click();
+  await expect(input).toHaveValue("후보 선택과 별개인 미전송 입력");
+  for (const mode of ["실패", "끊김", "중단"]) {
+    await input.fill(`합성 SSE ${mode}`);
+    await input.press("Enter");
+    await expect(page.getByRole("status")).toContainText("네이버에서 장소 후보를 검색하고 있어요.");
+    if (mode === "중단") await page.getByRole("button", { name: "요청 중단", exact: true }).click();
+    else await request.post(`http://127.0.0.1:8101/fixture/finish?case=${mode}`);
+    await expect(page.locator(".we2-status [role=alert]")).toContainText(
+      mode === "실패"
+        ? "오래 걸려 중단"
+        : mode === "끊김"
+          ? "연결이 끊겼어요"
+          : "요청을 중단했어요",
+    );
+    await expect(input).toHaveValue(`합성 SSE ${mode}`);
+    await expect(page.getByRole("button", { name: "메시지 다시 전송", exact: true })).toBeEnabled();
+    await expect
+      .poll(
+        async () =>
+          (await (await request.get(`http://127.0.0.1:8101/fixture/state?case=${mode}`)).json())
+            .pending,
+      )
+      .toBe(false);
+  }
+  await input.fill("합성 SSE 구버전");
+  await input.press("Enter");
+  await expect(page.locator(".we2-assistant").last()).toContainText("합성 구버전 응답");
+});
+
 test("cleared dates and pending changes cannot save an old proposal after reload", async ({
   page,
 }) => {

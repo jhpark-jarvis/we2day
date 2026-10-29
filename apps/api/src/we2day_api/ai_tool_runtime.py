@@ -19,6 +19,7 @@ class ToolIO:
 
     async def perform(self, action):
         search = action[0] == "places"
+        self.stats.stage("search" if search else "tools")
         if search:
             self.stats.counts["search_calls"] = self.stats.counts.get("search_calls", 0) + 1
         try:

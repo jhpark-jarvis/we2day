@@ -78,6 +78,10 @@ def candidate_reply(session, followup=""):
         if followup == "details"
         else "요청한 범위에 맞는 장소 후보를 확인해 주세요."
     )
+    if session.policy.keyword:
+        heading = (
+            f"‘{session.policy.keyword}’ 검색 후보예요. 실제 메뉴·시설은 지도에서 확인해 주세요."
+        )
     rows = [
         f"{i + 1}. {item.title}" + (f" — {item.address}" if item.address else "")
         for i, item in enumerate(representatives[:4])
@@ -106,7 +110,12 @@ async def read_candidate_request(directive, session, io):
         directive.intent not in {"search", "plan", "select"} and not directive.place_followup
     ):
         return
-    if directive.place_followup and session.previous_plan:
+    if (
+        directive.place_followup
+        and session.previous_plan
+        and not session.policy.keyword
+        and not getattr(session, "followup_of_search", False)
+    ):
         places = [a.place for a in session.previous_plan.activities if a.place]
         directive.reply = (
             (
@@ -238,7 +247,9 @@ async def read_candidate_request(directive, session, io):
         name = session.policy.scope.exact_name
         exact = bool(name and session.policy.scope.name_kind in {kind, "any"})
         args = {
-            "query": name if exact else f"{area} {LABELS.get(kind, '장소')}",
+            "query": name
+            if exact
+            else session.policy.keyword or f"{area} {LABELS.get(kind, '장소')}",
             "mode": "exact_name" if exact else "category",
             "name": name if exact else "",
             "kind": kind,

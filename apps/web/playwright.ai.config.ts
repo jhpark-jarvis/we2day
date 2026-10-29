@@ -11,12 +11,20 @@ export default defineConfig({
     { name: "ai-desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "ai-safari", use: { ...devices["iPhone 13"], defaultBrowserType: "webkit" } },
   ],
-  webServer: servers.map((server) => ({
-    ...server,
-    env: {
-      ...server.env,
-      WE2DAY_CLOUDFLARE_ACCOUNT_ID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      WE2DAY_CLOUDFLARE_API_TOKEN: "synthetic-never-sent",
+  webServer: [
+    ...servers.map((server) => ({
+      ...server,
+      env: {
+        ...server.env,
+        WE2DAY_CLOUDFLARE_ACCOUNT_ID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        WE2DAY_CLOUDFLARE_API_TOKEN: "synthetic-never-sent",
+        WE2DAY_API_URL: "http://127.0.0.1:8101",
+      },
+    })),
+    {
+      command: "node tests/fixtures/ai-stream-server.mjs",
+      url: "http://127.0.0.1:8101/health",
+      reuseExistingServer: false,
     },
-  })),
+  ],
 });

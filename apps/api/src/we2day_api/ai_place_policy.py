@@ -207,12 +207,13 @@ def requested_scope(text, previous=None, chosen=()):
 
 
 class PlacePolicy:
-    def __init__(self, scope=None, user_text="", *, rejected=(), excluded=()):
+    def __init__(self, scope=None, user_text="", *, rejected=(), excluded=(), keyword=""):
         self.scope = scope or SearchScope()
         self.user_text = user_text
         self.blocked = 0
         self.rejected = {norm(name) for name in rejected}
         self.excluded = set(excluded)
+        self.keyword = keyword
 
     def forbidden(self, title, kind="any"):
         return norm(title) in self.rejected or kind in self.excluded
@@ -241,7 +242,11 @@ class PlacePolicy:
                 self.blocked += 1
                 return None, "unconfirmed_place_name"
             args.query = args.name
-        elif any(kind != args.kind for kind in query_kinds) and args.kind != "any":
+        elif (
+            any(kind != args.kind for kind in query_kinds)
+            and args.kind != "any"
+            and not (self.keyword and norm(args.query) == norm(self.keyword))
+        ):
             self.blocked += 1
             return None, "mixed_activity_query"
         if self.scope.area:
@@ -252,6 +257,8 @@ class PlacePolicy:
             if norm(args.area) not in norm(evidence):
                 return None, "unconfirmed_area"
             self.scope.area = args.area
+        if self.keyword and args.mode != "exact_name":
+            args.query = self.keyword
         if args.mode != "exact_name" and args.area and norm(args.area) not in norm(args.query):
             args.query = f"{args.area} {args.query}"[:100]
         return args, None

@@ -143,6 +143,54 @@ function requestSignal(signal: AbortSignal | null | undefined, milliseconds: num
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+export async function callAiStream(body: string, signal: AbortSignal) {
+  const headers = {
+    "Cache-Control": "private, no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Accel-Buffering": "no",
+  };
+  const failure = (status: number, error: string) => Response.json({ error }, { status, headers });
+  try {
+    const client = await createAuthClient();
+    if (!client) return failure(503, "지금은 공유 공간에 연결할 수 없어요.");
+    const { data, error } = await client.auth.getSession();
+    if (error || !data.session) return failure(401, "로그인이 필요해요. 다시 로그인해 주세요.");
+    const response = await fetch(
+      `${process.env.WE2DAY_API_URL || "http://127.0.0.1:8000"}/ai/planner`,
+      {
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+        cache: "no-store",
+        signal: requestSignal(signal, 100_000),
+      },
+    );
+    if (!response.ok) {
+      const value = await response.json().catch(() => null);
+      return failure(response.status, apiError(response.status, value?.detail));
+    }
+    const streamed = response.headers.get("content-type")?.startsWith("text/event-stream");
+    const legacy = response.headers.get("content-type")?.startsWith("application/json");
+    if (!response.body || (!streamed && !legacy)) {
+      await response.body?.cancel();
+      return failure(502, "처리 상태를 받지 못했어요. 같은 요청으로 다시 시도해 주세요.");
+    }
+    // Pass through immediately: do not await json/text or buffer the response body.
+    return new Response(response.body, {
+      headers: {
+        ...headers,
+        "Content-Type": streamed ? "text/event-stream; charset=utf-8" : "application/json",
+      },
+    });
+  } catch {
+    return failure(503, "연결하지 못했어요. 같은 요청으로 다시 시도해 주세요.");
+  }
+}
+
 export function timingHeaders(result: { serverTiming: string }): Record<string, string> {
   return result.serverTiming ? { "Server-Timing": result.serverTiming } : {};
 }

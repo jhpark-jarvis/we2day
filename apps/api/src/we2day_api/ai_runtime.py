@@ -15,17 +15,23 @@ from we2day_api.upstream import BorrowedAsyncTransport
 
 
 class RunStats:
-    def __init__(self, version):
+    def __init__(self, version, progress=None):
         self.started = time.monotonic()
         self.version = version
         self.durations = {}
         self.counts = {"model_calls": 0, "request_bytes": 0, "response_bytes": 0}
         self.error_category = None
+        self.progress = progress
+
+    def stage(self, label):
+        if self.progress:
+            self.progress(label)
 
     @contextmanager
     def span(self, label):
         if label not in {"context", "model", "tools", "persist"}:
             raise ValueError("Invalid metric category")
+        self.stage(label)
         start = time.monotonic()
         try:
             yield

@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from we2day_api.ai_context import model_messages
@@ -34,6 +35,8 @@ from we2day_api.ai_runtime import (
     bounded_response,
     with_disconnect,
 )
+from we2day_api.ai_search_followups import pending_promise, saved_refinement
+from we2day_api.ai_stream import events
 from we2day_api.ai_tool_runtime import ToolIO, execute_batch
 from we2day_api.ai_tools import (
     TOOLS,
@@ -250,7 +253,9 @@ async def complete(
             stats.usage(payload if "usage" in payload else result)
             if "choices" in result:
                 message = result["choices"][0]["message"]
+                truncated = result["choices"][0].get("finish_reason") == "length"
             else:
+                truncated = False
                 message = {
                     "content": result.get("response"),
                     "tool_calls": result.get("tool_calls", []),
@@ -330,6 +335,9 @@ async def complete(
                 )
                 continue
             try:
+                stats.stage("validate")
+                if truncated:
+                    raise ValueError("Incomplete provider output")
                 if isinstance(text, str):
                     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
                     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
@@ -428,6 +436,14 @@ async def complete(
                 continue
             checks = (check_course(plan) if plan else []) + guarded
             reply = model_answer.reply
+            if pending_promise(reply):
+                reply = (
+                    "코스 초안을 정리했어요. 장소와 조건을 확인해 주세요."
+                    if plan
+                    else candidate_reply(session)
+                    if session
+                    else "이번 응답에서 검색을 실행하지 않았어요. 원하는 지역과 활동을 알려주세요."
+                )
             if session and (
                 session.operation in {"search", "reject"}
                 or session.operation is None
@@ -511,7 +527,18 @@ async def chat(body: ChatInput, request: Request, response: Response, store: Sto
         raise HTTPException(422, "ai_invalid_messages")
     if bool(body.conversation_id) != bool(body.request_id):
         raise HTTPException(422, "invalid_request")
-    stats, budget = RunStats(PROMPT_VERSION), Budget()
+    if "text/event-stream" in request.headers.get("accept", ""):
+        return StreamingResponse(
+            events(lambda progress: _run_chat(body, request, store, progress)),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "private, no-store", "X-Accel-Buffering": "no"},
+        )
+    return await _run_chat(body, request, store)
+
+
+async def _run_chat(body, request, store, progress=None):
+    settings = request.app.state.settings
+    stats, budget = RunStats(PROMPT_VERSION, progress), Budget()
     status = "ok"
     try:
         async with (
@@ -523,6 +550,9 @@ async def chat(body: ChatInput, request: Request, response: Response, store: Sto
             ) as database,
         ):
             scoped = AIStore(store, database, budget, stats)
+            if progress:
+                async with asyncio.timeout(budget.remaining()):
+                    return await _chat(body, settings, scoped, external, budget, stats)
             return await with_disconnect(
                 _chat(body, settings, scoped, external, budget, stats), request, budget
             )
@@ -614,16 +644,21 @@ async def _chat(body, settings, store, client, budget, stats):
             directive.slots["intake"]["turn_version"] = body.version + 1
         scope = directive.scope
         context = StoredContext.model_validate(merge_context(before_context, {}, directive))
+        lexical = saved_refinement(context.model_dump(), scope)
         known_date = context.date
         policy = PlacePolicy(
             scope,
             "\n".join(m.content for m in body.messages[:-1] if m.role == "user") + "\n" + latest,
             rejected=directive.state.rejected_places,
             excluded=directive.state.excluded_kinds,
+            keyword=lexical["query"] if lexical else "",
         )
         session = ToolSession(settings, store, body.selected_places, body.chosen_places, policy)
         session.previous_plan = proposal
         session.operation = directive.intent
+        session.followup_of_search = (
+            before_context.get("control", {}).get("last_action") or {}
+        ).get("operation") == "search"
         if body.brief:
             session.initial_activities = body.brief.activities
         if body.brief and not body.brief.recommend:
@@ -762,6 +797,7 @@ async def _chat(body, settings, store, client, budget, stats):
             answer = await complete(
                 settings, messages, session, client=client, budget=budget, stats=stats, io=io
             )
+        stats.stage("validate")
         if answer.plan and session.append_only:
             directive.state.append_pending = False
         if answer.plan and body.brief:
@@ -819,7 +855,7 @@ async def _chat(body, settings, store, client, budget, stats):
         return SavedChatResult(**answer.model_dump(), candidates=candidates)
     finally:
         # No business write after cancellation/deadline. Expiry recovers abandoned leases.
-        if acquired and not finished and not asyncio.current_task().cancelling():
+        if acquired and not finished:
             try:
                 async with asyncio.timeout(budget.remaining(1)):
                     await store.rpc(

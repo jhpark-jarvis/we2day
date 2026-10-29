@@ -4,6 +4,7 @@ import {
   ArrowDown,
   Bookmark,
   CalendarDays,
+  Check,
   ChevronDown,
   History,
   LoaderCircle,
@@ -28,6 +29,8 @@ import { AiIntake, IntakeSummary } from "@/components/ai-intake";
 import Link from "@/components/progress-link";
 import { We2AiIcon } from "@/components/we2-ai-icon";
 import { briefMessage, type IntakeContext, type PlanningBrief } from "@/lib/ai-intake";
+import { AI_STAGES, type AiStage, readAiResponse } from "@/lib/ai-response";
+import { naverAppLinks } from "@/lib/naver-app";
 import type { PlanContent } from "@/lib/plans";
 
 function searchScopeKey(scope: IntakeContext["search_scope"]): string {
@@ -67,6 +70,18 @@ type Candidate = {
   title: string;
   address: string;
   destination?: string;
+};
+
+type ChatResponse = {
+  reply: string;
+  version: number;
+  context?: IntakeContext;
+  candidates?: Candidate[];
+  candidates_available?: boolean;
+  plan?: PlanContent | null;
+  tools?: { name: string }[];
+  checks?: string[];
+  weather?: unknown[];
 };
 type Retry = {
   id: string;
@@ -173,6 +188,30 @@ function AiDialog({
     </dialog>
   );
 }
+function CandidateMapLink({ candidate }: { candidate: Candidate }) {
+  const [href, setHref] = useState(
+    `https://map.naver.com/p/search/${encodeURIComponent(candidate.title)}`,
+  );
+  useEffect(() => {
+    const links = naverAppLinks(window.location.origin, candidate.destination || candidate.title);
+    if (links && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
+      setHref(/Android/i.test(navigator.userAgent) ? links.android : links.ios);
+  }, [candidate]);
+  return (
+    <a
+      className="icon-button"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      referrerPolicy="no-referrer"
+      aria-label={`${candidate.title} 네이버 지도`}
+      title="네이버 지도"
+    >
+      <MapPin size={18} aria-hidden="true" />
+    </a>
+  );
+}
+
 function CandidateList({
   candidates,
   busy,
@@ -190,15 +229,19 @@ function CandidateList({
             <strong>{candidate.title}</strong>
             {candidate.address && <p>{candidate.address}</p>}
           </div>
-          <button
-            type="button"
-            className="text-button"
-            disabled={busy}
-            aria-label={`${candidate.title} 선택`}
-            onClick={() => select(candidate)}
-          >
-            선택
-          </button>
+          <div className="we2-candidate-actions">
+            <CandidateMapLink candidate={candidate} />
+            <button
+              type="button"
+              className="icon-button"
+              disabled={busy}
+              aria-label={`${candidate.title} 선택`}
+              title="코스에 반영"
+              onClick={() => select(candidate)}
+            >
+              <Check size={18} aria-hidden="true" />
+            </button>
+          </div>
         </article>
       ))}
     </div>
@@ -245,6 +288,8 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [activityKeys, setActivityKeys] = useState<string[]>([]);
   const [proposal, setProposal] = useState<PlanContent | null>(null);
   const [pending, setPending] = useState(false);
+  const [progressStage, setProgressStage] = useState<AiStage>("accepted");
+  const activeRequest = useRef<AbortController | null>(null);
   const [saving, setSaving] = useState(false);
   const [chatError, setChatError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -262,6 +307,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const mounted = useRef(true);
   const [oldestTurn, setOldestTurn] = useState(1);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidateMessageId, setCandidateMessageId] = useState<string | null>(null);
   const [candidatesUnavailable, setCandidatesUnavailable] = useState(false);
   const [chosenPlaces, setChosenPlaces] = useState<
     { title: string; address: string; destination?: string }[]
@@ -324,6 +370,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           setActivityKeys(plan?.activities.map(() => crypto.randomUUID()) || []);
           updateText(drafts.current.get(id) || "");
           setCandidates([]);
+          setCandidateMessageId(null);
           setCandidatesUnavailable(
             Boolean(
               turns[turns.length - 1]?.result.context?.control?.last_action ||
@@ -378,6 +425,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     void loadHistory(true);
     return () => {
       mounted.current = false;
+      activeRequest.current?.abort();
       historySequence.current++;
       conversationSequence.current++;
       placeSequence.current++;
@@ -471,6 +519,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       submittedBrief || (retry.current?.text === content ? retry.current.brief : undefined);
     setChosenPlaces(chosen);
     setPending(true);
+    setProgressStage("accepted");
     setPendingText(content);
     setChatError("");
     if (!preserveInput) {
@@ -501,14 +550,15 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();
     retry.current = { id: requestId, text: content, signature, brief, candidate, preserveDraft };
     try {
+      const controller = new AbortController();
+      activeRequest.current = controller;
       const response = await fetch("/api/ai/planner", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ ...payload, request_id: requestId }),
-        signal: AbortSignal.timeout(110000),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(110000)]),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "답변을 받지 못했어요.");
+      const result = await readAiResponse<ChatResponse>(response, setProgressStage);
       conversation.current.version = result.version;
       if (newDraftId.current === conversation.current.id) newDraftId.current = crypto.randomUUID();
       retry.current = null;
@@ -531,10 +581,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
           ...saved.filter((item) => item.id !== id),
         ].slice(0, 100);
       });
+      const assistantId = crypto.randomUUID();
       setMessages([
         ...next,
         {
-          id: crypto.randomUUID(),
+          id: assistantId,
           role: "assistant",
           content: result.reply,
           weatherSource: Boolean(result.weather?.length),
@@ -550,6 +601,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       );
       if (hasCandidates || searched || !sameScope) {
         setCandidates(result.candidates || []);
+        setCandidateMessageId(hasCandidates ? assistantId : null);
         setCandidatesUnavailable(result.candidates_available === false && !hasCandidates);
       } else if (result.candidates_available === false) {
         setCandidatesUnavailable(true);
@@ -565,10 +617,15 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     } catch (error) {
       if (!preserveInput) updateText(content);
       setChatError(
-        error instanceof Error ? error.message : "연결하지 못했어요. 다시 시도해 주세요.",
+        activeRequest.current?.signal.aborted
+          ? "요청을 중단했어요. 같은 요청으로 다시 시도할 수 있어요."
+          : error instanceof Error
+            ? error.message
+            : "연결하지 못했어요. 다시 시도해 주세요.",
       );
     } finally {
       setPending(false);
+      activeRequest.current = null;
       setPendingText("");
     }
   }
@@ -576,6 +633,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     setSelectedPlaces(update);
     if (candidates.length) {
       setCandidates([]);
+      setCandidateMessageId(null);
       setCandidatesUnavailable(true);
     }
   }
@@ -602,6 +660,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     setSaveError("");
     setActivityKeys([]);
     setCandidates([]);
+    setCandidateMessageId(null);
     setCandidatesUnavailable(false);
     setChosenPlaces([]);
     setSelectedPlaces([]);
@@ -776,7 +835,36 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   위투 AI
                 </span>
               )}
-              <p>{message.content}</p>
+              <p>
+                {message.role === "assistant" &&
+                message.id === candidateMessageId &&
+                candidates.length
+                  ? message.content.split("\n")[0]
+                  : message.content}
+              </p>
+              {message.role === "assistant" &&
+                message.id === candidateMessageId &&
+                candidates.length > 0 && (
+                  <section className="we2-message-places" aria-label="답변의 장소 후보">
+                    <CandidateList
+                      candidates={candidates.slice(0, 3)}
+                      busy={busy}
+                      select={selectCandidate}
+                    />
+                    {candidates.length > 3 && (
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={(event) => {
+                          dialogTrigger.current = event.currentTarget;
+                          setDialog("candidates");
+                        }}
+                      >
+                        후보 {candidates.length}개 전체
+                      </button>
+                    )}
+                  </section>
+                )}
               {message.weatherSource && (
                 <small className="we2-weather-source">
                   도시 기준 예보 ·{" "}
@@ -826,10 +914,21 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   <LoaderCircle size={15} className="ai-spinner" aria-hidden="true" />
                   {loadingHistory || loadingConversation
                     ? "대화 기록을 불러오고 있어요."
-                    : "장소와 코스를 살펴보고 있어요."}
+                    : AI_STAGES[progressStage]}
                 </>
               )}
             </span>
+          )}
+          {pending && (
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="요청 중단"
+              title="중단"
+              onClick={() => activeRequest.current?.abort()}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
           )}
         </div>
         <div className="we2-input-area">
@@ -935,17 +1034,6 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         </div>
       </section>
       <div className="we2-sidebar">
-        {candidates.length > 0 && (
-          <section className="we2-candidates we2-candidates-inline" aria-label="장소 후보">
-            <header className="we2-proposal-header">
-              <span>
-                <MapPin size={17} aria-hidden="true" />
-                장소 후보 · {candidates.length}
-              </span>
-            </header>
-            <CandidateList candidates={candidates} busy={busy} select={selectCandidate} />
-          </section>
-        )}
         <section
           ref={proposalRef}
           tabIndex={-1}
