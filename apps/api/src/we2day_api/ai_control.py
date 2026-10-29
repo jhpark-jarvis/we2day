@@ -16,6 +16,7 @@ from we2day_api.ai_intake import PlanningBrief, change_window, start_brief
 from we2day_api.ai_place_answers import private_anchor, recover_followup_area
 from we2day_api.ai_place_policy import Kind, SearchScope, explicit_area, kinds, norm
 from we2day_api.ai_runtime import bounded_response
+from we2day_api.ai_search_followups import continuation, grounded_query, refinement, result_question
 from we2day_api.prompt_bundle import PROMPT
 
 VERSION = 1
@@ -28,6 +29,7 @@ class Action(BaseModel):
     area: str = Field(max_length=100)
     kinds: list[Kind] = Field(max_length=8)
     question: str = Field(max_length=180)
+    query: str = Field(default="", max_length=50)
 
 
 class SavedAction(BaseModel):
@@ -88,6 +90,18 @@ def prepare(body, context, proposal, today):
     latest = body.brief.message() if body.brief else body.messages[-1].content
     before = dict(context)
     control = state_at(before, body.version)
+    narrowed = None if body.brief else refinement(latest)
+    if not narrowed and continuation(latest) and control.get("outcome") == "not_requested":
+        # Legacy promise/status chain: stop at the most recent substantive user request.
+        prior = next(
+            (
+                m.content
+                for m in reversed(body.messages[:-1])
+                if m.role == "user" and not continuation(m.content)
+            ),
+            "",
+        )
+        narrowed = refinement(prior)
     window = None if body.brief else change_window(latest, before)
     remaining = latest
     if window:
@@ -107,7 +121,7 @@ def prepare(body, context, proposal, today):
         directive = window
     else:
         directive = analyze(
-            remaining,
+            remaining + " 장소 찾아줘" if narrowed else remaining,
             before,
             proposal,
             body.chosen_places,
@@ -131,21 +145,43 @@ def prepare(body, context, proposal, today):
         directive.slots.update(activity_edit=None, pending_fields=None)
         if before.get("intake"):
             directive.slots["intake"] = {**before["intake"], "pending": None}
-    if not window and (before.get("intake") or {}).get("pending") and new_task(latest):
+    if (
+        not window
+        and (before.get("intake") or {}).get("pending")
+        and (new_task(latest) or narrowed)
+    ):
         directive.slots["intake"] = {**before["intake"], "pending": None}
+    if narrowed:
+        directive.intent = directive.state.intent = "search"
+        directive.reply, directive.plan = "", None
+        directive.state.pending = None
+        directive.scope.kinds = [narrowed["kind"]]
+        directive.state.excluded_kinds = [
+            k for k in directive.state.excluded_kinds if k != narrowed["kind"]
+        ]
+        directive.scope.exact_name, directive.scope.name_kind = "", "any"
+        directive.scope.search_only = True
+        directive.slots.update(place_search=narrowed, activity_edit=None, pending_fields=None)
+    elif directive.intent in PLACE_INTENTS and not result_question(latest):
+        # An explicit new search/selection replaces a one-off lexical refinement.
+        directive.slots["place_search"] = None
     short = re.sub(r"[\s.!?]", "", latest)
-    retry = bool(
-        re.fullmatch(
-            r"(?:저장(?:한)?장소(?:를|도)?(?:포함해서|포함해|함께)?)?"
-            r"(?:다시|한번더|한번만더)(?:해줘|찾아줘|추천해줘|해볼래|해)?",
-            short,
+    retry = (
+        bool(
+            re.fullmatch(
+                r"(?:저장(?:한)?장소(?:를|도)?(?:포함해서|포함해|함께)?)?"
+                r"(?:다시|한번더|한번만더)(?:해줘|찾아줘|추천해줘|해볼래|해)?",
+                short,
+            )
         )
+        and not narrowed
     )
     selection_repair = bool(
         re.search(r"(?:체크|선택)(?:해\s*둔|해\s*놓|했|해놨|했잖|한\s*곳)|저장.*체크", latest)
         and not re.search(r"해제|취소|선택하지|체크하지", latest)
     )
     if not body.brief and (retry or selection_repair):
+        directive.slots.pop("place_search", None)
         previous = control.get("last_action") or {}
         operation = previous.get("operation", "search")
         if operation not in PLACE_INTENTS:
@@ -173,6 +209,10 @@ def prepare(body, context, proposal, today):
             and directive.state.excluded_kinds
         ):
             directive.ask("target", "남길 활동이나 새로 찾을 활동을 알려주세요.", resume="search")
+    if result_question(latest) and control and control.get("last_action") is None:
+        directive.place_followup = ""
+        directive.allowed_tools.clear()
+        directive.reply = "진행 중인 검색은 없어요. 다시 찾을 지역이나 장소를 알려주세요."
     if directive.intent in PLACE_INTENTS or directive.place_followup:
         # A selection correction does not erase the user's earlier explicit area.
         if not (private_anchor(explicit_area(latest)) and explicit_area(latest)):
@@ -242,7 +282,10 @@ def prepare(body, context, proposal, today):
     social = bool(directive.reply or social_turn(latest))
     tasklike = bool(
         kinds(latest)
-        or re.search(r"장소|근방|동네|근처|주변|고른|체크|거기|밥|한잔|가볼|추천|코스|플랜", latest)
+        or re.search(
+            r"장소|근방|동네|근처|주변|고른|체크|거기|밥|한잔|가볼|추천|코스|플랜|없나|있을까|먹고\s*싶",
+            latest,
+        )
     )
     unclear = (
         directive.intent == "chat"
@@ -390,6 +433,8 @@ async def interpret(control, latest, settings, client, budget, stats):
         allowed = set(kinds(latest)) | set(scope.kinds)
         if any(k not in allowed for k in action.kinds):
             raise ValueError("Unrequested activity")
+        if action.query and not grounded_query(action.query, latest):
+            raise ValueError("Ungrounded query")
         if (
             action.operation in {"search", "plan"}
             and (action.area or scope.area)
@@ -402,6 +447,12 @@ async def interpret(control, latest, settings, client, budget, stats):
             directive.scope.search_only = action.operation == "search"
             directive.slots["region"] = directive.scope.area
             directive.allowed_tools = {"search_places"}
+            if action.query and len(directive.scope.kinds) == 1:
+                directive.slots["place_search"] = {
+                    "version": 1,
+                    "query": action.query,
+                    "kind": directive.scope.kinds[0],
+                }
             if action.operation == "plan" and not control.context.get("date"):
                 directive.ask(
                     "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume="plan"
@@ -429,6 +480,7 @@ def reduce_context(before, incoming, directive, body, session, reason):
     cancelled = not body.brief and cancel_request(body.messages[-1].content)
     if cancelled:
         previous = None
+        result["place_search"] = None
     operation = (
         directive.state.pending.resume
         if directive.state.pending and directive.state.pending.resume in PLACE_INTENTS

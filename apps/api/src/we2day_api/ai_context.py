@@ -23,6 +23,8 @@ def model_context(context, scope, directive, session, selected_count, today):
             "start_time": context.intake.data.start_time,
             "end_time": context.intake.data.end_time,
         }
+    if session.policy.keyword:
+        data["place_query"] = session.policy.keyword
     if session.initial_activities is not None:
         data["initial"] = True
     if selected_count:

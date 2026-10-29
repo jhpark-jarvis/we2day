@@ -18,6 +18,7 @@ from we2day_api.ai_place_policy import (
     norm,
     requested_scope,
 )
+from we2day_api.ai_search_followups import result_question
 from we2day_api.plans import PlanContent
 
 Intent = Literal["search", "select", "plan", "edit", "reject", "clarify", "chat", "weather"]
@@ -402,9 +403,11 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         r"(?:그게|그곳|장소가|그장소가|추천한곳이|추천장소가|그러면)?(?:어디야|어딘데|어디인데|어디에있어|어디있어|어느장소야|장소어디야|어디인지알려줘|어디인지보여줘)(?:요)?",
         short,
     )
-    if status_question or location_question:
+    if status_question or location_question or result_question(text):
         if context.get("region") or previous_scope.kinds or proposal or selected:
-            directive.place_followup = "status" if status_question else "details"
+            directive.place_followup = (
+                "status" if status_question or result_question(text) else "details"
+            )
             directive.state.pending = old_pending
             directive.scope.area = directive.scope.area or context.get("region", "")
             directive.scope.kinds = directive.scope.kinds or kinds(
