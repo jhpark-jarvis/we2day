@@ -622,12 +622,20 @@ async def interpret(control, latest, settings, client, budget, stats):
         if relation or len(replacement) > 1:
             targets = [t for t in targets if grounded_query(t.query, target_evidence)]
         spec = SearchSpec(targets=targets) if targets else None
+        anchor_text = (
+            control.previous_request
+            if continuation(latest) and control.previous_request
+            else latest
+        )
         expected_anchor, required_anchor = referenced_anchor(
-            latest, control.proposal, bool(prior and prior.anchor_pending)
+            anchor_text, control.proposal, bool(prior and prior.anchor_pending)
         )
         if required_anchor:
             action.anchor_index = expected_anchor
             action.anchor_needed = expected_anchor is None
+        elif action.anchor_index is not None:
+            # A model-generated reference is not evidence that the user named it.
+            action.anchor_index, action.anchor_needed = None, True
         if action.anchor_index is not None:
             if not relation and not resuming:
                 raise ValueError("Unrequested anchor")

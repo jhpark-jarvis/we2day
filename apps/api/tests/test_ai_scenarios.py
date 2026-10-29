@@ -213,6 +213,38 @@ def test_anchor_identity_survives_reorder_but_not_replacement():
     assert current_anchor(spec, plan) is None
 
 
+@pytest.mark.parametrize("prefix", ["서울역", "동네 문구점", "여기"])
+def test_model_reference_requires_user_evidence_even_inside_a_valid_area(prefix):
+    async def run():
+        text = f"{prefix} 주변 약국 찾아줘"
+        body = ChatInput(messages=[Message(role="user", content=text)])
+        decision = prepare(
+            body, {"region": "중랑구"}, PlanContent.model_validate(PLAN), date(2030, 1, 5)
+        )
+
+        def model(request):
+            data = json.loads(json.loads(request.content)["messages"][-1]["content"])
+            proposal = action(["약국"], area=data["area"], anchor_ref="activity_1")
+            return httpx.Response(
+                200, json={"choices": [{"message": {"content": json.dumps(proposal)}}]}
+            )
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(model)) as client:
+            await interpret(
+                decision,
+                text,
+                SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic"),
+                client,
+                Budget(),
+                RunStats("test"),
+            )
+        assert not decision.directive.allowed_tools
+        assert decision.directive.state.pending is not None
+        assert not (decision.directive.slots.get("place_search") or {}).get("anchor_key")
+
+    asyncio.run(run())
+
+
 def test_relation_anchor_words_cannot_be_targets_even_when_model_includes_them(monkeypatch):
     async def run():
         c = Conversation(monkeypatch)
