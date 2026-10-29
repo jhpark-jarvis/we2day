@@ -104,12 +104,20 @@ class AIStore:
             # In-memory test doubles only; production always uses the async network path.
             return self.store.call(method, path, **kwargs)
         transport = self.store.transport
+        # The fixed author-scoped history RPC returns at most fifty bounded turns.
+        # Only legacy alias repair uses it; provider and ordinary DB limits stay small.
+        history_read = (
+            method == "POST"
+            and path == "rpc/read_ai_conversations"
+            and isinstance(kwargs.get("json"), dict)
+            and bool(kwargs["json"].get("p_id"))
+        )
         status, raw = await bounded_response(
             self.client,
             method,
             str(transport.base_url.join(path)),
             self.budget,
-            limit=131072,
+            limit=3_145_728 if history_read else 131072,
             seconds=8,
             headers=dict(transport.headers),
             **kwargs,

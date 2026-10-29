@@ -557,3 +557,167 @@ def test_social_turn_keeps_window_clarification_basis_current(monkeypatch):
         assert result.context.intake.pending is None
 
     asyncio.run(run())
+
+
+async def legacy_saved_area_turn(monkeypatch, text, *, selected=True, history=None, initial=None):
+    """A public area no longer present in the client's eleven-message window."""
+    from fastapi import HTTPException
+
+    identifier, cid = str(uuid4()), str(uuid4())
+    before = context()
+    before["region"] = before["search_scope"]["area"] = "샘플 집"
+    before["dialogue"]["turn_version"] = 12
+    before["dialogue"]["pending"] = {"field": "region", "value": "", "resume": "search"}
+    store = MemoryStore({"initial": {"context": initial or before}})
+    store.version = 12
+    calls = []
+    original_rpc = store.rpc
+
+    async def rpc(name, values=None):
+        if name == "release_ai_planner_turn":
+            store.events.append(name)
+        if name == "read_ai_conversations":
+            calls.append(("history", values))
+            if isinstance(history, Exception):
+                raise history
+            if callable(history):
+                return history(cid)
+            return (
+                history
+                if history is not None
+                else {
+                    "id": cid,
+                    "version": 12,
+                    "turns": [
+                        {"version": 1, "user_text": "샘플 집 근처에서 볼 거야"},
+                        {"version": 4, "user_text": "그럼 양주 덕계 근처로 알아봐줘"},
+                        *[{"version": v, "user_text": "다시"} for v in range(5, 13)],
+                    ],
+                }
+            )
+        return await original_rpc(name, values)
+
+    async def read(method, table, params):
+        calls.append(("selected", params))
+        assert params["id"] == f"in.({identifier})"
+        return [{"id": identifier, "label": "샘플 집", "destination": "경기도 양주시 평화로 1"}]
+
+    async def no_completion(*args, **kwargs):
+        pytest.fail("A known saved public area and retry need no model interpretation")
+
+    def provider(request):
+        assert request.url.host == "naverapihub.apigw.ntruss.com"
+        calls.append(("search", request.url.params["query"]))
+        category = "카페" if "카페" in request.url.params["query"] else "음식점"
+        area = (
+            "서울특별시 성동구 성수동1가 1"
+            if "성수동" in request.url.params["query"]
+            else "경기도 양주시 덕계동 1"
+        )
+        return httpx.Response(
+            200,
+            json={
+                "items": [{"title": "합성" + category, "category": category, "roadAddress": area}]
+            },
+        )
+
+    store.rpc, store.call = rpc, read
+    monkeypatch.setattr(ai_planner, "complete", no_completion)
+    body = ai_planner.ChatInput.model_validate(
+        {
+            "conversation_id": cid,
+            "request_id": str(uuid4()),
+            "version": 12,
+            "messages": [
+                *[
+                    {
+                        "role": role,
+                        "content": "부산으로 검색했어요" if role == "assistant" else "다시",
+                    }
+                    for role in ["user", "assistant"] * 5
+                ],
+                {"role": "user", "content": text},
+            ],
+            "selected_places": [{"source": "favorite", "id": identifier}] if selected else [],
+        }
+    )
+    settings = SimpleNamespace(
+        naver_search_enabled=True,
+        naver_search_client_id="synthetic",
+        naver_search_client_secret="synthetic",
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider)) as client:
+        try:
+            answer = await ai_planner._chat(
+                body, settings, store, client, Budget(), RunStats("test")
+            )
+        except HTTPException:
+            assert any(event == "release_ai_planner_turn" for event in store.events)
+            raise
+    return answer, calls
+
+
+@pytest.mark.parametrize("text", ["다시", "저장 장소 포함해서 다시", "저장 장소에 체크했잖아."])
+@pytest.mark.parametrize("selected", [False, True])
+def test_legacy_retry_recovers_authorized_area_outside_client_window(monkeypatch, text, selected):
+    answer, calls = asyncio.run(legacy_saved_area_turn(monkeypatch, text, selected=selected))
+    assert answer.context.region == answer.context.intake.data.region == "양주 덕계"
+    assert any(c[0] == "search" and c[1].startswith("양주 덕계 ") for c in calls)
+    assert len([c for c in calls if c[0] == "history"]) == 1
+    assert not any("부산" in str(c) for c in calls if c[0] == "search")
+    assert answer.context.control["last_action"]["scope"]["area"] == "양주 덕계"
+
+
+@pytest.mark.parametrize("text", ["성수동 근처 카페 찾아줘", "다른 집 근처 카페 찾아줘"])
+def test_new_explicit_area_does_not_read_or_resurrect_old_history(monkeypatch, text):
+    answer, calls = asyncio.run(legacy_saved_area_turn(monkeypatch, text))
+    assert not any(c[0] == "history" for c in calls)
+    if text.startswith("성수동"):
+        assert answer.context.region == "성수동" and answer.candidates
+    else:
+        assert not any(c[0] == "search" for c in calls)
+
+
+def test_restored_area_stops_history_repair_reads(monkeypatch):
+    before = context()
+    before["region"] = before["search_scope"]["area"] = "양주 덕계"
+    answer, calls = asyncio.run(legacy_saved_area_turn(monkeypatch, "다시", initial=before))
+    assert answer.context.region == "양주 덕계"
+    assert not any(c[0] == "history" for c in calls)
+
+
+@pytest.mark.parametrize("history", [None, {}, {"id": str(uuid4()), "version": 12, "turns": []}])
+def test_missing_or_other_conversation_history_is_not_location_evidence(monkeypatch, history):
+    # None is represented by an empty authorized response here, not the fixture default.
+    answer, calls = asyncio.run(legacy_saved_area_turn(monkeypatch, "다시", history=history or {}))
+    assert not any(c[0] == "search" for c in calls)
+    assert "동네" in answer.reply
+
+
+@pytest.mark.parametrize("problem", ["future", "duplicate", "too_many", "stale", "new_private"])
+def test_saved_repair_rejects_invalid_or_superseded_history(monkeypatch, problem):
+    def history(cid):
+        turns = [{"version": 4, "user_text": "양주 덕계 근처로 알아봐줘"}]
+        if problem == "future":
+            turns.append({"version": 13, "user_text": "성수동 근처로"})
+        elif problem == "duplicate":
+            turns += turns[:]
+        elif problem == "too_many":
+            turns *= 51
+        elif problem == "new_private":
+            turns.append({"version": 11, "user_text": "다른 집 근처에서 볼 거야"})
+        return {"id": cid, "version": 11 if problem == "stale" else 12, "turns": turns}
+
+    answer, calls = asyncio.run(legacy_saved_area_turn(monkeypatch, "다시", history=history))
+    assert not any(c[0] == "search" for c in calls)
+    assert "동네" in answer.reply
+
+
+def test_failed_authorized_history_read_releases_lease(monkeypatch):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            legacy_saved_area_turn(monkeypatch, "다시", history=HTTPException(503, "unavailable"))
+        )
+    assert error.value.status_code == 503

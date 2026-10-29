@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from we2day_api.ai_context import model_messages
-from we2day_api.ai_control import interpret, prepare, reduce_context
+from we2day_api.ai_control import interpret, prepare, reduce_context, restore_saved_area
 from we2day_api.ai_dialogue import explicit_date as explicit_date
 from we2day_api.ai_dialogue import merge_context
 from we2day_api.ai_intake import PlanningBrief, window_checks
@@ -565,6 +565,7 @@ async def _chat(body, settings, store, client, budget, stats):
         if proposal and not before_context.get("date") and not context.dialogue.cleared_date:
             before_context["date"] = proposal.date
         decision = prepare(body, before_context, proposal, today)
+        await restore_saved_area(decision, body, store, stats)
         before_context, directive = decision.context, decision.directive
         if decision.interpret:
             if not await store.rpc("reserve_ai_planner_request"):

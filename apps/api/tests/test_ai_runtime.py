@@ -13,6 +13,43 @@ from we2day_api.places import SearchResults
 from we2day_api.upstream import BorrowedAsyncTransport
 
 
+def test_large_history_read_is_bounded_and_caller_scoped():
+    from we2day_api.ai_runtime import AIStore
+    from we2day_api.data import DataAPI
+
+    async def run():
+        def handler(request):
+            assert request.url.host == "synthetic.supabase.invalid"
+            assert request.headers["authorization"] == "Bearer caller-jwt"
+            assert request.headers["apikey"] == "publishable"
+            amount = 3_145_729 if request.headers.get("x-case") == "oversized" else 160000
+            return httpx.Response(200, json={"synthetic": "x" * amount})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with httpx.Client(
+                base_url="https://synthetic.supabase.invalid",
+                headers={"Authorization": "Bearer caller-jwt", "apikey": "publishable"},
+            ) as transport:
+                store = AIStore(DataAPI(transport), client, Budget(), RunStats("test"))
+                assert (
+                    len((await store.rpc("read_ai_conversations", {"p_id": "owned"}))["synthetic"])
+                    == 160000
+                )
+                for name, data in [
+                    ("read_ai_conversations", {}),
+                    ("begin_ai_planner_turn", {"p_id": "owned"}),
+                ]:
+                    with pytest.raises(HTTPException) as error:
+                        await store.rpc(name, data)
+                    assert error.value.status_code == 502
+                transport.headers["x-case"] = "oversized"
+                with pytest.raises(HTTPException) as error:
+                    await store.rpc("read_ai_conversations", {"p_id": "owned"})
+                assert error.value.status_code == 502
+
+    asyncio.run(run())
+
+
 def test_slow_drip_is_closed_at_whole_deadline():
     class Drip(httpx.AsyncByteStream):
         closed = False

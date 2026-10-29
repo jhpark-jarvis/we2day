@@ -28,7 +28,7 @@ def recover_followup_area(directive, history):
         directive.intent not in {"search", "plan", "select"} and not directive.place_followup
     ) or not private_anchor(directive.scope.area):
         return
-    for message in reversed(history[-10:]):
+    for message in reversed(history[-50:]):
         if message.role != "user":
             continue
         area = explicit_area(message.content)

@@ -3,6 +3,7 @@
 import json
 import re
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Literal
 
 import httpx
@@ -118,7 +119,11 @@ def prepare(body, context, proposal, today):
             reason = "compound"
     short = re.sub(r"[\s.!?]", "", latest)
     retry = bool(
-        re.fullmatch(r"(?:다시|한번더|한번만더)(?:해줘|찾아줘|추천해줘|해볼래|해)?", short)
+        re.fullmatch(
+            r"(?:저장(?:한)?장소(?:를|도)?(?:포함해서|포함해|함께)?)?"
+            r"(?:다시|한번더|한번만더)(?:해줘|찾아줘|추천해줘|해볼래|해)?",
+            short,
+        )
     )
     selection_repair = bool(
         re.search(r"(?:체크|선택)(?:해\s*둔|해\s*놓|했|해놨|했잖|한\s*곳)|저장.*체크", latest)
@@ -141,11 +146,8 @@ def prepare(body, context, proposal, today):
         directive.allowed_tools = {"search_places"}
         reason = "retry" if retry else "selection"
     if directive.intent in PLACE_INTENTS or directive.place_followup:
-        # Do not override a new explicit private anchor or a new selected-anchor correction.
-        if (
-            not (private_anchor(explicit_area(latest)) and explicit_area(latest))
-            and not selection_repair
-        ):
+        # A selection correction does not erase the user's earlier explicit area.
+        if not (private_anchor(explicit_area(latest)) and explicit_area(latest)):
             recover_followup_area(directive, body.messages[:-1])
     replacement_area = explicit_area(latest)
     if (
@@ -203,6 +205,60 @@ def prepare(body, context, proposal, today):
         and not directive.scope.area
     )
     return RequestControl(directive, before, reason, anchor_search, include_only, unclear)
+
+
+async def restore_saved_area(control, body, store, stats):
+    """Repair legacy alias state from this author's conversation, never model prose.
+
+    Client model input intentionally contains only a short tail. Read at most the
+    existing history RPC's fifty turns only while that tail cannot repair an alias.
+    The retrieved text is server-only evidence; it is not appended to model input.
+    """
+    directive = control.directive
+    latest = body.messages[-1].content
+    if (
+        body.brief
+        or not body.conversation_id
+        or not body.version
+        or sum(message.role == "user" for message in body.messages[:-1]) >= body.version
+        or not private_anchor(directive.scope.area)
+        or private_anchor(explicit_area(latest))
+        or not (directive.intent in PLACE_INTENTS or directive.place_followup or control.interpret)
+    ):
+        return
+    with stats.span("context"):
+        history = await store.rpc(
+            "read_ai_conversations",
+            {"p_id": str(body.conversation_id), "p_before": body.version + 1},
+        )
+    stats.counts["history_repair_reads"] = 1
+    if (
+        not isinstance(history, dict)
+        or history.get("id") != str(body.conversation_id)
+        or history.get("version") != body.version
+        or not isinstance(history.get("turns"), list)
+        or len(history["turns"]) > 50
+    ):
+        return
+    turns = history["turns"]
+    if any(
+        not isinstance(turn, dict)
+        or type(turn.get("version")) is not int
+        or not 0 < turn["version"] <= body.version
+        or not isinstance(turn.get("user_text"), str)
+        or len(turn["user_text"]) > 4000
+        for turn in turns
+    ) or len({turn["version"] for turn in turns}) != len(turns):
+        return
+    recover_followup_area(
+        directive,
+        [
+            SimpleNamespace(role="user", content=t["user_text"])
+            for t in sorted(turns, key=lambda t: t["version"])
+        ],
+    )
+    if not private_anchor(directive.scope.area):
+        control.interpret = False
 
 
 async def interpret(control, latest, settings, client, budget, stats):
