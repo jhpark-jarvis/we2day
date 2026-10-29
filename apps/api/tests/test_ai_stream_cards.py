@@ -10,7 +10,7 @@ from test_ai_long_dialogue import Conversation
 
 from we2day_api import ai_planner
 from we2day_api.ai_runtime import Budget, RunStats
-from we2day_api.ai_search_followups import pending_promise, refinement
+from we2day_api.ai_search_followups import parking_request, pending_promise, refinement
 from we2day_api.ai_stream import events
 from we2day_api.ai_tools import ToolSession
 from we2day_api.config import Settings
@@ -18,6 +18,210 @@ from we2day_api.data import require_data
 from we2day_api.main import create_app
 
 REAL_COMPLETE = ai_planner.complete
+
+
+@pytest.mark.parametrize(
+    "text", ["흠.. 피자집도 추천해줘", "음 피자집도 좀 찾아줘", "그럼 피자집은 추천해줘"]
+)
+def test_natural_food_search_retains_the_specific_query_and_retry(monkeypatch, text):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        before = json.loads(json.dumps(c.store.proposal))
+        result = await c.send(text)
+        assert result.candidates and c.queries[-1] == "중랑구 피자집"
+        assert result.context.model_extra["place_search"]["query"] == "피자집"
+        for message in ["고마워", "다시", "찾았어!?"]:
+            await c.send(message)
+        assert c.queries[-1] == "중랑구 피자집" and c.store.proposal == before
+        await c.send("카페 찾아줘")
+        assert c.queries[-1] == "중랑구 카페"
+
+    asyncio.run(run())
+
+
+def parking_provider(c):
+    def provider(request):
+        assert request.url.host == "naverapihub.apigw.ntruss.com"
+        c.queries.append(request.url.params["query"])
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "title": "합성 공영주차장",
+                        "category": "교통>주차장",
+                        "roadAddress": "서울특별시 중랑구 신내동 1",
+                    },
+                    {
+                        "title": "합성식당",
+                        "category": "음식점",
+                        "roadAddress": "서울특별시 중랑구 신내동 2",
+                    },
+                    {
+                        "title": "먼 공영주차장",
+                        "category": "주차장",
+                        "roadAddress": "부산광역시 해운대구 1",
+                    },
+                ]
+            },
+        )
+
+    return provider
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "식사 장소 주변에 주차장 알려달라고",
+        "선택한 식당 주변 주차장 찾아줘",
+        "합성식당 주변 주차장 찾아줘",
+    ],
+)
+def test_parking_is_the_target_and_meal_is_the_anchor(monkeypatch, text):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.provider = parking_provider(c)
+        before = json.loads(json.dumps(c.store.proposal))
+        result = await c.send(text)
+        assert c.queries == ["중랑구 합성식당 주차장"]
+        assert [p.title for p in result.candidates] == ["합성 공영주차장"]
+        assert result.context.region == "중랑구" and result.context.search_scope.kinds == ["any"]
+        assert c.store.proposal == before
+        for _ in range(16):
+            await c.send("고마워")
+        await c.send("다시")
+        assert c.queries[-1] == "중랑구 합성식당 주차장"
+        result = await choose_card(c, None)
+        assert (
+            result.plan.activities[:2] == ai_planner.PlanContent.model_validate(before).activities
+        )
+        assert len(result.plan.activities) == 3 and result.plan.activities[-1].title == "주차장"
+        assert result.plan.activities[-1].time is None and result.plan.activities[-1].cost is None
+        await c.send("카페 찾아줘")
+        assert c.queries[-1] == "중랑구 카페"
+
+    asyncio.run(run())
+
+
+def test_an_ambiguous_course_anchor_requires_a_choice_not_a_fake_area(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.provider = parking_provider(c)
+        result = await c.send("이후 일정에 주변 주차장도 찾아줘")
+        assert not c.queries and result.plan is None
+        assert "어느 장소" in result.reply and result.context.region == "중랑구"
+        result = await c.send("다시")
+        assert not c.queries and "어느 장소" in result.reply
+        result = await c.send("식사 장소")
+        assert c.queries == ["중랑구 합성식당 주차장"] and result.candidates
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("answer,anchor", [("2번", "합성식당"), ("합성카페", "합성카페")])
+def test_parking_anchor_clarification_accepts_number_or_actual_name(monkeypatch, answer, anchor):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.provider = parking_provider(c)
+        await c.send("이후 일정에 주변 주차장도 찾아줘")
+        result = await c.send(answer)
+        assert c.queries == [f"중랑구 {anchor} 주차장"] and result.candidates
+
+    asyncio.run(run())
+
+
+def test_new_search_replaces_a_pending_parking_anchor_question(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        await c.send("이후 일정에 주변 주차장도 찾아줘")
+        await c.send("카페 찾아줘")
+        assert c.queries == ["중랑구 카페"] and c.store.context.get("place_search") is None
+
+    asyncio.run(run())
+
+
+def test_parking_empty_name_search_uses_only_the_stored_road_and_labels_the_scope(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.store.proposal["activities"][1]["place"] = "합성식당 (서울특별시 중랑구 망우로 322)"
+        normal = parking_provider(c)
+
+        def provider(request):
+            if "합성식당" in request.url.params["query"]:
+                c.queries.append(request.url.params["query"])
+                return httpx.Response(200, json={"items": []})
+            return normal(request)
+
+        c.provider = provider
+        result = await c.send("2번 활동 주변 주차장 찾아줘")
+        assert c.queries == ["중랑구 합성식당 주차장", "중랑구 망우로 주차장"]
+        assert result.candidates and "도로·동네 범위" in result.reply
+        assert "실제 거리·주차 가능 여부" in result.reply
+        assert result.context.model_extra["place_search"]["query"] == "합성식당 주차장"
+
+    asyncio.run(run())
+
+
+def test_parking_provider_failure_does_not_broaden_or_claim_an_empty_result(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.store.proposal["activities"][1]["place"] = "합성식당 (서울 중랑구 망우로 322)"
+
+        def provider(request):
+            c.queries.append(request.url.params["query"])
+            return httpx.Response(503)
+
+        c.provider = provider
+        result = await c.send("식사 장소 주변 주차장 찾아줘")
+        assert len(c.queries) == 1 and "완료하지 못했어요" in result.reply
+        assert "찾지 못했어요" not in result.reply
+
+    asyncio.run(run())
+
+
+def test_one_course_anchor_and_corrupt_legacy_area_use_its_existing_address(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.provider = parking_provider(c)
+        c.store.proposal["activities"] = [c.store.proposal["activities"][1]]
+        c.store.proposal["activities"][0]["place"] = "합성식당 (서울특별시 중랑구 신내동 1)"
+        c.store.context["region"] = "식사 장소"
+        c.store.context["search_scope"]["area"] = "식사 장소"
+        result = await c.send("이후 일정에 주변 주차장도 찾아줘")
+        assert c.queries == ["중랑구 신내동 합성식당 주차장"] and result.candidates
+        assert result.context.region == "중랑구 신내동"
+
+    asyncio.run(run())
+
+
+def test_retry_repairs_an_already_saved_bad_parking_turn(monkeypatch):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True)
+        c.provider = parking_provider(c)
+        c.store.context["search_scope"].update(area="식사 장소", kinds=["restaurant"])
+        c.store.context["region"] = "식사 장소"
+        c.store.proposal["activities"][1]["place"] = "합성식당 (서울 중랑구 신내동 1)"
+        c.history = [
+            {"role": "user", "content": "식사 장소 주변에 주차장 알려달라고"},
+            {"role": "assistant", "content": "조건에 맞는 장소를 확인하지 못했어요."},
+        ]
+        result = await c.send("다시")
+        assert c.queries == ["중랑구 신내동 합성식당 주차장"] and result.candidates
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "주차장은 검색하지 마",
+        "주차장 기능은 뭐야?",
+        '제목은 "주차장"으로',
+        "주차장 말고 카페 찾아줘",
+    ],
+)
+def test_parking_mentions_are_not_automatically_searches(text):
+    assert parking_request(text) is None
 
 
 async def choose_card(

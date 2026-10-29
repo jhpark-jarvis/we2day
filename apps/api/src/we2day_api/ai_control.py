@@ -14,9 +14,23 @@ from we2day_api.ai_dialogue import Directive, analyze, merge_context, new_task, 
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, change_window, start_brief
 from we2day_api.ai_place_answers import private_anchor, recover_followup_area
-from we2day_api.ai_place_policy import Kind, SearchScope, explicit_area, kinds, norm
+from we2day_api.ai_place_policy import (
+    Kind,
+    SearchScope,
+    explicit_area,
+    kinds,
+    norm,
+    relational_area,
+)
 from we2day_api.ai_runtime import bounded_response
-from we2day_api.ai_search_followups import continuation, grounded_query, refinement, result_question
+from we2day_api.ai_search_followups import (
+    continuation,
+    grounded_query,
+    parking_request,
+    parking_scope,
+    refinement,
+    result_question,
+)
 from we2day_api.prompt_bundle import PROMPT
 
 VERSION = 1
@@ -91,7 +105,11 @@ def prepare(body, context, proposal, today):
     before = dict(context)
     control = state_at(before, body.version)
     narrowed = None if body.brief else refinement(latest)
-    if not narrowed and continuation(latest) and control.get("outcome") == "not_requested":
+    if (
+        not narrowed
+        and continuation(latest)
+        and (control.get("last_action") or {}).get("operation") == "search"
+    ):
         # Legacy promise/status chain: stop at the most recent substantive user request.
         prior = next(
             (
@@ -165,6 +183,52 @@ def prepare(body, context, proposal, today):
     elif directive.intent in PLACE_INTENTS and not result_question(latest):
         # An explicit new search/selection replaces a one-off lexical refinement.
         directive.slots["place_search"] = None
+    parking = (
+        None
+        if body.brief or body.chosen_places
+        else parking_request(
+            latest,
+            before.get("place_search")
+            if (before.get("dialogue", {}).get("pending") or {}).get("field") == "target"
+            else None,
+        )
+    )
+    waiting_for_parking = (before.get("dialogue", {}).get("pending") or {}).get(
+        "field"
+    ) == "target" and (before.get("place_search") or {}).get("query", "").endswith("주차장")
+    if (
+        not parking
+        and continuation(latest)
+        and (relational_area(directive.scope.area) or waiting_for_parking)
+    ):
+        prior = next(
+            (
+                m.content
+                for m in reversed(body.messages[:-1])
+                if m.role == "user" and not continuation(m.content)
+            ),
+            "",
+        )
+        parking = parking_request(prior)
+    if parking:
+        area, query, question = parking_scope(
+            parking,
+            proposal,
+            (before.get("search_scope") or {}).get("area") or before.get("region", ""),
+        )
+        directive.intent = directive.state.intent = "search"
+        directive.reply, directive.plan, directive.place_followup = "", None, ""
+        directive.state.pending = None
+        directive.scope = SearchScope(area=area, kinds=["any"], search_only=True)
+        directive.slots.update(
+            place_search={"version": 1, "query": query, "kind": "any"},
+            activity_edit=None,
+            pending_fields=None,
+        )
+        if area and not relational_area(area):
+            directive.slots["region"] = area
+        if question:
+            directive.ask("target", question, resume="search")
     short = re.sub(r"[\s.!?]", "", latest)
     retry = (
         bool(
@@ -175,6 +239,7 @@ def prepare(body, context, proposal, today):
             )
         )
         and not narrowed
+        and not parking
     )
     selection_repair = bool(
         re.search(r"(?:체크|선택)(?:해\s*둔|해\s*놓|했|해놨|했잖|한\s*곳)|저장.*체크", latest)
@@ -321,7 +386,7 @@ async def restore_saved_area(control, body, store, stats):
         or not body.conversation_id
         or not body.version
         or sum(message.role == "user" for message in body.messages[:-1]) >= body.version
-        or not private_anchor(directive.scope.area)
+        or not (private_anchor(directive.scope.area) or relational_area(directive.scope.area))
         or private_anchor(explicit_area(latest))
         or not (directive.intent in PLACE_INTENTS or directive.place_followup or control.interpret)
     ):
@@ -357,7 +422,7 @@ async def restore_saved_area(control, body, store, stats):
             for t in sorted(turns, key=lambda t: t["version"])
         ],
     )
-    if not private_anchor(directive.scope.area):
+    if not private_anchor(directive.scope.area) and not relational_area(directive.scope.area):
         control.interpret = False
 
 

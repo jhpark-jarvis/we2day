@@ -578,7 +578,7 @@ async def _run_chat(body, request, store, progress=None):
         stats.emit(status)
 
 
-def _select_place(directive, session, context, previous_scope, latest):
+def _select_place(directive, session, context, previous_scope, latest, previous_query=""):
     """An explicit card selection changes a destination, not model-owned plan metadata."""
     chosen = session.chosen_candidate
     if directive.intent != "select" or directive.reply or not chosen or not context.date:
@@ -595,12 +595,22 @@ def _select_place(directive, session, context, previous_scope, latest):
     )
     kind = known[0] if len(known) == 1 else "any"
     previous = session.previous_plan
+    parking = previous_query.endswith("주차장") and not specified
     index = None
     if previous:
         if not latest.startswith("선택한 장소:"):
             index = activity_target(latest, previous)
         if index is None and session.append_only:
             index = len(previous.activities)
+        if index is None and parking:
+            matches = [i for i, a in enumerate(previous.activities) if a.title == "주차장"]
+            index = (
+                matches[0]
+                if len(matches) == 1
+                else len(previous.activities)
+                if not matches
+                else None
+            )
         if index is None:
             matches = [
                 i
@@ -634,6 +644,8 @@ def _select_place(directive, session, context, previous_scope, latest):
         (value for value in context.activities if kind in kinds(value)),
         LABELS.get(kind, chosen.title),
     )
+    if parking:
+        label = "주차장"
     selected = session.resolve(
         ModelPlan(
             title=result.title,
@@ -783,7 +795,14 @@ async def _chat(body, settings, store, client, budget, stats):
             for activity in proposal.activities:
                 if activity.place:
                     session.seed(activity)
-        _select_place(directive, session, context, before_context.get("search_scope", {}), latest)
+        _select_place(
+            directive,
+            session,
+            context,
+            before_context.get("search_scope", {}),
+            latest,
+            (before_context.get("place_search") or {}).get("query", ""),
+        )
         io = ToolIO(settings, client, store, budget, stats)
         await read_candidate_request(directive, session, io)
         stats.counts["tool_calls"] = session.calls

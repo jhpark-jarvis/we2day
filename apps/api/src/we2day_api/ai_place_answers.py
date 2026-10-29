@@ -3,7 +3,16 @@
 import json
 import re
 
-from we2day_api.ai_place_policy import LABELS, area_matches, explicit_area, kinds, norm, plain
+from we2day_api.ai_place_policy import (
+    LABELS,
+    area_matches,
+    explicit_area,
+    kinds,
+    norm,
+    plain,
+    relational_area,
+)
+from we2day_api.ai_search_followups import parking_fallback
 from we2day_api.ai_tool_runtime import execute_batch
 
 
@@ -26,14 +35,14 @@ def recover_followup_area(directive, history):
     """Repair an unresolved alias using only a recent explicit user area, never model prose."""
     if (
         directive.intent not in {"search", "plan", "select"} and not directive.place_followup
-    ) or not private_anchor(directive.scope.area):
+    ) or not (private_anchor(directive.scope.area) or relational_area(directive.scope.area)):
         return
     for message in reversed(history[-50:]):
         if message.role != "user":
             continue
         area = explicit_area(message.content)
         if area:
-            if not private_anchor(area):
+            if not private_anchor(area) and not relational_area(area):
                 directive.scope.area = area
                 directive.scope.exact_name, directive.scope.name_kind = "", "any"
                 directive.slots["region"] = area
@@ -62,6 +71,11 @@ def candidate_reply(session, followup=""):
             return "장소 검색을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
         if not session.searches:
             return "아직 실제 장소를 검색하지 못했어요. 검색할 지역이나 장소를 알려주세요."
+        if session.policy.keyword.endswith("주차장"):
+            return (
+                "검색한 범위에서 주차장 후보를 찾지 못했어요. "
+                "기준 장소나 검색할 동네를 바꿔 주세요."
+            )
         return "조건에 맞는 장소를 확인하지 못했어요. 정확한 이름이나 지역을 알려주세요."
     # One representative per requested kind in the saved human reply. The complete
     # ephemeral candidate list remains a separate response, never a stored cache.
@@ -129,6 +143,10 @@ async def read_candidate_request(directive, session, io):
         )
         return
     area = session.policy.scope.area
+    if relational_area(area):
+        directive.ask("region", "검색할 동네나 기준 장소를 알려주세요.", resume="search")
+        session.resolution = "unresolved"
+        return
     if session.selected and "lookup_selected_places" in session.allowed_tools:
         await execute_batch(
             session, [{"function": {"name": "lookup_selected_places", "arguments": "{}"}}], io
@@ -264,6 +282,37 @@ async def read_candidate_request(directive, session, io):
             }
         )
     await execute_batch(session, calls, io)
+    fallback = parking_fallback(session.policy.keyword, session.previous_plan)
+    if (
+        fallback
+        and not verified_candidates(session)
+        and all(r["status"] == "ok" for r in session.reports)
+    ):
+        session.policy.keyword = fallback
+        await execute_batch(
+            session,
+            [
+                {
+                    "function": {
+                        "name": "search_places",
+                        "arguments": json.dumps(
+                            {
+                                "query": fallback,
+                                "mode": "category",
+                                "kind": "any",
+                                "area": area,
+                            },
+                            ensure_ascii=False,
+                        ),
+                    }
+                }
+            ],
+            io,
+        )
+        directive.notices.append(
+            "장소명으로 결과를 찾지 못해, 저장된 주소의 도로·동네 범위에서 검색했어요. "
+            "실제 거리·주차 가능 여부는 지도에서 확인해 주세요."
+        )
     failed = any(r["status"] == "failed" for r in session.reports)
     covered = set(session.candidate_kinds.values())
     if session.resolution not in {"not_allowed", "invalid_arguments", "budget_exhausted"}:

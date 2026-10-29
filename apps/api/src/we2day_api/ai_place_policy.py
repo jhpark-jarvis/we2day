@@ -59,6 +59,16 @@ class SearchScope(BaseModel):
     single_activity: bool = False
 
 
+def relational_area(text):
+    return bool(
+        re.search(
+            r"(?:이후|이전|다음|이번|해당|현재).*일정|(?:식사|약속|선택한|고른|방문한).*장소"
+            r"|^(?:선택한|고른|방문한)\s|^\d+\s*번|^(?:식사|식당|카페|약속|코스|일정)(?:\s|$)",
+            text,
+        )
+    )
+
+
 def explicit_area(text):
     nearby = re.search(r"근처|주변|인근|주위", text)
     if nearby:
@@ -67,6 +77,7 @@ def explicit_area(text):
         if (
             re.fullmatch(r"[가-힣A-Za-z0-9]+(?:\s+[가-힣A-Za-z0-9]+){0,2}", prefix)
             and len(prefix) <= 50
+            and not relational_area(prefix)
             and prefix
             not in {
                 "이",
@@ -265,6 +276,8 @@ class PlacePolicy:
 
     def relevant(self, item, args):
         title, category = plain(item.title), plain(item.category)
+        if self.keyword.endswith("주차장") and not re.search(r"주차장|주차시설", title + category):
+            return False
         if self.forbidden(title, args.kind):
             return False
         name_match = not args.name or norm(title) == norm(args.name)
