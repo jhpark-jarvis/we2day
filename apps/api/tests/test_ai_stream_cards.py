@@ -20,6 +20,50 @@ from we2day_api.main import create_app
 REAL_COMPLETE = ai_planner.complete
 
 
+def test_plan_completion_describes_only_the_verified_draft_change():
+    async def run():
+        session = ToolSession(
+            SimpleNamespace(),
+            None,
+            [],
+            [
+                SimpleNamespace(
+                    title="합성 식당", address="서울 중랑구", destination="합성 식당 (서울 중랑구)"
+                )
+            ],
+        )
+        session.direct_final = True
+        session.operation = "select"
+        candidate = session.chosen_candidate
+
+        def provider(_):
+            value = {
+                "reply": "국물 요리가 포함된 식사이며 오늘 영업 중이에요.",
+                "plan": {
+                    "title": "합성 코스",
+                    "date": "2030-01-05",
+                    "activities": [{"title": "식사", "place_ref": candidate.ref}],
+                },
+            }
+            return httpx.Response(
+                200, json={"choices": [{"message": {"content": json.dumps(value)}}]}
+            )
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(provider)) as client:
+            result = await REAL_COMPLETE(
+                SimpleNamespace(cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic"),
+                [{"role": "user", "content": "선택한 장소 반영"}],
+                session,
+                client=client,
+                budget=Budget(),
+                stats=RunStats("test"),
+            )
+        assert result.plan and result.plan.activities[0].place == candidate.destination
+        assert result.reply == "선택한 장소를 코스 초안에 반영했어요."
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("never_finishes", [False, True])
 def test_token_truncation_has_only_one_bounded_repair(never_finishes):
     async def run():

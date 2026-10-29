@@ -436,6 +436,14 @@ async def complete(
                 continue
             checks = (check_course(plan) if plan else []) + guarded
             reply = model_answer.reply
+            if plan and session:
+                # A validated plan proves the draft change, not menus/opening hours
+                # or other prose the model may append to its completion claim.
+                reply = (
+                    "선택한 장소를 코스 초안에 반영했어요."
+                    if session.operation == "select"
+                    else "코스 초안을 정리했어요. 장소와 조건을 확인해 주세요."
+                )
             if pending_promise(reply):
                 reply = (
                     "코스 초안을 정리했어요. 장소와 조건을 확인해 주세요."
