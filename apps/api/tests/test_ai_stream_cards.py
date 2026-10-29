@@ -10,7 +10,7 @@ from test_ai_long_dialogue import Conversation
 
 from we2day_api import ai_planner
 from we2day_api.ai_runtime import Budget, RunStats
-from we2day_api.ai_search_followups import parking_request, pending_promise, refinement
+from we2day_api.ai_search_followups import pending_promise, refinement
 from we2day_api.ai_stream import events
 from we2day_api.ai_tools import ToolSession
 from we2day_api.config import Settings
@@ -156,8 +156,9 @@ def test_parking_empty_name_search_uses_only_the_stored_road_and_labels_the_scop
         result = await c.send("2번 활동 주변 주차장 찾아줘")
         assert c.queries == ["중랑구 합성식당 주차장", "중랑구 망우로 주차장"]
         assert result.candidates and "도로·동네 범위" in result.reply
-        assert "실제 거리·주차 가능 여부" in result.reply
-        assert result.context.model_extra["place_search"]["query"] == "합성식당 주차장"
+        assert "실제 거리와 이용 조건" in result.reply
+        assert result.context.model_extra["place_search"]["query"] == "주차장"
+        assert result.context.model_extra["place_search"]["anchor_key"]
 
     asyncio.run(run())
 
@@ -220,8 +221,16 @@ def test_retry_repairs_an_already_saved_bad_parking_turn(monkeypatch):
         "주차장 말고 카페 찾아줘",
     ],
 )
-def test_parking_mentions_are_not_automatically_searches(text):
-    assert parking_request(text) is None
+def test_parking_mentions_are_not_automatically_searches(monkeypatch, text):
+    async def run():
+        c = Conversation(monkeypatch, proposal=True, allow_model=True)
+        await c.send(text)
+        if "말고" in text:
+            assert c.queries == ["중랑구 카페"]
+        else:
+            assert not c.queries
+
+    asyncio.run(run())
 
 
 async def choose_card(
@@ -255,10 +264,12 @@ async def choose_card(
         }
     )
     stats = RunStats("test")
-    async with httpx.AsyncClient(transport=httpx.MockTransport(c.provider)) as client:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(c.transport)) as client:
         result = await ai_planner._chat(
             body,
             SimpleNamespace(
+                cloudflare_account_id="a" * 32,
+                cloudflare_api_token="synthetic",
                 naver_search_enabled=True,
                 naver_search_client_id="synthetic",
                 naver_search_client_secret="synthetic",
@@ -268,7 +279,9 @@ async def choose_card(
             Budget(),
             stats,
         )
-    assert stats.counts["model_calls"] == 0
+    assert stats.counts["model_calls"] <= 1
+    if text.startswith("선택한 장소:"):
+        assert stats.counts["model_calls"] == 0
     c.history.append({"role": "assistant", "content": result.reply})
     return result
 

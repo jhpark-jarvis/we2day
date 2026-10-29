@@ -26,7 +26,7 @@ from we2day_api.ai_place_answers import (
     claims_place_search,
     read_candidate_request,
 )
-from we2day_api.ai_place_policy import LABELS, PlacePolicy, explicit_area, kinds
+from we2day_api.ai_place_policy import LABELS, PlacePolicy, explicit_area, kinds, norm
 from we2day_api.ai_runtime import (
     AIStore,
     Budget,
@@ -36,6 +36,7 @@ from we2day_api.ai_runtime import (
     with_disconnect,
 )
 from we2day_api.ai_search_followups import pending_promise, saved_refinement
+from we2day_api.ai_search_spec import current_anchor, saved_spec, search_queries
 from we2day_api.ai_stream import events
 from we2day_api.ai_tool_runtime import ToolIO, execute_batch
 from we2day_api.ai_tools import (
@@ -578,7 +579,7 @@ async def _run_chat(body, request, store, progress=None):
         stats.emit(status)
 
 
-def _select_place(directive, session, context, previous_scope, latest, previous_query=""):
+def _select_place(directive, session, context, previous_scope, latest, previous_search=None):
     """An explicit card selection changes a destination, not model-owned plan metadata."""
     chosen = session.chosen_candidate
     if directive.intent != "select" or directive.reply or not chosen or not context.date:
@@ -595,15 +596,27 @@ def _select_place(directive, session, context, previous_scope, latest, previous_
     )
     kind = known[0] if len(known) == 1 else "any"
     previous = session.previous_plan
-    parking = previous_query.endswith("주차장") and not specified
+    previous_spec = saved_spec({"place_search": previous_search})
+    if kind == "any" and previous_spec and previous_spec.result_kind != "any":
+        kind = previous_spec.result_kind
+    target_label = (
+        previous_spec.targets[0].query
+        if kind == "any"
+        and previous_spec
+        and len(previous_spec.targets) == 1
+        and previous_spec.targets[0].kind == "any"
+        else ""
+    )
     index = None
     if previous:
         if not latest.startswith("선택한 장소:"):
             index = activity_target(latest, previous)
         if index is None and session.append_only:
             index = len(previous.activities)
-        if index is None and parking:
-            matches = [i for i, a in enumerate(previous.activities) if a.title == "주차장"]
+        if index is None and target_label:
+            matches = [
+                i for i, a in enumerate(previous.activities) if norm(a.title) == norm(target_label)
+            ]
             index = (
                 matches[0]
                 if len(matches) == 1
@@ -644,8 +657,8 @@ def _select_place(directive, session, context, previous_scope, latest, previous_
         (value for value in context.activities if kind in kinds(value)),
         LABELS.get(kind, chosen.title),
     )
-    if parking:
-        label = "주차장"
+    if target_label:
+        label = target_label
     selected = session.resolve(
         ModelPlan(
             title=result.title,
@@ -741,7 +754,22 @@ async def _chat(body, settings, store, client, budget, stats):
             directive.slots["intake"]["turn_version"] = body.version + 1
         scope = directive.scope
         context = StoredContext.model_validate(merge_context(before_context, {}, directive))
-        lexical = saved_refinement(context.model_dump(), scope)
+        spec = saved_spec(context.model_dump(), scope)
+        lexical = saved_refinement(context.model_dump(), scope) if not spec else None
+        if spec and spec.anchor_pending:
+            directive.ask(
+                "target",
+                "어느 장소를 기준으로 찾을까요? 활동 번호나 장소를 알려주세요.",
+                resume="search",
+            )
+        if spec and spec.anchor_key and spec.area != scope.area:
+            directive.ask(
+                "target", "검색 지역이 바뀌었어요. 기준 장소를 다시 알려주세요.", resume="search"
+            )
+        if spec and spec.anchor_key and not current_anchor(spec, proposal):
+            directive.ask(
+                "target", "기준 장소가 바뀌었어요. 어느 장소 주변에서 찾을까요?", resume="search"
+            )
         known_date = context.date
         policy = PlacePolicy(
             scope,
@@ -749,6 +777,7 @@ async def _chat(body, settings, store, client, budget, stats):
             rejected=directive.state.rejected_places,
             excluded=directive.state.excluded_kinds,
             keyword=lexical["query"] if lexical else "",
+            queries=search_queries(spec, proposal) if spec else (),
         )
         session = ToolSession(
             settings,
@@ -758,6 +787,7 @@ async def _chat(body, settings, store, client, budget, stats):
             policy,
         )
         session.previous_plan = proposal
+        session.search_anchor = current_anchor(spec, proposal) if spec else None
         session.operation = directive.intent
         session.followup_of_search = (
             before_context.get("control", {}).get("last_action") or {}
@@ -807,10 +837,24 @@ async def _chat(body, settings, store, client, budget, stats):
             context,
             before_context.get("search_scope", {}),
             latest,
-            (before_context.get("place_search") or {}).get("query", ""),
+            before_context.get("place_search"),
         )
         io = ToolIO(settings, client, store, budget, stats)
         await read_candidate_request(directive, session, io)
+        if (
+            spec
+            and directive.intent == "search"
+            and len(spec.targets) == 1
+            and spec.targets[0].kind == "any"
+        ):
+            actual = {
+                session.candidate_kinds[p.ref]
+                for p in session.visible_candidates()
+                if p.source == "naver" and p.ref in session.fresh_refs
+            }
+            if len(actual) == 1:
+                spec.result_kind = next(iter(actual))
+                directive.slots["place_search"] = spec.model_dump()
         stats.counts["tool_calls"] = session.calls
         if (
             not directive.reply

@@ -595,11 +595,19 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       const hasCandidates = Boolean(result.candidates?.length);
       const sameScope =
         searchScopeKey(result.context?.search_scope) ===
-        searchScopeKey(planningContext?.search_scope);
+          searchScopeKey(planningContext?.search_scope) &&
+        JSON.stringify(result.context?.place_search ?? null) ===
+          JSON.stringify(planningContext?.place_search ?? null);
       const searched = result.tools?.some(
         (tool: { name: string }) => tool.name === "search_places",
       );
-      if (hasCandidates || searched || !sameScope) {
+      if (
+        hasCandidates ||
+        searched ||
+        !sameScope ||
+        result.context?.dialogue?.pending ||
+        result.context?.control?.last_action === null
+      ) {
         setCandidates(result.candidates || []);
         setCandidateMessageId(hasCandidates ? assistantId : null);
         setCandidatesUnavailable(result.candidates_available === false && !hasCandidates);

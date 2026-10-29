@@ -12,7 +12,7 @@ from we2day_api.ai_place_policy import (
     plain,
     relational_area,
 )
-from we2day_api.ai_search_followups import parking_fallback
+from we2day_api.ai_search_spec import address_fallback
 from we2day_api.ai_tool_runtime import execute_batch
 
 
@@ -71,11 +71,6 @@ def candidate_reply(session, followup=""):
             return "장소 검색을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
         if not session.searches:
             return "아직 실제 장소를 검색하지 못했어요. 검색할 지역이나 장소를 알려주세요."
-        if session.policy.keyword.endswith("주차장"):
-            return (
-                "검색한 범위에서 주차장 후보를 찾지 못했어요. "
-                "기준 장소나 검색할 동네를 바꿔 주세요."
-            )
         return "조건에 맞는 장소를 확인하지 못했어요. 정확한 이름이나 지역을 알려주세요."
     # One representative per requested kind in the saved human reply. The complete
     # ephemeral candidate list remains a separate response, never a stored cache.
@@ -100,10 +95,9 @@ def candidate_reply(session, followup=""):
         f"{i + 1}. {item.title}" + (f" — {item.address}" if item.address else "")
         for i, item in enumerate(representatives[:4])
     ]
-    missing = set(session.policy.scope.kinds) - set(session.candidate_kinds.values())
     if failed:
         rows.append("일부 활동의 검색은 완료하지 못했어요.")
-    elif missing:
+    elif session.resolution == "partial":
         rows.append("일부 활동은 조건에 맞는 후보를 확인하지 못했어요.")
     return "\n".join([heading, *rows])
 
@@ -261,13 +255,14 @@ async def read_candidate_request(directive, session, io):
     if not requested or len(requested) > 4:
         return
     calls = []
-    for kind in requested:
+    queries = session.policy.queries or [
+        (k, session.policy.keyword or f"{area} {LABELS.get(k, '장소')}", "") for k in requested
+    ]
+    for kind, query, _ in queries:
         name = session.policy.scope.exact_name
         exact = bool(name and session.policy.scope.name_kind in {kind, "any"})
         args = {
-            "query": name
-            if exact
-            else session.policy.keyword or f"{area} {LABELS.get(kind, '장소')}",
+            "query": name if exact else query,
             "mode": "exact_name" if exact else "category",
             "name": name if exact else "",
             "kind": kind,
@@ -282,45 +277,65 @@ async def read_candidate_request(directive, session, io):
             }
         )
     await execute_batch(session, calls, io)
-    fallback = parking_fallback(session.policy.keyword, session.previous_plan)
+    fallback = address_fallback(getattr(session, "search_anchor", None))
     if (
         fallback
         and not verified_candidates(session)
         and all(r["status"] == "ok" for r in session.reports)
     ):
-        session.policy.keyword = fallback
-        await execute_batch(
-            session,
-            [
-                {
-                    "function": {
-                        "name": "search_places",
-                        "arguments": json.dumps(
-                            {
-                                "query": fallback,
-                                "mode": "category",
-                                "kind": "any",
-                                "area": area,
-                            },
-                            ensure_ascii=False,
-                        ),
+        extra = [(k, f"{fallback} {target}", target) for k, _, target in session.policy.queries]
+        session.policy.queries.extend(extra)
+        for kind, query, _ in extra:
+            if len(session.searches) >= 4:
+                break
+            await execute_batch(
+                session,
+                [
+                    {
+                        "function": {
+                            "name": "search_places",
+                            "arguments": json.dumps(
+                                {
+                                    "query": query,
+                                    "mode": "category",
+                                    "kind": kind,
+                                    "area": area,
+                                },
+                                ensure_ascii=False,
+                            ),
+                        }
                     }
-                }
-            ],
-            io,
-        )
+                ],
+                io,
+            )
         directive.notices.append(
-            "장소명으로 결과를 찾지 못해, 저장된 주소의 도로·동네 범위에서 검색했어요. "
-            "실제 거리·주차 가능 여부는 지도에서 확인해 주세요."
+            "기준 장소명으로 결과를 찾지 못해 저장된 주소의 도로·동네 범위에서 검색했어요. "
+            "실제 거리와 이용 조건은 지도에서 확인해 주세요."
         )
     failed = any(r["status"] == "failed" for r in session.reports)
     covered = set(session.candidate_kinds.values())
+    complete = set(requested) <= covered
+    if session.policy.queries:
+        # Coverage belongs to the requested queries, not the provider's genre.
+        # Two different free-form targets can legitimately have the same genre.
+        required = {(k, t) for k, _, t in session.policy.queries}
+        found = set()
+        for key, items in session.searches.items():
+            if not items:
+                continue
+            args = json.loads(key)
+            found.update(
+                (k, t)
+                for k, q, t in session.policy.queries
+                if k == args["kind"] and norm(q) in norm(args["query"])
+            )
+        complete = required <= found
     if session.resolution not in {"not_allowed", "invalid_arguments", "budget_exhausted"}:
         session.resolution = (
             ("partial" if covered else "failed")
             if failed
             else "ready"
-            if set(requested) <= covered
+            if complete
             else "partial"
             if covered
             else "empty"

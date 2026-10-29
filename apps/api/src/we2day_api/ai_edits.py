@@ -10,6 +10,11 @@ from we2day_api.plans import PlanContent
 
 
 def cancel_request(text):
+    if not re.search(r"[\"'‘“]|취소하지|말고.*(?:찾|검색|추천)", text) and re.search(
+        r"(?:검색|요청|찾기|추천).*(?:취소|중단|그만|하지\s*마)"
+        r"|찾지\s*마|.{0,80}취소\s*해\s*줘(?:요)?[.!?\s]*$", text
+    ):
+        return True
     return bool(
         re.fullmatch(
             r"\s*(?:아니(?:야|요)?[,.]?\s*)?"

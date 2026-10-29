@@ -603,7 +603,19 @@ class ToolSession:
                     candidate = self.add(item.title, item.roadAddress or item.address, "naver")
                     if candidate:
                         self.fresh_refs.add(candidate.ref)
-                        self.candidate_kinds[candidate.ref] = args.kind
+                        actual = kinds(item.category)
+                        specific = [k for k in actual if k != "restaurant"]
+                        self.candidate_kinds[candidate.ref] = (
+                            (
+                                specific[0]
+                                if len(specific) == 1
+                                else actual[0]
+                                if len(actual) == 1
+                                else "any"
+                            )
+                            if args.kind == "any"
+                            else args.kind
+                        )
                         items.append(candidate.evidence())
                 self.searches[query] = items
                 self.reports.append({"name": name, "status": "ok", "count": len(items)})

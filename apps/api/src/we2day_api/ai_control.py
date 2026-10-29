@@ -13,8 +13,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from we2day_api.ai_dialogue import Directive, analyze, merge_context, new_task, social_turn
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, change_window, start_brief
-from we2day_api.ai_place_answers import private_anchor, recover_followup_area
+from we2day_api.ai_place_answers import address_area, private_anchor, recover_followup_area
 from we2day_api.ai_place_policy import (
+    LABELS,
     Kind,
     SearchScope,
     explicit_area,
@@ -26,10 +27,20 @@ from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_search_followups import (
     continuation,
     grounded_query,
-    parking_request,
-    parking_scope,
     refinement,
     result_question,
+    saved_refinement,
+)
+from we2day_api.ai_search_spec import (
+    SearchSpec,
+    SearchTarget,
+    anchor_key,
+    area_only_request,
+    place_name,
+    referenced_anchor,
+    saved_spec,
+    scope_for,
+    semantic_request,
 )
 from we2day_api.prompt_bundle import PROMPT
 
@@ -40,10 +51,14 @@ PLACE_INTENTS = {"search", "plan", "select"}
 class Action(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     operation: Literal["search", "plan", "chat", "clarify"]
-    area: str = Field(max_length=100)
-    kinds: list[Kind] = Field(max_length=8)
-    question: str = Field(max_length=180)
+    area: str = Field(default="", max_length=100)
+    kinds: list[Kind] = Field(default_factory=list, max_length=8)
+    question: str = Field(default="", max_length=180)
     query: str = Field(default="", max_length=50)
+    targets: list[str] = Field(default_factory=list, max_length=4)
+    anchor_ref: str = Field(default="", max_length=32)
+    anchor_index: int | None = Field(default=None, ge=0, le=7)
+    anchor_needed: bool = False
 
 
 class SavedAction(BaseModel):
@@ -88,6 +103,8 @@ class RequestControl:
     include_only: bool = False
     interpret: bool = False
     model_reserved: bool = False
+    proposal: object = None
+    previous_request: str = ""
 
 
 def state_at(context, version):
@@ -108,6 +125,7 @@ def prepare(body, context, proposal, today):
     if (
         not narrowed
         and continuation(latest)
+        and not saved_spec(before)
         and (control.get("last_action") or {}).get("operation") == "search"
     ):
         # Legacy promise/status chain: stop at the most recent substantive user request.
@@ -163,6 +181,9 @@ def prepare(body, context, proposal, today):
         directive.slots.update(activity_edit=None, pending_fields=None)
         if before.get("intake"):
             directive.slots["intake"] = {**before["intake"], "pending": None}
+        directive.slots["place_search"] = None
+        directive.allowed_tools.clear()
+        return RequestControl(directive, before, "rule", proposal=proposal)
     if (
         not window
         and (before.get("intake") or {}).get("pending")
@@ -182,53 +203,13 @@ def prepare(body, context, proposal, today):
         directive.slots.update(place_search=narrowed, activity_edit=None, pending_fields=None)
     elif directive.intent in PLACE_INTENTS and not result_question(latest):
         # An explicit new search/selection replaces a one-off lexical refinement.
-        directive.slots["place_search"] = None
-    parking = (
-        None
-        if body.brief
-        else parking_request(
-            latest,
-            before.get("place_search")
-            if (before.get("dialogue", {}).get("pending") or {}).get("field") == "target"
-            else None,
-        )
-    )
-    waiting_for_parking = (before.get("dialogue", {}).get("pending") or {}).get(
-        "field"
-    ) == "target" and (before.get("place_search") or {}).get("query", "").endswith("주차장")
-    if (
-        not parking
-        and continuation(latest)
-        and (relational_area(directive.scope.area) or waiting_for_parking)
-    ):
-        prior = next(
-            (
-                m.content
-                for m in reversed(body.messages[:-1])
-                if m.role == "user" and not continuation(m.content)
-            ),
-            "",
-        )
-        parking = parking_request(prior)
-    if parking:
-        area, query, question = parking_scope(
-            parking,
-            proposal,
-            (before.get("search_scope") or {}).get("area") or before.get("region", ""),
-        )
-        directive.intent = directive.state.intent = "search"
-        directive.reply, directive.plan, directive.place_followup = "", None, ""
-        directive.state.pending = None
-        directive.scope = SearchScope(area=area, kinds=["any"], search_only=True)
-        directive.slots.update(
-            place_search={"version": 1, "query": query, "kind": "any"},
-            activity_edit=None,
-            pending_fields=None,
-        )
-        if area and not relational_area(area):
-            directive.slots["region"] = area
-        if question:
-            directive.ask("target", question, resume="search")
+        previous_spec = saved_spec(before)
+        if previous_spec and area_only_request(latest):
+            if not previous_spec.anchor_key:
+                previous_spec.area = directive.scope.area
+            directive.slots["place_search"] = previous_spec.model_dump()
+        else:
+            directive.slots["place_search"] = None
     short = re.sub(r"[\s.!?]", "", latest)
     retry = (
         bool(
@@ -239,7 +220,6 @@ def prepare(body, context, proposal, today):
             )
         )
         and not narrowed
-        and not parking
     )
     selection_repair = bool(
         re.search(r"(?:체크|선택)(?:해\s*둔|해\s*놓|했|해놨|했잖|한\s*곳)|저장.*체크", latest)
@@ -369,7 +349,86 @@ def prepare(body, context, proposal, today):
         or nearby
         and not directive.scope.area
     )
-    return RequestControl(directive, before, reason, anchor_search, include_only, unclear)
+    legacy_retry = (
+        continuation(latest)
+        and not saved_spec(before)
+        and (
+            bool(before.get("place_search") and not saved_spec(before))
+            or relational_area(directive.scope.area)
+            or control.get("outcome") == "not_requested"
+            and not directive.reply
+            and (control.get("last_action") or {}).get("operation") == "search"
+        )
+    )
+    semantic = (
+        not body.brief
+        and not directive.slots.get("pending_fields")
+        and not social_turn(latest)
+        and (legacy_retry or not retry and semantic_request(latest, directive, proposal, before))
+    )
+    if semantic:
+        directive.reply = ""
+        directive.allowed_tools.clear()
+        directive.state.pending = None
+        directive.slots.update(activity_edit=None, pending_fields=None)
+        if not re.search(r"날짜|예산|이동\s*수단|제목", latest):
+            directive.plan = None
+        named = proposal and any(
+            norm(place_name(a)) == norm(directive.scope.area) for a in proposal.activities
+        )
+        if relational_area(directive.scope.area) or named:
+            directive.scope.area = before.get("region", "")
+        if relational_area(directive.scope.area):
+            directive.scope.area = ""
+    request = RequestControl(
+        directive,
+        before,
+        reason,
+        anchor_search,
+        include_only,
+        unclear or semantic,
+        proposal=proposal,
+    )
+    request.previous_request = next(
+        (
+            m.content
+            for m in reversed(body.messages[:-1])
+            if m.role == "user" and not continuation(m.content) and not social_turn(m.content)
+        ),
+        "",
+    )
+    if semantic and resume_anchor_answer(request, latest):
+        request.interpret = False
+    return request
+
+
+def resume_anchor_answer(control, latest):
+    """A current activity reference answers the pending question without another guess."""
+    spec = saved_spec(control.context)
+    if (
+        not spec
+        or not spec.anchor_pending
+        or re.search(r"찾|검색|추천|알려|바꿔|바꾸|변경|취소|제외", latest)
+    ):
+        return False
+    index, required = referenced_anchor(latest, control.proposal, True)
+    area = control.context.get("region", "")
+    if not required or index is None or not area or relational_area(area):
+        return False
+    activity = control.proposal.activities[index]
+    if not place_name(activity):
+        return False
+    spec.anchor_index, spec.anchor_key = index, anchor_key(activity)
+    spec.anchor_pending, spec.area = False, area
+    directive = control.directive
+    directive.scope = scope_for(spec.targets, area)
+    directive.intent = directive.state.intent = "search"
+    directive.state.pending = None
+    directive.reply, directive.plan = "", None
+    directive.allowed_tools = {"search_places"}
+    directive.slots.update(place_search=spec.model_dump(), activity_edit=None, pending_fields=None)
+    control.reason = "rule"
+    return True
 
 
 async def restore_saved_area(control, body, store, stats):
@@ -428,7 +487,10 @@ async def restore_saved_area(control, body, store, stats):
 
 async def interpret(control, latest, settings, client, budget, stats):
     """An interpretation proposal has no permission, tool invocation, or invented facts."""
-    schema = Action.model_json_schema()
+    if resume_anchor_answer(control, latest):
+        return
+    prior_view = saved_spec(control.context)
+    legacy_view = saved_refinement(control.context, control.directive.scope)
     inputs = {
         "model": "@cf/qwen/qwen3-30b-a3b-fp8",
         "messages": [
@@ -439,16 +501,34 @@ async def interpret(control, latest, settings, client, budget, stats):
                     {
                         "request": latest,
                         "area": control.directive.scope.area,
-                        "kinds": control.directive.scope.kinds,
+                        "previous_search": (
+                            {
+                                "targets": [t.query for t in prior_view.targets],
+                                "awaiting_anchor": prior_view.anchor_pending,
+                            }
+                            if prior_view
+                            else {"targets": [legacy_view["query"]], "awaiting_anchor": False}
+                            if legacy_view
+                            else None
+                        ),
+                        "previous_request": control.previous_request,
+                        "activities": [
+                            {
+                                "ref": f"activity_{i + 1}",
+                                "number": i + 1,
+                                "title": a.title,
+                                "place_name": place_name(a),
+                            }
+                            for i, a in enumerate(control.proposal.activities)
+                        ]
+                        if control.proposal
+                        else [],
                     },
                     ensure_ascii=False,
                 ),
             },
         ],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": "task_action", "strict": True, "schema": schema},
-        },
+        "response_format": {"type": "json_object"},
         "temperature": 0,
         "max_tokens": 400,
     }
@@ -481,6 +561,8 @@ async def interpret(control, latest, settings, client, budget, stats):
     try:
         payload = json.loads(raw)
         stats.usage(payload)
+        if payload["choices"][0].get("finish_reason") == "length":
+            raise ValueError("Incomplete interpretation")
         value = payload["choices"][0]["message"]["content"]
         action = (
             Action.model_validate_json(value)
@@ -495,40 +577,112 @@ async def interpret(control, latest, settings, client, budget, stats):
             and norm(action.area) != norm(scope.area)
         ):
             raise ValueError("Ungrounded area")
-        allowed = set(kinds(latest)) | set(scope.kinds)
-        if any(k not in allowed for k in action.kinds):
-            raise ValueError("Unrequested activity")
-        if action.query and not grounded_query(action.query, latest):
-            raise ValueError("Ungrounded query")
+        prior = saved_spec(control.context)
+        targets = []
+        for query in action.targets:
+            query = " ".join(query.split())
+            if any(norm(t.query) == norm(query) for t in targets):
+                continue
+            detected = kinds(query)
+            specific = [k for k in detected if k != "restaurant"]
+            kind = (
+                specific[0] if len(specific) == 1 else detected[0] if len(detected) == 1 else "any"
+            )
+            targets.append(SearchTarget(kind=kind, query=query))
+        if action.anchor_ref:
+            match = re.fullmatch(r"activity_([1-8])", action.anchor_ref)
+            if not match:
+                raise ValueError("Unknown anchor reference")
+            action.anchor_index = int(match[1]) - 1
+        if not targets and action.kinds:
+            # Compatibility for older interpreter outputs; arbitrary classes still
+            # need a user-grounded query, not merely an inherited search scope.
+            allowed = set(kinds(latest)) | set(scope.kinds)
+            if any(k not in allowed for k in action.kinds):
+                raise ValueError("Unrequested activity")
+            targets = [
+                SearchTarget(kind=k, query=action.query or LABELS.get(k, "")) for k in action.kinds
+            ]
+        evidence = latest
+        resuming = bool(prior and prior.anchor_pending) or continuation(latest)
+        if resuming and prior:
+            evidence += " " + " ".join(t.query for t in prior.targets)
+        if resuming:
+            evidence += " " + control.previous_request
+            if legacy_view:
+                evidence += " " + legacy_view["query"]
+        relation = re.search(r"주변|근처|인근|주위", latest)
+        target_evidence = latest[relation.end() :] if relation else evidence
+        for target in targets:
+            if not grounded_query(target.query, evidence):
+                raise ValueError("Ungrounded query")
+        replacement = re.split(r"말고|대신", target_evidence)
+        if len(replacement) > 1 and re.search(r"찾|검색|추천|알려", replacement[-1]):
+            target_evidence = replacement[-1]
+        if relation or len(replacement) > 1:
+            targets = [t for t in targets if grounded_query(t.query, target_evidence)]
+        spec = SearchSpec(targets=targets) if targets else None
+        expected_anchor, required_anchor = referenced_anchor(
+            latest, control.proposal, bool(prior and prior.anchor_pending)
+        )
+        if required_anchor:
+            action.anchor_index = expected_anchor
+            action.anchor_needed = expected_anchor is None
+        if action.anchor_index is not None:
+            if not relation and not resuming:
+                raise ValueError("Unrequested anchor")
+            if not control.proposal or action.anchor_index >= len(control.proposal.activities):
+                raise ValueError("Unknown anchor")
+            activity = control.proposal.activities[action.anchor_index]
+            if not place_name(activity):
+                action.anchor_needed = True
+            elif spec:
+                spec.anchor_index = action.anchor_index
+                spec.anchor_key = anchor_key(activity)
+        directive = control.directive
+        if spec:
+            if spec.anchor_key and (not scope.area or relational_area(scope.area)):
+                activity = control.proposal.activities[spec.anchor_index]
+                address = re.search(r"\(([^()]*)\)", activity.place)
+                scope.area = address_area(address[1]) if address else ""
+            directive.scope = scope_for(targets, action.area or scope.area)
+            spec.area = directive.scope.area
+            directive.slots["place_search"] = spec.model_dump()
         if (
-            action.operation in {"search", "plan"}
-            and (action.area or scope.area)
-            and (action.kinds or scope.kinds)
+            action.anchor_needed
+            and (not spec or not spec.anchor_key)
+            or action.operation == "clarify"
         ):
-            directive = control.directive
+            if spec:
+                spec.anchor_pending = True
+                directive.slots["place_search"] = spec.model_dump()
+            directive.ask(
+                "target",
+                "어느 장소를 기준으로 무엇을 찾을까요? 활동 번호나 장소를 알려주세요.",
+                resume="search",
+            )
+            control.reason = "clarify"
+        elif action.operation in {"search", "plan"} and spec and directive.scope.area:
             directive.intent = directive.state.intent = action.operation
-            directive.scope.area = action.area or scope.area
-            directive.scope.kinds = action.kinds or scope.kinds
+            directive.state.pending = None
+            directive.reply, directive.place_followup = "", ""
+            directive.slots.update(activity_edit=None, pending_fields=None)
+            directive.state.excluded_kinds = [
+                k for k in directive.state.excluded_kinds if k not in directive.scope.kinds
+            ]
             directive.scope.search_only = action.operation == "search"
             directive.slots["region"] = directive.scope.area
             directive.allowed_tools = {"search_places"}
-            if action.query and len(directive.scope.kinds) == 1:
-                directive.slots["place_search"] = {
-                    "version": 1,
-                    "query": action.query,
-                    "kind": directive.scope.kinds[0],
-                }
             if action.operation == "plan" and not control.context.get("date"):
                 directive.ask(
                     "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume="plan"
                 )
             control.reason = "interpreted"
-        elif action.operation == "clarify":
-            control.directive.ask(
-                "target",
-                "어느 장소나 활동을 어떻게 할까요? 원하는 작업을 알려주세요.",
-                resume="search",
-            )
+        elif action.operation == "chat":
+            directive.intent = directive.state.intent = "chat"
+            directive.allowed_tools.clear()
+        else:
+            directive.ask("region", "어느 지역에서 어떤 장소를 찾아볼까요?", resume="search")
             control.reason = "clarify"
     except (ValueError, KeyError, TypeError, IndexError, ValidationError):
         control.directive.ask(

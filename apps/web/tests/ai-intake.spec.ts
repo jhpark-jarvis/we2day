@@ -2,6 +2,61 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("a pending anchor replaces old candidates even when the category and area stay equal", async ({
+  page,
+}) => {
+  await fixtureLogin(page);
+  let posts = 0;
+  await page.route("**/api/ai/planner**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: historyItems });
+    posts++;
+    return route.fulfill({
+      json: {
+        reply: posts === 1 ? "합성 시설 후보" : "어느 장소를 기준으로 찾을까요?",
+        plan: null,
+        checks: [],
+        version: posts,
+        context: {
+          region: "합성구",
+          search_scope: { area: "합성구", kinds: ["any"] },
+          place_search: {
+            semantic: 1,
+            version: 1,
+            targets: [{ kind: "any", query: "합성시설" }],
+            anchor_pending: posts > 1,
+          },
+          dialogue: { pending: posts > 1 ? { field: "target", resume: "search" } : null },
+        },
+        candidates:
+          posts === 1
+            ? [
+                {
+                  ref: "p1",
+                  title: "합성 시설",
+                  address: "합성구 1",
+                  destination: "합성 시설 (합성구 1)",
+                  source: "naver",
+                },
+              ]
+            : [],
+        candidates_available: true,
+      },
+    });
+  });
+  await page.goto("/plans/ai");
+  await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+  const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
+  await input.fill("합성시설 찾아줘");
+  await input.press("Enter");
+  await expect(page.getByRole("button", { name: "합성 시설 선택", exact: true })).toBeVisible();
+  await input.fill("그 장소 주변 합성시설 찾아줘");
+  await input.press("Enter");
+  await expect(page.getByText("어느 장소를 기준으로 찾을까요?", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "합성 시설 선택", exact: true })).toHaveCount(0);
+  expect(posts).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("real BFF streams progress before a final card response and keeps failures recoverable", async ({
   page,
   request,

@@ -52,6 +52,7 @@ class Conversation:
         )
         self.id = str(uuid4())
         self.history, self.queries, self.calls = [], [], []
+        self.semantic_action = None
         original = self.store.rpc
 
         async def rpc(name, values=None):
@@ -82,13 +83,29 @@ class Conversation:
             return httpx.Response(
                 200,
                 json={
-                    "items": [{"title": "합성" + kind, "category": kind, "roadAddress": address}]
+                    "items": [
+                        {
+                            "title": "합성" + kind,
+                            "category": kind,
+                            "description": query,
+                            "roadAddress": address,
+                        }
+                    ]
                 },
             )
 
         self.store.rpc = rpc
         self.provider = provider
         monkeypatch.setattr(ai_planner, "complete", completion)
+
+    def transport(self, request):
+        if request.url.host == "api.cloudflare.com":
+            from semantic_fixture import semantic_response
+
+            return semantic_response(
+                request, self.semantic_action(request) if self.semantic_action else None
+            )
+        return self.provider(request)
 
     async def send(self, text):
         self.history.append({"role": "user", "content": text})
@@ -100,10 +117,12 @@ class Conversation:
                 "version": self.store.version,
             }
         )
-        async with httpx.AsyncClient(transport=httpx.MockTransport(self.provider)) as client:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(self.transport)) as client:
             result = await ai_planner._chat(
                 body,
                 SimpleNamespace(
+                    cloudflare_account_id="a" * 32,
+                    cloudflare_api_token="synthetic",
                     naver_search_enabled=True,
                     naver_search_client_id="synthetic",
                     naver_search_client_secret="synthetic",

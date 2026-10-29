@@ -266,7 +266,7 @@ def test_interpreter_cannot_invent_slots_or_permissions(action):
 
         def model(request):
             value = json.loads(request.content)
-            assert "tools" not in value and value["response_format"]["type"] == "json_schema"
+            assert "tools" not in value and value["response_format"]["type"] == "json_object"
             return httpx.Response(
                 200, json={"choices": [{"message": {"content": json.dumps(action)}}]}
             )

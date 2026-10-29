@@ -63,7 +63,8 @@ def relational_area(text):
     return bool(
         re.search(
             r"(?:이후|이전|다음|이번|해당|현재).*일정|(?:식사|약속|선택한|고른|방문한).*장소"
-            r"|^(?:선택한|고른|방문한)\s|^\d+\s*번|^(?:식사|식당|카페|약속|코스|일정)(?:\s|$)",
+            r"|^(?:선택한|고른|방문한)\s|^\d+\s*번|^(?:식사|식당|카페|약속|코스|일정)(?:\s|$)"
+            r"|^(?:그|저|이|해당|아까)\s*(?:장소|곳)(?:\s|$)",
             text,
         )
     )
@@ -218,19 +219,25 @@ def requested_scope(text, previous=None, chosen=()):
 
 
 class PlacePolicy:
-    def __init__(self, scope=None, user_text="", *, rejected=(), excluded=(), keyword=""):
+    def __init__(
+        self, scope=None, user_text="", *, rejected=(), excluded=(), keyword="", queries=()
+    ):
         self.scope = scope or SearchScope()
         self.user_text = user_text
         self.blocked = 0
         self.rejected = {norm(name) for name in rejected}
         self.excluded = set(excluded)
         self.keyword = keyword
+        self.queries = list(queries)
 
     def forbidden(self, title, kind="any"):
         return norm(title) in self.rejected or kind in self.excluded
 
     def prepare(self, values, evidence_addresses=()):
         args = SearchArguments.model_validate(values).model_copy()
+        approved = any(k == args.kind and norm(q) == norm(args.query) for k, q, _ in self.queries)
+        if self.queries and not approved:
+            return None, "outside_requested_query"
         query_kinds = kinds(args.query)
         if args.kind == "any":
             allowed = self.scope.kinds or query_kinds
@@ -256,6 +263,7 @@ class PlacePolicy:
         elif (
             any(kind != args.kind for kind in query_kinds)
             and args.kind != "any"
+            and not approved
             and not (self.keyword and norm(args.query) == norm(self.keyword))
         ):
             self.blocked += 1
@@ -276,8 +284,25 @@ class PlacePolicy:
 
     def relevant(self, item, args):
         title, category = plain(item.title), plain(item.category)
-        if self.keyword.endswith("주차장") and not re.search(r"주차장|주차시설", title + category):
-            return False
+        if self.queries:
+            target = next(
+                (t for k, q, t in self.queries if k == args.kind and norm(q) in norm(args.query)),
+                "",
+            )
+            terms = [
+                norm(t)
+                for t in target.split()
+                if len(norm(t)) >= 2
+                and t not in {"파는", "있는", "하는"}
+                and norm(t) != norm(LABELS.get(args.kind, ""))
+            ]
+            source = norm(title + category + item.description)
+            for term in terms:
+                forms = {term, re.sub(r"(?:집|가게|업체|장소|곳)$", "", term)} - {""}
+                if not any(len(form) >= 2 and form in source for form in forms):
+                    return False
+            if args.kind == "any" and not terms:
+                return False
         if self.forbidden(title, args.kind):
             return False
         name_match = not args.name or norm(title) == norm(args.name)
@@ -322,4 +347,4 @@ class PlacePolicy:
             return False
         if scope.exact_name and scope.name_kind in {"any", kind}:
             return norm(title) in {norm(scope.exact_name), norm(scope.exact_name) + "공원"}
-        return not scope.kinds or kind in scope.kinds
+        return not scope.kinds or "any" in scope.kinds or kind in scope.kinds
