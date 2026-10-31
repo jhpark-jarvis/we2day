@@ -36,6 +36,7 @@ from we2day_api.ai_search_spec import (
     SearchTarget,
     anchor_key,
     area_only_request,
+    changed_area,
     place_name,
     referenced_anchor,
     saved_spec,
@@ -291,13 +292,15 @@ def prepare(body, context, proposal, today):
             directive.ask(
                 "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume=directive.intent
             )
-    replacement_area = explicit_area(latest)
+    replacement_area = changed_area(latest) or explicit_area(latest)
     if (
-        directive.intent == "chat"
+        (directive.intent == "chat" or changed_area(latest))
         and replacement_area
         and re.search(r"지역|동네|으로|바꿔|바꾸|변경", latest)
     ):
         directive.intent = directive.state.intent = "edit"
+        directive.state.pending = None
+        directive.allowed_tools.clear()
         directive.scope.area = replacement_area
         directive.slots["region"] = replacement_area
         directive.reply = f"지역을 {replacement_area}(으)로 바꿨어요."
@@ -656,17 +659,22 @@ async def interpret(control, latest, settings, client, budget, stats):
             directive.scope = scope_for(targets, action.area or scope.area)
             spec.area = directive.scope.area
             directive.slots["place_search"] = spec.model_dump()
-        if (
-            action.anchor_needed
-            and (not spec or not spec.anchor_key)
-            or action.operation == "clarify"
-        ):
+        if action.anchor_needed and (not spec or not spec.anchor_key):
             if spec:
                 spec.anchor_pending = True
                 directive.slots["place_search"] = spec.model_dump()
             directive.ask(
                 "target",
                 "어느 장소를 기준으로 무엇을 찾을까요? 활동 번호나 장소를 알려주세요.",
+                resume="search",
+            )
+            control.reason = "clarify"
+        elif action.operation == "clarify":
+            directive.ask(
+                "region" if spec and not directive.scope.area else "target",
+                "어느 지역에서 찾아볼까요? 동네나 지역을 알려주세요."
+                if spec and not directive.scope.area
+                else "어떤 활동이나 장소를 찾고 싶은지 알려주세요.",
                 resume="search",
             )
             control.reason = "clarify"

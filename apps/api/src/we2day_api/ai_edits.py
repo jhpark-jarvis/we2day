@@ -12,7 +12,8 @@ from we2day_api.plans import PlanContent
 def cancel_request(text):
     if not re.search(r"[\"'‘“]|취소하지|말고.*(?:찾|검색|추천)", text) and re.search(
         r"(?:검색|요청|찾기|추천).*(?:취소|중단|그만|하지\s*마)"
-        r"|찾지\s*마|.{0,80}취소\s*해\s*줘(?:요)?[.!?\s]*$", text
+        r"|찾지\s*마|.{0,80}취소\s*해\s*줘(?:요)?[.!?\s]*$",
+        text,
     ):
         return True
     return bool(
@@ -101,7 +102,21 @@ def edit_activities(text, proposal, previous, clock_value):
     shift = bool(re.search(r"미뤄|늦춰|당겨|앞당겨", text))
     indices, invalid = targets(text, len(proposal.activities))
     multiple_time = "시간" in text and len(indices) > 1 and bool(re.search(r"바꿔|변경|설정", text))
-    operation = "swap" if swap else "shift" if shift else "time" if multiple_time else None
+    explicit_clock = bool(
+        indices
+        and not invalid
+        and re.search(r"바꿔|바꾸|변경|수정|맞춰|(?:으로|로)\s*해\s*줘", text)
+        and re.search(r"\d{1,2}:\d{2}|\d{1,2}시", text)
+    )
+    operation = (
+        "swap"
+        if swap
+        else "shift"
+        if shift
+        else "time"
+        if multiple_time or explicit_clock
+        else None
+    )
     if not operation and not previous:
         return None
     if operation and re.search(r"(?:제목|날짜|예산).{0,30}(?:바꿔|변경|수정)", text):

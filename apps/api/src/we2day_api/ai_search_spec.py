@@ -5,6 +5,7 @@ import re
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from we2day_api.ai_conversation_hints import guidance
 from we2day_api.ai_place_policy import Kind, SearchScope, explicit_area, kinds, norm
 from we2day_api.ai_search_followups import continuation, search_phrase
 
@@ -89,7 +90,8 @@ def address_fallback(activity):
 def semantic_request(text, directive, proposal, before):
     """Route free-form venue requests, not nouns from a domain-specific dictionary."""
     if (
-        directive.place_followup
+        guidance(text)
+        or directive.place_followup
         or text.startswith("선택한 장소:")
         or re.search(r"제목|기능|사용법", text)
     ):
@@ -130,6 +132,9 @@ def semantic_request(text, directive, proposal, before):
     # A safe fast path remains for an exact, plain category lookup. Rich requests
     # use semantic extraction even if an old parser happened to inherit a category.
     if directive.intent == "search" and requested and not directive.scope.exact_name:
+        target_text = text.replace(explicit_area(text), "") if explicit_area(text) else text
+        if len(kinds(text)) < 2 and re.search(r"랑|하고|그리고|(?:와|과|및)\s|[,，]", target_text):
+            return True
         if directive.slots.get("place_search") or not directive.scope.kinds:
             return True
         if not kinds(text):
@@ -144,10 +149,27 @@ def area_only_request(text):
     return bool(
         area
         and re.fullmatch(
-            re.escape(area) + r"\s*(?:(?:근처|주변|인근|주위)(?:로|에서|에)?\s*)?"
+            re.escape(area) + r"\s*(?:(?:근처|주변|인근|주위)\s*)?(?:에서|으로|로|에)?\s*"
             r"(?:알아\s*봐|찾아|검색해|추천해)\s*(?:줘|주세요|줄래)(?:요)?[.!?\s]*",
             search_phrase(text),
         )
+    )
+
+
+def changed_area(text):
+    value = search_phrase(
+        re.split(r"(?:말고|아니라)(?=\s|$)|(?<![가-힣])대신(?=\s|$)", text)[-1].strip()
+    )
+    area = explicit_area(value)
+    return (
+        area
+        if area
+        and re.fullmatch(
+            re.escape(area)
+            + r"\s*(?:으로|로)?\s*(?:바꾸자|바꿔(?:줘)?|바꿀게|변경해(?:줘)?|할게|하자)[.!?\s]*",
+            value,
+        )
+        else ""
     )
 
 

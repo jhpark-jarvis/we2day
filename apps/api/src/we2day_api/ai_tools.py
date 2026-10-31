@@ -22,7 +22,7 @@ from pydantic import (
 from we2day_api.ai_dialogue import DialogueState
 from we2day_api.ai_edits import ActivityEdit, PendingFields
 from we2day_api.ai_intake import IntakeState
-from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds
+from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds, source_kind
 from we2day_api.places import fetch_places
 from we2day_api.plans import Activity, PlanContent
 
@@ -603,18 +603,9 @@ class ToolSession:
                     candidate = self.add(item.title, item.roadAddress or item.address, "naver")
                     if candidate:
                         self.fresh_refs.add(candidate.ref)
-                        actual = kinds(item.category)
-                        specific = [k for k in actual if k != "restaurant"]
+                        actual = source_kind(item.category)
                         self.candidate_kinds[candidate.ref] = (
-                            (
-                                specific[0]
-                                if len(specific) == 1
-                                else actual[0]
-                                if len(actual) == 1
-                                else "any"
-                            )
-                            if args.kind == "any"
-                            else args.kind
+                            actual if actual != "any" else args.kind
                         )
                         items.append(candidate.evidence())
                 self.searches[query] = items

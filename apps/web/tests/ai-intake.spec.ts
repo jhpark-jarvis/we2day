@@ -2,6 +2,31 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("starter examples provide a region and activity and remain editable before sending", async ({
+  page,
+}) => {
+  await fixtureLogin(page);
+  let posts = 0;
+  await page.route("**/api/ai/planner**", async (route) => {
+    if (route.request().method() !== "GET") posts++;
+    await route.fulfill({ json: [] });
+  });
+  await page.goto("/plans/ai");
+  await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+  const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
+  for (const label of ["산책과 카페", "비 오는 날", "가벼운 하루"]) {
+    await page.getByRole("button", { name: label, exact: true }).click();
+    const text = await input.inputValue();
+    expect(text).toMatch(/성수동|연남동/);
+    expect(text).toMatch(/카페/);
+    expect(text).toMatch(/\d{4}-\d{2}-\d{2}|날짜는 미정/);
+    expect(posts).toBe(0);
+    await expect(input).toBeFocused();
+  }
+  await input.fill("내 지역과 예산으로 바꾼 문장");
+  await expect(input).toHaveValue("내 지역과 예산으로 바꾼 문장");
+});
+
 test("a pending anchor replaces old candidates even when the category and area stay equal", async ({
   page,
 }) => {

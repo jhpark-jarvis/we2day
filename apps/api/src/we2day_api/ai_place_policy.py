@@ -38,6 +38,13 @@ def kinds(value):
     return [key for key, words in WORDS.items() if any(word in value for word in words)]
 
 
+def source_kind(category):
+    """A provider's specific genre takes precedence over its food parent category."""
+    detected = kinds(category)
+    specific = [kind for kind in detected if kind != "restaurant"]
+    return specific[0] if len(specific) == 1 else detected[0] if len(detected) == 1 else "any"
+
+
 def generic_name(value):
     return norm(value) in {norm(word) for words in WORDS.values() for word in words}
 
@@ -71,6 +78,7 @@ def relational_area(text):
 
 
 def explicit_area(text):
+    text = re.split(r"(?:말고|아니라)(?=\s|$)|(?<![가-힣])대신(?=\s|$)", text)[-1].strip()
     nearby = re.search(r"근처|주변|인근|주위", text)
     if nearby:
         prefix = re.split(r"[,，.!?\n]", text[: nearby.start()])[-1].strip()
@@ -284,6 +292,8 @@ class PlacePolicy:
 
     def relevant(self, item, args):
         title, category = plain(item.title), plain(item.category)
+        if args.kind == "restaurant" and source_kind(category) not in {"restaurant", "any"}:
+            return False
         if self.queries:
             target = next(
                 (t for k, q, t in self.queries if k == args.kind and norm(q) in norm(args.query)),

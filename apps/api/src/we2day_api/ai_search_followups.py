@@ -8,7 +8,7 @@ from we2day_api.ai_place_policy import explicit_area, generic_name, kinds, norm
 def search_phrase(text):
     """Normalize discourse only for search parsing; preserve the original message."""
     return re.sub(
-        r"^(?:(?:흠|음|어|아|그럼|그러면|혹시|대신|좋아|일단)(?:[.,…!?]+|\s+)\s*)+",
+        r"^(?:(?:흠|음|어|아|아니|아니야|그럼|그러면|혹시|대신|좋아|일단)(?:[.,…!?]+|\s+)\s*)+",
         "",
         text.strip(),
     )

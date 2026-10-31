@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from we2day_api.ai_conversation_hints import guidance
 from we2day_api.ai_edits import cancel_request, edit_activities
 from we2day_api.ai_place_policy import (
     WORDS,
@@ -266,7 +267,7 @@ def social_turn(text):
     return bool(
         re.fullmatch(
             r"\s*(?:응|네|넵|좋아|알겠어|알겠어요|알겠습니다|고마워|고맙습니다|"
-            r"감사해|감사해요|감사합니다|안녕|안녕하세요)(?:요)?[.!?~\s]*",
+            r"감사해|감사해요|감사합니다|안녕|안녕하세요)(?:요)?[.!?~\sㅎㅋ🙂😊]*",
             text,
         )
     )
@@ -305,7 +306,9 @@ def field_values(text):
 
 
 def cleared(value):
-    return bool(re.match(r"(?:아직\s*)?(?:미정|없음|비워|없애|초기화|정하지\s*않)", value))
+    return bool(
+        re.match(r"(?:아직\s*)?(?:미정|없음|비워|없애|초기화|정하지|안\s*정|빼|제외)", value)
+    )
 
 
 def replacement(value):
@@ -319,6 +322,12 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     state.pending = None
     previous_scope = SearchScope.model_validate(context.get("search_scope") or {})
     directive = Directive(state, previous_scope.model_copy(deep=True))
+    hint = guidance(text)
+    if hint:
+        directive.intent = directive.state.intent = "chat"
+        directive.state.pending = old_pending
+        directive.reply = hint
+        return directive
     # Social turns precede every pending-edit controller and preserve all staged values.
     if social_turn(text):
         directive.state.pending = old_pending
@@ -455,7 +464,7 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         state.excluded_kinds = [k for k in state.excluded_kinds if k not in selected_kind]
     searching = re.sub(r"(?:검색|추천)하지\s*(?:마|말)|검색\s*말고|찾지\s*(?:마|말)", "", positive)
     search = bool(re.search(r"검색|찾아|찾아봐|찾아줄|후보|추천|알아\s*봐|살펴\s*봐", searching))
-    search = search or bool(active and re.search(r"보여\s*줘", searching))
+    search = search or bool(active and re.search(r"보여\s*(?:줘|주세요|줄래)", searching))
     search = search or bool(active and re.search(r"보고\s*싶|찾자", searching))
     # A contextual venue list is a request even without an imperative verb.
     search = search or bool(
@@ -489,14 +498,26 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     title_field = bool(re.search(r"제목|(?:코스|플랜)\s*(?:이름|명칭)", field_text))
     date_field = bool(re.search(r"날짜|일자", field_text))
     time_field = "시간" in field_text
-    budget_field = bool(re.search(r"예산|총액|전체\s*비용", field_text))
+    budget_field = bool(re.search(r"예산|총액|전체\s*비용", field_text)) or bool(
+        plan_request
+        and len(re.findall(r"\d[\d,.]*\s*(?:만\s*원?|천\s*원?|원)", field_text)) == 1
+        and re.search(
+            r"\d[\d,.]*\s*(?:만\s*원?|천\s*원?|원)\s*(?:으로|이내|안에서|이하|정도|까지)",
+            field_text,
+        )
+    )
     transport_field = bool(re.search(r"이동\s*수단|교통|자동차|자가용|대중교통|도보", field_text))
     fields = field_values(text)
     region_field = bool("지역" in fields or "동네" in fields)
     requirement_field = "추가조건" in fields
     questioning = bool(re.search(r"충분|얼마|무엇|뭐야|어떻게|어떤|왜", text)) and not edit_request
     condition_request = not questioning and bool(
-        fields and (edit_request or any(cleared(v) for v in fields.values()))
+        fields
+        and (
+            edit_request
+            or re.search(r"할게|정하자|정할래", text)
+            or any(cleared(v) for v in fields.values())
+        )
     )
     weather = bool(re.search(r"날씨|예보|비\s*오|우천", text))
     remove = bool(re.search(r"빼\s*줘|제외해|삭제해|없애", text)) and not bool(
@@ -538,6 +559,11 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     ):
         directive.ask("target", "어느 장소나 활동을 말하나요? 이름을 알려주세요.", resume="search")
     state.intent = directive.intent
+    if plan_request and not proposal and active:
+        directive.slots["activities"] = sorted(
+            [min((w for w in WORDS[k] if w in positive), key=positive.index) for k in active],
+            key=positive.index,
+        )[:8]
     if adding:
         state.append_pending = not bool(rejected or denied_kinds or edit_request)
         directive.slots["activities"] = list(

@@ -792,7 +792,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   <We2AiIcon size={72} />
                 </span>
                 <h2>우리, 어디로 갈까요?</h2>
-                <p>날짜와 하고 싶은 일을 알려주세요.</p>
+                <p>날짜·지역·하고 싶은 일을 알려주세요.</p>
                 <button
                   type="button"
                   className="text-button"
@@ -809,14 +809,18 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 </button>
                 <div className="we2-starters">
                   {[
-                    { label: "산책과 카페", prompt: `${today} 오후 산책과 카페 코스를 같이 짜줘.` },
+                    {
+                      label: "산책과 카페",
+                      prompt: `${today}에 성수동에서 산책하고 카페에 가고 싶어. 코스를 짜줘.`,
+                    },
                     {
                       label: "비 오는 날",
-                      prompt: `${today} 비 오는 날 실내 데이트를 계획하고 싶어.`,
+                      prompt:
+                        "날짜는 미정이야. 성수동에서 카페랑 전시 장소부터 찾아줘. 실내 위주로 보고 싶어.",
                     },
                     {
                       label: "가벼운 하루",
-                      prompt: `${today} 무리하지 않는 가벼운 데이트를 계획하고 싶어.`,
+                      prompt: `${today}에 연남동에서 카페와 식사만 하고 싶어. 걷기 적게 코스를 짜줘.`,
                     },
                   ].map(({ label, prompt }) => (
                     <button
@@ -1019,7 +1023,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 readOnly={busy}
                 disabled={!available}
                 aria-busy={pending}
-                placeholder="어떤 데이트를 하고 싶어요?"
+                placeholder={
+                  messages.length
+                    ? "바꿀 조건이나 원하는 장소를 알려주세요"
+                    : "예: 성수동에서 카페와 식사, 예산 5만원"
+                }
                 enterKeyHint="send"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {

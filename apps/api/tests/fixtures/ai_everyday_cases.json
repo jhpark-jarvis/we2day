@@ -1,0 +1,2299 @@
+{
+  "version": "everyday-2026-10-31-b",
+  "cases": [
+    {
+      "id": "U01",
+      "split": "core",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "2030-01-05에 성수동에서 5만원으로 카페 갔다가 저녁 먹는 코스 짜줘. 대중교통으로 갈 거야.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "date": "2030-01-05",
+              "region": "성수동",
+              "budget": 50000,
+              "transport": "대중교통"
+            },
+            "initial_order": [
+              "cafe",
+              "restaurant"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "U02",
+      "split": "core",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "날짜는 아직 모르겠고 연남동 카페부터 추천해줘.",
+          "expect": {
+            "plan": "absent",
+            "slots": {
+              "date": null,
+              "region": "연남동"
+            },
+            "scope": {
+              "kinds": [
+                "cafe"
+              ]
+            },
+            "needs_search": true,
+            "candidate_min": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "U03",
+      "split": "core",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "비 오는 날 실내에서 할 만한 데이트 추천해줘.",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "pending": true,
+            "reply_any": [
+              "지역",
+              "동네",
+              "어디"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "U04",
+      "split": "core",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "뭐부터 알려주면 돼?",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "reply_any": [
+              "날짜",
+              "지역",
+              "동네"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "U05",
+      "split": "core",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "날짜는 미정이야. 성수동에서 카페랑 전시 먼저 찾아줘.",
+          "expect": {
+            "plan": "absent",
+            "slots": {
+              "date": null,
+              "region": "성수동"
+            },
+            "needs_search": true,
+            "queries_any": [
+              "카페",
+              "전시"
+            ],
+            "candidate_min": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "U06",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "성수동 말고 연남동으로 바꾸자.",
+          "expect": {
+            "slots": {
+              "region": "연남동"
+            },
+            "keep_proposal": true,
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U07",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산 8만원 말고 5만원으로 바꿔줘.",
+          "expect": {
+            "slots": {
+              "budget": 50000
+            },
+            "patch": {
+              "budget": 50000
+            },
+            "no_search": true,
+            "plan": "required"
+          }
+        }
+      ]
+    },
+    {
+      "id": "U08",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "날짜만 2030-01-12로 바꾸고 카페는 그대로 둬.",
+          "expect": {
+            "slots": {
+              "date": "2030-01-12"
+            },
+            "patch": {
+              "date": "2030-01-12"
+            },
+            "plan": "required",
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U09",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산은 빼고 시간도 아직 정하지 말자.",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "pending": true,
+            "keep_proposal": true,
+            "reply_not": [
+              "시간은 아직 정하지 않았어요"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "U10",
+      "split": "core",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "2030-01-05 성수동에서 도서관하고 카페 가는 코스 만들어줘. 예산은 3만원이야.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "date": "2030-01-05",
+              "region": "성수동",
+              "budget": 30000
+            },
+            "initial_order": [
+              "library",
+              "cafe"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "U11",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "두 번째 활동은 오후 3시로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.1.time": "15:00"
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U12",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "마지막 일정 한 시간 늦춰줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.1.time": "18:00"
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U13",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "첫 번째랑 두 번째 순서 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "no_search": true,
+            "reverse_activities": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U14",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "지금 예산이 얼마였지?",
+          "expect": {
+            "slots": {
+              "budget": 50000
+            },
+            "plan": "absent",
+            "no_search": true,
+            "reply_any": [
+              "50,000",
+              "5만원"
+            ],
+            "keep_proposal": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U15",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "지금 그 식당 영업 중이야?",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "reply_any": [
+              "확인",
+              "영업"
+            ],
+            "reply_not": [
+              "영업 중이에요",
+              "지금 영업해요"
+            ],
+            "keep_proposal": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U16",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "중랑구 카페 추천해줘.",
+          "expect": {
+            "needs_search": true,
+            "candidate_min": 1
+          }
+        },
+        {
+          "text": "그중 두 번째로 할게.",
+          "expect": {
+            "plan": "absent",
+            "no_search": true,
+            "reply_any": [
+              "선택",
+              "후보",
+              "아이콘"
+            ],
+            "keep_proposal": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U17",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "카페는 빼고 전시 찾아줘.",
+          "expect": {
+            "needs_search": true,
+            "keep_proposal": true,
+            "queries_any": [
+              "전시"
+            ]
+          }
+        },
+        {
+          "text": "고마워 ㅎㅎ",
+          "expect": {
+            "no_search": true,
+            "keep_proposal": true
+          }
+        },
+        {
+          "text": "다시 찾아줘.",
+          "expect": {
+            "needs_search": true,
+            "keep_proposal": true,
+            "queries_any": [
+              "전시"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "U18",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "성수동 카페 추천해 줄래?",
+          "expect": {
+            "needs_search": true,
+            "candidate_min": 1
+          }
+        },
+        {
+          "text": "아니 연남동에서 찾아줘.",
+          "expect": {
+            "needs_search": true,
+            "slots": {
+              "region": "연남동"
+            },
+            "scope": {
+              "kinds": [
+                "cafe"
+              ]
+            }
+          }
+        },
+        {
+          "text": "검색은 그만해줘.",
+          "expect": {
+            "no_search": true
+          }
+        },
+        {
+          "text": "다시",
+          "expect": {
+            "no_search": true,
+            "reply_any": [
+              "어떤",
+              "원하는"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "H01",
+      "split": "validation",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "2030-01-12에 연남동에서 도서관이랑 카페 가고 싶어. 4만원 이내로 코스 짜줘.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "date": "2030-01-12",
+              "region": "연남동",
+              "budget": 40000
+            },
+            "initial_order": [
+              "library",
+              "cafe"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "H02",
+      "split": "validation",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "카페만 먼저 보여주세요. 날짜는 나중에 정할게요.",
+          "expect": {
+            "plan": "absent",
+            "needs_search": true,
+            "scope": {
+              "kinds": [
+                "cafe"
+              ]
+            },
+            "keep_proposal": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "H03",
+      "split": "validation",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산 10만원은 취소하고 6만원으로 할게.",
+          "expect": {
+            "slots": {
+              "budget": 60000
+            },
+            "plan": "required",
+            "patch": {
+              "budget": 60000
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "H04",
+      "split": "validation",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "두 번째 일정 시작을 16:30으로 해줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.1.time": "16:30"
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "H05",
+      "split": "validation",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "동네 도서관 좀 찾아줄래?",
+          "expect": {
+            "needs_search": true,
+            "scope": {
+              "kinds": [
+                "library"
+              ]
+            }
+          }
+        },
+        {
+          "text": "찾았나요?",
+          "expect": {
+            "needs_search": true,
+            "scope": {
+              "kinds": [
+                "library"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "H06",
+      "split": "validation",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "제목은 \"기다려줘\"로 바꿔줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "title": "기다려줘"
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "U19",
+      "split": "core",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산은 안 정할래.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "budget": null
+            },
+            "patch": {
+              "budget": null
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "H07",
+      "split": "holdout",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "2030-01-19 성수동에서 미술관 보고 카페 들를래. 총 7만원 안에서 코스 제안해줘.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "date": "2030-01-19",
+              "region": "성수동",
+              "budget": 70000
+            },
+            "initial_order": [
+              "museum",
+              "cafe"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "H08",
+      "split": "holdout",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "예산은 0원으로 할게.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "budget": 0
+            },
+            "patch": {
+              "budget": 0
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "H09",
+      "split": "holdout",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "첫 번째 일정 시각을 15:30으로 맞춰줘.",
+          "expect": {
+            "plan": "required",
+            "patch": {
+              "activities.0.time": "15:30"
+            },
+            "no_search": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "H10",
+      "split": "holdout",
+      "initial": {
+        "context": {
+          "date": "2030-01-05",
+          "region": "중랑구",
+          "transport": "자동차",
+          "budget": 50000,
+          "activities": [
+            "카페",
+            "식사"
+          ],
+          "requirements": "실내 위주",
+          "intake": {
+            "data": {
+              "date": "2030-01-05",
+              "start_time": "13:00",
+              "end_time": "19:00",
+              "region": "중랑구",
+              "transport": "자동차",
+              "activities": [
+                "카페",
+                "식사"
+              ],
+              "recommend": false,
+              "budget": 50000,
+              "requirements": "실내 위주"
+            },
+            "pending": null,
+            "turn_version": 0
+          },
+          "search_scope": {
+            "kinds": [
+              "cafe",
+              "restaurant"
+            ],
+            "exact_name": "",
+            "name_kind": "any",
+            "area": "중랑구",
+            "search_only": false,
+            "single_activity": false
+          },
+          "dialogue": {
+            "intent": "plan",
+            "rejected_places": [],
+            "excluded_kinds": [],
+            "pending": null,
+            "turn_version": 0,
+            "cleared_date": false,
+            "append_pending": false
+          }
+        },
+        "proposal": {
+          "title": "합성 코스",
+          "date": "2030-01-05",
+          "budget": 50000,
+          "transport": "자동차",
+          "activities": [
+            {
+              "title": "카페",
+              "time": "14:00",
+              "place": "합성카페",
+              "map_url": "",
+              "cost": 0,
+              "note": "원래 메모"
+            },
+            {
+              "title": "식사",
+              "time": "17:00",
+              "place": "합성식당",
+              "map_url": "",
+              "cost": 20000,
+              "note": "다른 메모"
+            }
+          ],
+          "preparation": [
+            "물"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "text": "전시회랑 카페만 추천해 주세요. 날짜는 미정입니다.",
+          "expect": {
+            "plan": "absent",
+            "slots": {
+              "date": null
+            },
+            "needs_search": true,
+            "queries_any": [
+              [
+                "전시",
+                "박물관",
+                "미술관"
+              ],
+              "카페"
+            ],
+            "keep_proposal": true,
+            "candidate_min": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "H11",
+      "split": "holdout",
+      "initial": {
+        "context": {}
+      },
+      "steps": [
+        {
+          "text": "다음 주 토요일에 성수동에서 카페랑 저녁 코스 짜줘. 5만원 이내로.",
+          "expect": {
+            "plan": "required",
+            "slots": {
+              "region": "성수동",
+              "budget": 50000
+            },
+            "initial_order": [
+              "cafe",
+              "restaurant"
+            ],
+            "relative_date": "next_saturday"
+          }
+        }
+      ]
+    }
+  ]
+}
