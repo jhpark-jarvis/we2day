@@ -19,6 +19,7 @@ export type IntakeContext = {
   requirements?: string;
   search_scope?: Record<string, unknown>;
   place_search?: unknown;
+  location_request?: { version: 1; basis: number } | null;
   control?: { last_action?: { operation: string } | null; outcome?: string };
   dialogue?: { cleared_date?: boolean; pending?: { resume: string } | null };
   activity_edit?: unknown;

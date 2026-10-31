@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from we2day_api.ai_dialogue import Directive, analyze, merge_context, new_task, social_turn
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, change_window, start_brief
+from we2day_api.ai_location import project_location, resume_location
 from we2day_api.ai_place_answers import address_area, private_anchor, recover_followup_area
 from we2day_api.ai_place_policy import (
     LABELS,
@@ -106,6 +107,7 @@ class RequestControl:
     model_reserved: bool = False
     proposal: object = None
     previous_request: str = ""
+    selected: bool = False
 
 
 def state_at(context, version):
@@ -185,6 +187,15 @@ def prepare(body, context, proposal, today):
         directive.slots["place_search"] = None
         directive.allowed_tools.clear()
         return RequestControl(directive, before, "rule", proposal=proposal)
+    if not body.brief and resume_location(directive, body, before):
+        return RequestControl(
+            directive,
+            before,
+            "selection" if body.selected_places else "conditions",
+            nearby=bool(body.selected_places),
+            proposal=proposal,
+            selected=bool(body.selected_places),
+        )
     if (
         not window
         and (before.get("intake") or {}).get("pending")
@@ -391,6 +402,7 @@ def prepare(body, context, proposal, today):
         include_only,
         unclear or semantic,
         proposal=proposal,
+        selected=bool(body.selected_places),
     )
     request.previous_request = next(
         (
@@ -659,7 +671,16 @@ async def interpret(control, latest, settings, client, budget, stats):
             directive.scope = scope_for(targets, action.area or scope.area)
             spec.area = directive.scope.area
             directive.slots["place_search"] = spec.model_dump()
-        if action.anchor_needed and (not spec or not spec.anchor_key):
+        if action.anchor_needed and not control.proposal and control.selected and spec:
+            action.anchor_needed = False
+        if action.anchor_needed and spec and not control.proposal:
+            directive.ask(
+                "region",
+                "어느 동네에서 찾아볼까요? 자주 가는 곳을 선택하거나 동네를 알려주세요.",
+                resume="search",
+            )
+            control.reason = "clarify"
+        elif action.anchor_needed and (not spec or not spec.anchor_key):
             if spec:
                 spec.anchor_pending = True
                 directive.slots["place_search"] = spec.model_dump()
@@ -678,7 +699,11 @@ async def interpret(control, latest, settings, client, budget, stats):
                 resume="search",
             )
             control.reason = "clarify"
-        elif action.operation in {"search", "plan"} and spec and directive.scope.area:
+        elif (
+            action.operation in {"search", "plan"}
+            and spec
+            and (directive.scope.area or control.selected)
+        ):
             directive.intent = directive.state.intent = action.operation
             directive.state.pending = None
             directive.reply, directive.place_followup = "", ""
@@ -694,6 +719,13 @@ async def interpret(control, latest, settings, client, budget, stats):
                     "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume="plan"
                 )
             control.reason = "interpreted"
+        elif action.operation in {"search", "plan"} and spec:
+            directive.ask(
+                "region",
+                "어느 동네에서 찾아볼까요? 자주 가는 곳을 선택하거나 동네를 알려주세요.",
+                resume=action.operation,
+            )
+            control.reason = "clarify"
         elif action.operation == "chat":
             directive.intent = directive.state.intent = "chat"
             directive.allowed_tools.clear()
@@ -716,6 +748,7 @@ def reduce_context(before, incoming, directive, body, session, reason):
     if cancelled:
         previous = None
         result["place_search"] = None
+    project_location(result, before, directive, body, cancelled)
     operation = (
         directive.state.pending.resume
         if directive.state.pending and directive.state.pending.resume in PLACE_INTENTS

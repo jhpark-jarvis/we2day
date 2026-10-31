@@ -248,6 +248,12 @@ async def read_candidate_request(directive, session, io):
         # A selected place URL is not a geocoding result or nearby-search coordinate.
         if session.selected:
             directive.ask("region", "선택한 장소 근처의 어느 동네에서 찾아볼까요?", resume="search")
+        else:
+            directive.ask(
+                "region",
+                "어느 동네에서 찾아볼까요? 자주 가는 곳을 선택하거나 동네를 알려주세요.",
+                resume="plan" if directive.intent == "plan" else "search",
+            )
         return
     requested = session.policy.scope.kinds or (
         [session.policy.scope.name_kind] if session.policy.scope.exact_name else []

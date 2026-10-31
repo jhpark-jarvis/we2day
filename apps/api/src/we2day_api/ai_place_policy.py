@@ -49,6 +49,15 @@ def generic_name(value):
     return norm(value) in {norm(word) for words in WORDS.values() for word in words}
 
 
+def query_forms(term):
+    """Compare a compound's stem too, including Korean interfix final-siot spelling."""
+    stem = re.sub(r"(?:집|가게|업체|장소|곳)$", "", term)
+    forms = {term, stem} - {""}
+    if stem and "가" <= stem[-1] <= "힣" and (ord(stem[-1]) - ord("가")) % 28 == 19:
+        forms.add(stem[:-1] + chr(ord(stem[-1]) - 19))
+    return forms
+
+
 class SearchArguments(SearchInput):
     mode: Literal["exact_name", "category", "nearby"] = "category"
     name: str = Field(default="", max_length=100)
@@ -69,7 +78,8 @@ class SearchScope(BaseModel):
 def relational_area(text):
     return bool(
         re.search(
-            r"(?:이후|이전|다음|이번|해당|현재).*일정|(?:식사|약속|선택한|고른|방문한).*장소"
+            r"^(?:여기|거기|저기|현재\s*위치|(?:내|우리|제|이|그|저)?\s*(?:근처|주변|인근|주위))(?:에서|에)?$"
+            r"|(?:이후|이전|다음|이번|해당|현재).*일정|(?:식사|약속|선택한|고른|방문한).*장소"
             r"|^(?:선택한|고른|방문한)\s|^\d+\s*번|^(?:식사|식당|카페|약속|코스|일정)(?:\s|$)"
             r"|^(?:그|저|이|해당|아까)\s*(?:장소|곳)(?:\s|$)",
             text,
@@ -308,7 +318,7 @@ class PlacePolicy:
             ]
             source = norm(title + category + item.description)
             for term in terms:
-                forms = {term, re.sub(r"(?:집|가게|업체|장소|곳)$", "", term)} - {""}
+                forms = query_forms(term)
                 if not any(len(form) >= 2 and form in source for form in forms):
                     return False
             if args.kind == "any" and not terms:

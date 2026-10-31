@@ -90,7 +90,61 @@ type Retry = {
   brief?: PlanningBrief;
   candidate?: Candidate;
   preserveDraft?: boolean;
+  locationPlaces?: PlaceOption[];
 };
+
+function LocationQuestion({
+  busy,
+  select,
+  submit,
+}: {
+  busy: boolean;
+  select: (button: HTMLButtonElement) => void;
+  submit: (area: string) => void;
+}) {
+  const [area, setArea] = useState("");
+  return (
+    <section className="we2-location-question" aria-label="검색 위치 답변">
+      <button
+        type="button"
+        className="text-button"
+        disabled={busy}
+        onClick={(event) => select(event.currentTarget)}
+      >
+        <Bookmark size={16} aria-hidden="true" />
+        자주 가는 곳
+      </button>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (area.trim()) submit(area.trim());
+        }}
+      >
+        <label htmlFor="ai-location-answer">동네 직접 입력</label>
+        <div>
+          <input
+            id="ai-location-answer"
+            type="text"
+            value={area}
+            maxLength={100}
+            placeholder="예: 성수동, 양주 덕계"
+            disabled={busy}
+            onChange={(event) => setArea(event.target.value)}
+          />
+          <button
+            type="submit"
+            className="icon-button"
+            aria-label="입력한 지역에서 검색"
+            title="검색"
+            disabled={busy || !area.trim()}
+          >
+            <Send size={18} aria-hidden="true" />
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
 
 async function read(view: string, query = "") {
   const response = await fetch(`/api/ai/planner?view=${view}${query}`, { cache: "no-store" });
@@ -318,6 +372,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
   const [dialog, setDialog] = useState<"places" | "candidates" | null>(null);
+  const [locationPicker, setLocationPicker] = useState(false);
   const [placeSource, setPlaceSource] = useState<"favorite" | "wish">("favorite");
   const [placeOffset, setPlaceOffset] = useState(0);
   const placeRetry = useRef({ source: "favorite" as "favorite" | "wish", offset: 0 });
@@ -497,6 +552,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     candidate?: Candidate,
     submittedBrief?: PlanningBrief,
     preserveDraft = false,
+    locationPlaces?: PlaceOption[],
   ) {
     const content = messageOverride ?? text.trim();
     if (busy || !available || !content) return;
@@ -537,7 +593,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       proposal,
       conversation_id: conversation.current.id,
       version: conversation.current.version,
-      selected_places: selectedPlaces.map(({ source, id, usage }) => ({
+      selected_places: (locationPlaces ?? selectedPlaces).map(({ source, id, usage }) => ({
         source,
         id,
         ...(usage && usage !== "reference" ? { usage } : {}),
@@ -548,7 +604,15 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
     const signature = JSON.stringify(payload);
     const requestId =
       retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();
-    retry.current = { id: requestId, text: content, signature, brief, candidate, preserveDraft };
+    retry.current = {
+      id: requestId,
+      text: content,
+      signature,
+      brief,
+      candidate,
+      preserveDraft,
+      locationPlaces,
+    };
     try {
       const controller = new AbortController();
       activeRequest.current = controller;
@@ -855,6 +919,24 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   : message.content}
               </p>
               {message.role === "assistant" &&
+                message.id === messages.at(-1)?.id &&
+                planningContext?.location_request?.version === 1 &&
+                planningContext.location_request.basis === conversation.current.version && (
+                  <LocationQuestion
+                    busy={busy}
+                    select={(button) => {
+                      dialogTrigger.current = button;
+                      setLocationPicker(true);
+                      setDialog("places");
+                      void loadPlaces("favorite");
+                    }}
+                    submit={(area) => {
+                      changeSelection(() => []);
+                      void send(`지역: ${area}`, undefined, undefined, true, []);
+                    }}
+                  />
+                )}
+              {message.role === "assistant" &&
                 message.id === candidateMessageId &&
                 candidates.length > 0 && (
                   <section className="we2-message-places" aria-label="답변의 장소 후보">
@@ -912,7 +994,13 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                   inputRef.current?.focus({ preventScroll: true });
                   if (item)
                     void (item.candidate || item.preserveDraft || text.trim() === item.text
-                      ? send(item.text, item.candidate, item.brief, item.preserveDraft)
+                      ? send(
+                          item.text,
+                          item.candidate,
+                          item.brief,
+                          item.preserveDraft,
+                          item.locationPlaces,
+                        )
                       : send());
                 }}
               >
@@ -955,6 +1043,7 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
               aria-controls="we2-place-picker"
               onClick={(event) => {
                 dialogTrigger.current = event.currentTarget;
+                setLocationPicker(false);
                 setDialog("places");
                 void loadPlaces(placeSource);
               }}
@@ -1238,29 +1327,33 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
       {dialog === "places" && (
         <AiDialog
           id="we2-place-picker"
-          title="저장한 장소"
+          title={locationPicker ? "검색할 기준 장소" : "저장한 장소"}
           onClose={() => setDialog(null)}
           returnFocus={dialogTrigger.current}
         >
           <div className="we2-dialog-body">
-            <div className="we2-place-tabs">
-              {(["favorite", "wish"] as const).map((source) => (
-                <button
-                  key={source}
-                  type="button"
-                  className="text-button"
-                  aria-pressed={placeSource === source}
-                  disabled={loadingPlaces || busy}
-                  onClick={() => void loadPlaces(source)}
-                >
-                  {source === "favorite" ? "자주 가는 곳" : "위시"}
-                </button>
-              ))}
-            </div>
+            {!locationPicker && (
+              <div className="we2-place-tabs">
+                {(["favorite", "wish"] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    className="text-button"
+                    aria-pressed={placeSource === source}
+                    disabled={loadingPlaces || busy}
+                    onClick={() => void loadPlaces(source)}
+                  >
+                    {source === "favorite" ? "자주 가는 곳" : "위시"}
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="settings-hint">
-              선택한 장소만 사용해요. 최대 8개 · 새로고침하거나 대화를 바꾸면 선택이 해제돼요.
+              {locationPicker
+                ? "주변을 검색할 장소 한 곳을 골라주세요."
+                : "선택한 장소만 사용해요. 최대 8개 · 새로고침하거나 대화를 바꾸면 선택이 해제돼요."}
             </p>
-            {selectedPlaces.length > 0 && (
+            {!locationPicker && selectedPlaces.length > 0 && (
               <div className="we2-selected-places">
                 {selectedPlaces.map((item) => (
                   <button
@@ -1292,6 +1385,34 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             )}
             <div className="we2-place-options" aria-busy={loadingPlaces}>
               {placeOptions.map((item) => {
+                if (locationPicker)
+                  return (
+                    <button
+                      key={`${item.source}-${item.id}`}
+                      type="button"
+                      className="we2-location-place"
+                      disabled={busy || loadingPlaces}
+                      aria-label={`${item.title} 주변 검색`}
+                      onClick={() => {
+                        const places: PlaceOption[] = [{ ...item, usage: "anchor" }];
+                        changeSelection(() => places);
+                        setDialog(null);
+                        void send(
+                          "선택한 장소 주변에서 찾아줘.",
+                          undefined,
+                          undefined,
+                          true,
+                          places,
+                        );
+                      }}
+                    >
+                      <MapPin size={18} aria-hidden="true" />
+                      <span>
+                        {item.title}
+                        {item.address && <small>{item.address}</small>}
+                      </span>
+                    </button>
+                  );
                 const checked = selectedPlaces.some(
                   (place) => place.source === item.source && place.id === item.id,
                 );
@@ -1374,7 +1495,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
             </div>
           </div>
           <footer className="we2-dialog-footer">
-            <span>{selectedPlaces.length} / 8개 선택</span>
+            <span>
+              {locationPicker
+                ? "선택한 곳 주변에서 검색해요."
+                : `${selectedPlaces.length} / 8개 선택`}
+            </span>
             <button type="button" className="primary-button" onClick={() => setDialog(null)}>
               완료
             </button>

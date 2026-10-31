@@ -111,9 +111,11 @@ def semantic_request(text, directive, proposal, before):
     # These are linguistic actions, independent of which place the user requests.
     requested = bool(
         re.search(
-            r"찾|검색|추천|알아\s*봐|보여\s*줘|알려|없나|없을까|있을까|먹고\s*싶|가고\s*싶", text
+            r"찾|검색|추천|알아\s*봐|보여\s*줘|알려|없나|없을까|있나|있을까|먹고\s*싶|가고\s*싶",
+            text,
         )
     )
+    requested = requested or bool(re.search(r"(?:있|없)(?:어|어요)[?？]\s*$", text))
     relation = re.search(r"(.+?)(?:주변|근처|인근|주위)", text)
     related = bool(
         relation

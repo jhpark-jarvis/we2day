@@ -2,6 +2,114 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+for (const answer of ["favorite", "text"] as const) {
+  test(`a location question resumes through ${answer}, restores and retries the same explicit answer`, async ({
+    page,
+  }) => {
+    await fixtureLogin(page);
+    const place = {
+      source: "favorite",
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      title: "샘플 집",
+      address: "서울 중랑구 신내동 1",
+    };
+    const posts: Record<string, unknown>[] = [];
+    let savedTurn: unknown = null;
+    let placeReads = 0;
+    await page.route("**/api/ai/planner**", async (route) => {
+      const url = new URL(route.request().url());
+      if (route.request().method() === "GET") {
+        if (url.searchParams.get("view") === "places") {
+          placeReads++;
+          expect(url.searchParams.get("source")).toBe("favorite");
+          return route.fulfill({ json: [place] });
+        }
+        return route.fulfill({
+          json: url.searchParams.has("conversation_id")
+            ? { version: 1, turns: savedTurn ? [savedTurn] : [] }
+            : savedTurn
+              ? [
+                  {
+                    id: posts[0].conversation_id,
+                    title: "합성 위치 질문",
+                    version: 1,
+                    updated_at: "2030-01-01T00:00:00Z",
+                  },
+                ]
+              : [],
+        });
+      }
+      const body = route.request().postDataJSON();
+      posts.push(body);
+      if (posts.length === 2)
+        return route.fulfill({ status: 503, json: { error: "합성 일시 실패" } });
+      const waiting = posts.length === 1;
+      const result = {
+        reply: waiting ? "어느 동네에서 찾아볼까요?" : "원래 요청한 고깃집 후보예요.",
+        version: waiting ? 1 : 2,
+        plan: null,
+        checks: [],
+        context: {
+          region: waiting ? "" : "성수동",
+          location_request: waiting ? { version: 1, basis: 1 } : null,
+          dialogue: { pending: waiting ? { field: "region", resume: "search" } : null },
+        },
+        candidates: [],
+        candidates_available: true,
+      };
+      if (waiting)
+        savedTurn = {
+          request_id: body.request_id,
+          version: 1,
+          user_text: body.messages.at(-1).content,
+          result,
+          prompt_version: "fixture",
+        };
+      return route.fulfill({ json: result });
+    });
+    await page.goto("/plans/ai");
+    await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+    const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
+    await input.fill("샘플 집 근처 괜찮은 고깃집 있나?");
+    await input.press("Enter");
+    await expect(page.getByRole("region", { name: "검색 위치 답변" })).toBeVisible();
+    expect(placeReads).toBe(0);
+    await page.reload();
+    const question = page.getByRole("region", { name: "검색 위치 답변" });
+    await expect(question).toBeVisible();
+    await input.fill("따로 작성하던 미전송 문장");
+    if (answer === "favorite") {
+      await question.getByRole("button", { name: "자주 가는 곳", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "검색할 기준 장소", exact: true });
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole("button", { name: "샘플 집 주변 검색", exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+    } else {
+      // A typed answer replaces any selection left in the ordinary place picker.
+      await page.getByRole("button", { name: "저장한 장소", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "저장한 장소", exact: true });
+      await dialog.getByRole("checkbox").check();
+      await dialog.getByRole("button", { name: "완료", exact: true }).click();
+      await question.getByLabel("동네 직접 입력").fill("성수동");
+      await question.getByRole("button", { name: "입력한 지역에서 검색" }).click();
+    }
+    await expect(page.locator(".we2-status [role=alert]")).toContainText("합성 일시 실패");
+    await expect(input).toHaveValue("따로 작성하던 미전송 문장");
+    await page.getByRole("button", { name: "메시지 다시 전송", exact: true }).click();
+    await expect(page.getByText("원래 요청한 고깃집 후보예요.", { exact: true })).toBeVisible();
+    expect(posts).toHaveLength(3);
+    expect(posts[2]).toEqual(posts[1]);
+    expect(posts[1].selected_places).toEqual(
+      answer === "favorite" ? [{ source: "favorite", id: place.id, usage: "anchor" }] : [],
+    );
+    expect(placeReads).toBe(1);
+    await expect(question).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+}
+
 test("starter examples provide a region and activity and remain editable before sending", async ({
   page,
 }) => {

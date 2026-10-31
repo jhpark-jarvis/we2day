@@ -831,6 +831,17 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-attachments .text-button > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .we2-attachments .text-button > :is(svg,small) { flex-shrink:0; }
 .we2-attachments small { color:var(--accent); }
+.we2-location-question { margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:12px; min-width:0; }
+.we2-location-question > button { display:inline-flex; align-items:center; gap:6px; }
+.we2-location-question form { margin-top:12px; min-width:0; }
+.we2-location-question label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
+.we2-location-question form > div { display:flex; align-items:center; gap:6px; min-width:0; }
+.we2-location-question input { flex:1; width:0; min-width:0; font-size:16px; }
+.we2-location-question .icon-button { flex-shrink:0; }
+.we2-location-place { display:flex; width:100%; align-items:center; gap:10px; padding:12px; text-align:left; background:transparent; border:0; border-bottom:1px solid var(--line); min-width:0; }
+.we2-location-place:last-child { border-bottom:0; }
+.we2-location-place > svg { flex-shrink:0; }
+.we2-location-place > span { min-width:0; overflow-wrap:anywhere; }
 .we2-place-picker { margin:0 0 10px; padding:10px; border:1px solid var(--line); border-radius:12px; min-width:0; }
 .we2-place-tabs { display:flex; gap:6px; }
 .we2-place-tabs [aria-pressed="true"] { background:var(--soft); color:var(--accent); }
