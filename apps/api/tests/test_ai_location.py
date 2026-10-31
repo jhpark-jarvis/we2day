@@ -127,6 +127,7 @@ def test_location_selection_only_reads_the_explicit_id_and_retains_target(monkey
         await c.send("괜찮은 고깃집 있나?")
         result = await c.send("선택한 장소 주변에서 찾아줘.", selected=True)
         assert result.candidates and result.context.region == "중랑구 신내동"
+        assert all(p.source == "naver" for p in result.candidates)
         assert [r for r in c.reads if r[0] == "places"] == [("places", "중랑구 신내동 고깃집")]
         assert c.place_id not in json.dumps(c.store.context)
         assert all("신내동 1" not in json.dumps(m) for m in c.model_inputs)
@@ -234,3 +235,18 @@ def test_new_private_reference_cannot_reuse_an_older_public_area_when_interpreta
         assert result.context.location_request["scope"]["area"] == "다른 집"
 
     asyncio.run(run())
+
+
+def test_a_selected_anchor_is_not_a_result_when_search_has_no_verified_candidates():
+    from we2day_api.ai_place_policy import PlacePolicy, SearchScope
+    from we2day_api.ai_tools import ToolSession
+
+    session = ToolSession(
+        SimpleNamespace(), None, [], [], PlacePolicy(SearchScope(kinds=["any"], search_only=True))
+    )
+    session.operation = "search"
+    anchor = session.add("합성 기준점", "서울 성동구 성수동", "selected")
+    session.fresh_refs.add(anchor.ref)
+    session.selected_usage[anchor.ref] = "anchor"
+    assert session.visible_candidates() == []
+    assert session.candidates[anchor.ref] == anchor

@@ -440,6 +440,8 @@ class ToolSession:
         for item in self.candidates.values():
             if item.ref not in self.fresh_refs:
                 continue
+            if self.operation == "search" and self.selected_usage.get(item.ref) == "anchor":
+                continue
             detected = kinds(item.title)
             kind = self.candidate_kinds.get(item.ref, detected[0] if len(detected) == 1 else "any")
             if self.policy.accepts(item.title, kind):

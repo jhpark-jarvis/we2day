@@ -1068,17 +1068,19 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
                 <span>후보 {candidates.length}</span>
               </button>
             )}
-            {candidatesUnavailable && candidates.length === 0 && (
-              <button
-                type="button"
-                className="text-button"
-                disabled={busy}
-                onClick={() => void send("다시", undefined, undefined, true)}
-              >
-                <RotateCw size={16} aria-hidden="true" />
-                후보 다시 검색
-              </button>
-            )}
+            {candidatesUnavailable &&
+              !planningContext?.location_request &&
+              candidates.length === 0 && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => void send("다시", undefined, undefined, true)}
+                >
+                  <RotateCw size={16} aria-hidden="true" />
+                  후보 다시 검색
+                </button>
+              )}
             {proposal && (
               <button
                 type="button"

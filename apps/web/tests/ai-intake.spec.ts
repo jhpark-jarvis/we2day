@@ -52,6 +52,10 @@ for (const answer of ["favorite", "text"] as const) {
         context: {
           region: waiting ? "" : "성수동",
           location_request: waiting ? { version: 1, basis: 1 } : null,
+          control: {
+            last_action: { operation: "search" },
+            outcome: waiting ? "selection_required" : "ready",
+          },
           dialogue: { pending: waiting ? { field: "region", resume: "search" } : null },
         },
         candidates: [],
@@ -77,6 +81,7 @@ for (const answer of ["favorite", "text"] as const) {
     await page.reload();
     const question = page.getByRole("region", { name: "검색 위치 답변" });
     await expect(question).toBeVisible();
+    await expect(page.getByRole("button", { name: "후보 다시 검색", exact: true })).toHaveCount(0);
     await input.fill("따로 작성하던 미전송 문장");
     if (answer === "favorite") {
       await question.getByRole("button", { name: "자주 가는 곳", exact: true }).click();
