@@ -22,6 +22,7 @@ class LocationFlow:
         self.history, self.reads, self.model_inputs = [], [], []
         self.id, self.place_id = str(uuid4()), str(uuid4())
         self.target, self.destination = target, destination
+        self.omit_area = False
         flow = self
 
         class IO:
@@ -79,7 +80,7 @@ class LocationFlow:
                 request,
                 {
                     "operation": "search",
-                    "area": explicit_area(data["request"]),
+                    "area": "" if self.omit_area else explicit_area(data["request"]),
                     "targets": [self.target],
                     "anchor_needed": False,
                 },
@@ -218,3 +219,18 @@ def test_compound_spelling_matches_provider_category_without_adding_a_venue_dict
             }
         ).items[0]
         assert policy.relevant(item, args) is expected
+
+
+def test_new_private_reference_cannot_reuse_an_older_public_area_when_interpretation_omits_it(
+    monkeypatch,
+):
+    async def run():
+        c = LocationFlow(monkeypatch)
+        await c.send("성수동 고깃집 찾아줘")
+        before = len(c.reads)
+        c.omit_area = True
+        result = await c.send("다른 집 근처에서 보려고 하는데 괜찮은 고깃집 있어?")
+        assert result.context.location_request and len(c.reads) == before
+        assert result.context.location_request["scope"]["area"] == "다른 집"
+
+    asyncio.run(run())

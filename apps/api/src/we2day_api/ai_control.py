@@ -381,6 +381,9 @@ def prepare(body, context, proposal, today):
         and (legacy_retry or not retry and semantic_request(latest, directive, proposal, before))
     )
     if semantic:
+        latest_area = explicit_area(latest)
+        if latest_area and not relational_area(latest_area):
+            directive.scope.area = latest_area
         directive.reply = ""
         directive.allowed_tools.clear()
         directive.state.pending = None
