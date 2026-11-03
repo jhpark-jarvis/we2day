@@ -300,7 +300,25 @@ class PlacePolicy:
             args.query = f"{args.area} {args.query}"[:100]
         return args, None
 
+    def eligible(self, item, args):
+        """Hard constraints cannot be relaxed by semantic classification."""
+        title, category = plain(item.title), plain(item.category)
+        actual = source_kind(category)
+        if self.forbidden(title, args.kind) or self.forbidden(title, actual):
+            return False
+        if args.kind != "any" and actual not in {args.kind, "any"}:
+            return False
+        if args.mode == "exact_name":
+            names = {norm(args.name)}
+            if args.kind == "park":
+                names.add(norm(args.name) + "공원")
+            if norm(title) not in names:
+                return False
+        return not args.area or area_matches(args.area, item.address + " " + item.roadAddress)
+
     def relevant(self, item, args):
+        if not self.eligible(item, args):
+            return False
         title, category = plain(item.title), plain(item.category)
         if args.kind == "restaurant" and source_kind(category) not in {"restaurant", "any"}:
             return False

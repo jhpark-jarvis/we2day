@@ -12,6 +12,7 @@ from we2day_api.ai_place_policy import (
     plain,
     relational_area,
 )
+from we2day_api.ai_relevance import enrich_candidates
 from we2day_api.ai_search_spec import address_fallback
 from we2day_api.ai_tool_runtime import execute_batch
 
@@ -99,6 +100,11 @@ def candidate_reply(session, followup=""):
         rows.append("일부 활동의 검색은 완료하지 못했어요.")
     elif session.resolution == "partial":
         rows.append("일부 활동은 조건에 맞는 후보를 확인하지 못했어요.")
+    if any(item.match == "related" for item in candidates):
+        rows.append(
+            "관련 후보는 업종을 참고한 제안이에요. "
+            "요청한 메뉴·시설 등은 지도에서 확인하고 직접 선택해 주세요."
+        )
     return "\n".join([heading, *rows])
 
 
@@ -318,6 +324,7 @@ async def read_candidate_request(directive, session, io):
             "기준 장소명으로 결과를 찾지 못해 저장된 주소의 도로·동네 범위에서 검색했어요. "
             "실제 거리와 이용 조건은 지도에서 확인해 주세요."
         )
+    await enrich_candidates(session, io)
     failed = any(r["status"] == "failed" for r in session.reports)
     covered = set(session.candidate_kinds.values())
     complete = set(requested) <= covered
@@ -346,7 +353,17 @@ async def read_candidate_request(directive, session, io):
             if covered
             else "empty"
         )
-    if initial_plan and set(requested) <= set(session.candidate_kinds.values()):
+    direct_kinds = {
+        session.candidate_kinds.get(c.ref, "any")
+        for c in session.candidates.values()
+        if c.match != "related"
+    }
+    if (
+        initial_plan
+        and complete
+        and set(requested) <= direct_kinds
+        and not any(c.match == "related" for c in verified_candidates(session))
+    ):
         # Typed intake already determines these reads. Compose once from real evidence
         # instead of asking the model to rediscover the search arguments.
         session.direct_final = True

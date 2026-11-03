@@ -75,6 +75,7 @@ class PlanningContext(BaseModel):
 class Candidate(ChosenPlace):
     ref: str = Field(max_length=40)
     source: Literal["naver", "selected", "user"]
+    match: Literal["direct", "related"] = "direct"
 
     def evidence(self):
         # Canonical destination is server-only resolution data, duplicated in title/address.
@@ -355,6 +356,8 @@ class ToolSession:
         self.previous_places: dict[str, list[Candidate]] = {}
         self.chosen_candidate = None
         self.fresh_refs: set[str] = set()
+        self.relevance_pool: list[tuple] = []
+        self.relevance_attempted = False
         self.activity_limit: int | None = None
         self.initial_activities: list[str] | None = None
         self.requested_activities: list[str] | None = None
@@ -422,6 +425,9 @@ class ToolSession:
                     if len(previous) == 1:
                         candidate = previous[0]
             if candidate:
+                if candidate.match == "related":
+                    candidate = None
+            if candidate:
                 # Canonical server evidence, never model-generated names/addresses/URLs.
                 content["place"] = candidate.destination
             else:
@@ -456,6 +462,15 @@ class ToolSession:
             return None, ["지금은 장소 후보만 확인하고 있어요."]
         if not resolved:
             return resolved, []
+        if any(
+            c.match == "related"
+            and (
+                c.ref in {a.place_ref for a in model_plan.activities}
+                or any(a.place in {c.title, c.destination} for a in resolved.activities)
+            )
+            for c in self.candidates.values()
+        ):
+            return None, ["조건 확인이 필요한 후보는 직접 선택한 뒤 코스에 반영해 주세요."]
         used = {a.place_ref for a in model_plan.activities}
         included = {ref for ref, usage in self.selected_usage.items() if usage == "include"}
         anchors = {ref for ref, usage in self.selected_usage.items() if usage == "anchor"}
@@ -601,6 +616,8 @@ class ToolSession:
                 items = []
                 for item in results.items:
                     if not self.policy.relevant(item, args):
+                        if args.mode != "exact_name" and self.policy.eligible(item, args):
+                            self.relevance_pool.append((query, args, item))
                         continue
                     candidate = self.add(item.title, item.roadAddress or item.address, "naver")
                     if candidate:

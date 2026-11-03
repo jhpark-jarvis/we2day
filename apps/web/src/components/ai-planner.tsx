@@ -70,6 +70,7 @@ type Candidate = {
   title: string;
   address: string;
   destination?: string;
+  match?: "direct" | "related";
 };
 
 type ChatResponse = {
@@ -281,6 +282,9 @@ function CandidateList({
         <article key={candidate.ref}>
           <div>
             <strong>{candidate.title}</strong>
+            {candidate.match === "related" && (
+              <p className="settings-hint">관련 후보 · 요청 조건 확인 필요</p>
+            )}
             {candidate.address && <p>{candidate.address}</p>}
           </div>
           <div className="we2-candidate-actions">

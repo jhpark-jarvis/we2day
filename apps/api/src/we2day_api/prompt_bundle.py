@@ -16,6 +16,7 @@ class PromptBundle:
     finish: str
     repair: str
     interpret: str = ""
+    relevance: str = ""
 
 
 def read_bundle(root: Traversable) -> PromptBundle:
@@ -35,6 +36,8 @@ def read_bundle(root: Traversable) -> PromptBundle:
     names = ["system", "finish", "repair"]
     if int(version.rsplit("v", 1)[1]) >= 12:
         names.append("interpret")
+    if int(version.rsplit("v", 1)[1]) >= 15:
+        names.append("relevance")
     for name in names:
         content = root.joinpath(version, f"{name}.txt").read_bytes()
         if not content or len(content) > 16384:

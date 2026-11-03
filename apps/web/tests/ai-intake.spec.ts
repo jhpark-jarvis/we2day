@@ -2,6 +2,52 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("related candidates disclose uncertainty and require an explicit choice", async ({ page }) => {
+  await fixtureLogin(page);
+  const posts: Record<string, unknown>[] = [];
+  await page.route("**/api/ai/planner**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] });
+    posts.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        reply: "관련 업종의 후보예요. 요청한 메뉴는 확인해 주세요.",
+        plan: null,
+        checks: [],
+        version: posts.length,
+        candidates: [
+          {
+            ref: "p1",
+            source: "naver",
+            title: "공공 식당",
+            address: "서울 성수동",
+            destination: "공공 식당 (서울 성수동)",
+            match: "related",
+          },
+        ],
+      },
+    });
+  });
+  await page.goto("/plans/ai");
+  await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+  await page
+    .getByLabel("위투 AI에게 보낼 내용", { exact: true })
+    .fill("성수동 쌀국수 후보만 찾아줘");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(page.getByText("관련 후보 · 요청 조건 확인 필요")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "공공 식당 네이버 지도", exact: true }),
+  ).toBeVisible();
+  expect(posts).toHaveLength(1);
+  await page.getByRole("button", { name: "공공 식당 선택", exact: true }).click();
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1].chosen_places).toEqual([
+    { title: "공공 식당", address: "서울 성수동", destination: "공공 식당 (서울 성수동)" },
+  ]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 for (const answer of ["favorite", "text"] as const) {
   test(`a location question resumes through ${answer}, restores and retries the same explicit answer`, async ({
     page,
