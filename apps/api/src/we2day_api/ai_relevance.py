@@ -133,3 +133,5 @@ async def enrich_candidates(session, io):
         actual = source_kind(item.category)
         session.candidate_kinds[candidate.ref] = actual if actual != "any" else args.kind
         session.searches[key].append(candidate.evidence())
+        if key in session.search_reports:
+            session.search_reports[key]["count"] = len(session.searches[key])

@@ -33,7 +33,7 @@ test("related candidates disclose uncertainty and require an explicit choice", a
     .getByLabel("위투 AI에게 보낼 내용", { exact: true })
     .fill("성수동 쌀국수 후보만 찾아줘");
   await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
-  await expect(page.getByText("관련 후보 · 요청 조건 확인 필요")).toBeVisible();
+  await expect(page.getByText("관련 후보 · 확인 필요")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "공공 식당 네이버 지도", exact: true }),
   ).toBeVisible();

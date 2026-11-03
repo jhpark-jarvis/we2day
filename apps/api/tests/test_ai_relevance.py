@@ -22,6 +22,7 @@ def fixture():
     args = SearchArguments(query="성수동 쌀국수", area="성수동")
     key = args.model_dump_json()
     session.searches[key] = []
+    session.search_reports[key] = {"name": "search_places", "status": "ok", "count": 0}
     session.relevance_pool = [
         (
             key,
@@ -83,6 +84,7 @@ def test_related_is_public_minimal_unconfirmed_and_cannot_be_a_plan():
     ]
     candidate = session.visible_candidates()[0]
     assert candidate.match == "related" and candidate.source == "naver"
+    assert next(iter(session.search_reports.values()))["count"] == 1
     plan = ModelPlan(
         title="제안",
         date="2030-01-01",

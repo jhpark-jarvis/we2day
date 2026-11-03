@@ -283,7 +283,7 @@ function CandidateList({
           <div>
             <strong>{candidate.title}</strong>
             {candidate.match === "related" && (
-              <p className="settings-hint">관련 후보 · 요청 조건 확인 필요</p>
+              <p className="settings-hint">관련 후보 · 확인 필요</p>
             )}
             {candidate.address && <p>{candidate.address}</p>}
           </div>

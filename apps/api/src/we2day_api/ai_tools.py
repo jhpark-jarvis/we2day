@@ -346,6 +346,7 @@ class ToolSession:
         self.candidates: dict[str, Candidate] = {}
         self.reports: list[dict] = []
         self.searches: dict[str, list[dict]] = {}
+        self.search_reports: dict[str, dict] = {}
         self.search_failures: set[str] = set()
         self.weather: list[WeatherSummary] = []
         self.weather_queries: dict[str, dict] = {}
@@ -628,7 +629,9 @@ class ToolSession:
                         )
                         items.append(candidate.evidence())
                 self.searches[query] = items
-                self.reports.append({"name": name, "status": "ok", "count": len(items)})
+                report = {"name": name, "status": "ok", "count": len(items)}
+                self.reports.append(report)
+                self.search_reports[query] = report
                 return {
                     "items": items,
                     "notice": "관련 이름/업종/지역으로 거른 후보. 영업/시간·이동시간 미확인.",
