@@ -33,6 +33,213 @@ def session(selected=()):
     return ToolSession(SimpleNamespace(), Store(), list(selected), [])
 
 
+def test_geometry_dedup_preserves_branches_and_never_enters_evidence():
+    run = session()
+    a = run.add("<b>공공 카페</b>", "서울 성수동 1", "naver", coordinates=(127.04, 37.54))
+    same = run.add("공공  카페", "서울 성수동 1", "naver", coordinates=(127.04, 37.54))
+    branch = run.add("공공 카페", "서울 성수동 2", "naver", coordinates=(127.05, 37.54))
+    conflict = run.add("공공 카페", "서울 성수동 1", "naver", coordinates=(127.06, 37.54))
+    assert a is same and len({a.ref, branch.ref, conflict.ref}) == 3
+    assert "127.04" not in json.dumps(a.evidence())
+    assert "coordinates" not in a.model_dump()
+
+
+def test_distance_order_requires_unique_observed_anchor_and_preserves_match_tiers():
+    run = session()
+    anchor = run.add("공공 기준점", "서울 성수동 1", "user")
+    run.selected_usage[anchor.ref] = "anchor"
+    # The same explicitly chosen point has coordinates only after provider evidence.
+    run.add(anchor.title, anchor.address, "naver", coordinates=(127.04, 37.54))
+    far = run.add("먼 후보", "서울 성수동 3", "naver", coordinates=(127.06, 37.54))
+    near = run.add("가까운 후보", "서울 성수동 2", "naver", coordinates=(127.041, 37.54))
+    unknown = run.add("좌표 없는 후보", "서울 성수동 4", "naver")
+    related = run.add("미확인 후보", "서울 성수동 5", "naver", coordinates=(127.0401, 37.54))
+    related.match = "related"
+    run.fresh_refs.update(p.ref for p in [far, near, unknown, related])
+    assert [p.ref for p in run.visible_candidates()] == [
+        near.ref,
+        far.ref,
+        unknown.ref,
+        related.ref,
+    ]
+    run.coordinates.clear()
+    assert [p.ref for p in run.visible_candidates()] == [
+        far.ref,
+        near.ref,
+        unknown.ref,
+        related.ref,
+    ]
+
+
+def test_course_calculations_distinguish_unknown_zero_and_normalized_duplicates():
+    from we2day_api.plans import PlanContent
+
+    data = PlanContent.model_validate(
+        {
+            "title": "합성 계산",
+            "date": "2026-11-04",
+            "budget": 20000,
+            "activities": [
+                {"title": "점심", "place": "공공 카페 (서울 성수동 1)", "cost": 15000},
+                {"title": "전시", "place": "다른 곳", "cost": 0},
+                {"title": "저녁", "place": "공공  카페 (서울 성수동 1)", "cost": None},
+            ],
+        }
+    )
+    facts = ai_tools.course_summary(data)
+    assert facts["known_cost_total"] == 15000 and facts["unknown_cost_count"] == 1
+    assert facts["cost_complete"] is False and facts["over_budget"] is False
+    checks = ai_tools.check_course(data)
+    assert any("앞선 장소" in issue for issue in checks)
+    assert any("미정" in issue and "15,000" in issue for issue in checks)
+    data.activities[2].cost = 10000
+    assert ai_tools.course_summary(data)["over_budget"] is True
+
+
+def test_anchor_observation_is_exact_private_and_ambiguous_coordinates_disable_ranking():
+    from we2day_api.places import PlaceResult
+
+    run = session()
+    anchor = run.add("공공 기준점", "서울 성수동 1", "selected")
+    run.selected_usage[anchor.ref] = "anchor"
+    far = run.add("먼 후보", "서울 성수동 3", "naver", coordinates=(127.06, 37.54))
+    near = run.add("가까운 후보", "서울 성수동 2", "naver", coordinates=(127.041, 37.54))
+    run.observe_coordinates(
+        PlaceResult(
+            title="이름만 비슷한 기준점",
+            roadAddress=anchor.address,
+            mapx="127.04",
+            mapy="37.54",
+        )
+    )
+    assert not run.coordinates.get(anchor.ref)
+    assert run.ordered([far, near]) == [far, near]
+    run.observe_coordinates(
+        PlaceResult(
+            title=anchor.title,
+            roadAddress=anchor.address,
+            mapx="127.04",
+            mapy="37.54",
+        )
+    )
+    assert run.ordered([far, near]) == [near, far]
+    run.observe_coordinates(
+        PlaceResult(
+            title=anchor.title,
+            roadAddress=anchor.address,
+            mapx="127.08",
+            mapy="37.54",
+        )
+    )
+    assert run.ordered([far, near]) == [far, near]
+    assert len(run.candidates) == 3
+    assert "coordinates" not in json.dumps([c.model_dump() for c in run.candidates.values()])
+
+
+def test_batch_observes_anchor_before_filtering_without_extra_io(monkeypatch):
+    from we2day_api.ai_place_policy import PlacePolicy, SearchScope
+    from we2day_api.ai_tool_runtime import execute_batch
+
+    run = ToolSession(
+        SimpleNamespace(),
+        Store(),
+        [],
+        [],
+        PlacePolicy(
+            SearchScope(area="성수동", kinds=["cafe"]),
+            queries=[("cafe", "카페", "카페")],
+        ),
+    )
+    run.operation = "search"
+    anchor = run.add("공공 도서관", "서울 성수동 1", "selected")
+    run.selected_usage[anchor.ref] = "anchor"
+
+    class IO:
+        calls = 0
+
+        async def perform(self, action):
+            self.calls += 1
+            return SearchResults.model_validate(
+                {
+                    "items": [
+                        {
+                            "title": "먼 카페",
+                            "category": "카페",
+                            "address": "서울 성수동 3",
+                            "mapx": "127.06",
+                            "mapy": "37.54",
+                        },
+                        {
+                            "title": "가까운 카페",
+                            "category": "카페",
+                            "address": "서울 성수동 2",
+                            "mapx": "127.041",
+                            "mapy": "37.54",
+                        },
+                        {
+                            "title": "공공 도서관",
+                            "category": "도서관",
+                            "address": anchor.address,
+                            "mapx": "127.04",
+                            "mapy": "37.54",
+                        },
+                    ]
+                }
+            )
+
+    io = IO()
+    calls = [
+        {
+            "function": {
+                "name": "search_places",
+                "arguments": json.dumps(
+                    {
+                        "query": "카페",
+                        "kind": "cafe",
+                        "area": "성수동",
+                    },
+                    ensure_ascii=False,
+                ),
+            }
+        }
+    ]
+    result = asyncio.run(execute_batch(run, calls, io))
+    assert io.calls == 1
+    assert [row["title"] for row in result[0]["items"]] == ["가까운 카페", "먼 카페"]
+    assert [c.title for c in run.visible_candidates()] == ["가까운 카페", "먼 카페"]
+    assert not any(
+        s in json.dumps(result) for s in ["127.04", "mapx", "coordinates", "공공 도서관"]
+    )
+
+
+@pytest.mark.parametrize(
+    "costs,total,unknown,within",
+    [
+        ([None, None], None, 2, None),
+        ([0, 0], 0, 0, True),
+        ([20000, None], 20000, 1, None),
+        ([20001, None], 20001, 1, None),
+    ],
+)
+def test_cost_summary_never_claims_unknown_cost_is_free(costs, total, unknown, within):
+    from we2day_api.plans import PlanContent
+
+    content = PlanContent.model_validate(
+        {
+            "title": "예산 경계",
+            "date": "2026-11-04",
+            "budget": 20000,
+            "activities": [{"title": f"활동{i}", "cost": c} for i, c in enumerate(costs)],
+        }
+    )
+    facts = ai_tools.course_summary(content)
+    assert (facts["known_cost_total"], facts["unknown_cost_count"], facts["within_budget"]) == (
+        total,
+        unknown,
+        within,
+    )
+
+
 def plan(**updates):
     return {
         "title": "합성 코스",

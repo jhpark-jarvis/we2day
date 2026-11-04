@@ -38,7 +38,8 @@ def test_new_compound_and_expression_corpus(case):
 def test_course_warnings_use_only_entered_costs_and_times():
     plan = PlanContent.model_validate(CORPUS["cases"][0]["initial"]["proposal"])
     original = plan.model_dump()
-    assert check_course(plan) == []
+    assert check_course(plan) == ["확인된 활동비는 50,000원이며, 1개 활동의 비용은 미정이에요."]
+    assert plan.model_dump() == original
     plan.budget = 10000
     plan.activities[1].time = plan.activities[0].time
     issues = check_course(plan)

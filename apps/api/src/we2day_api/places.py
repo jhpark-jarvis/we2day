@@ -1,5 +1,7 @@
 """Transient NAVER API HUB search shared by authenticated UI and bounded AI tools."""
 
+import math
+import re
 from typing import Annotated
 
 import httpx
@@ -33,6 +35,37 @@ class PlaceResult(BaseModel):
     description: str = Field(default="", max_length=4000)
     address: str = Field(default="", max_length=2000)
     roadAddress: str = Field(default="", max_length=2000)
+    # Provider evidence is request-local and never part of the UI/model wire contract.
+    mapx: str = Field(default="", exclude=True, repr=False)
+    mapy: str = Field(default="", exclude=True, repr=False)
+
+    @field_validator("mapx", "mapy", mode="before")
+    @classmethod
+    def optional_coordinate(cls, value):
+        if type(value) not in (str, int, float):
+            return ""
+        text = str(value).strip()
+        return text if len(text) <= 24 and re.fullmatch(r"\d+(?:\.\d+)?", text) else ""
+
+    @property
+    def coordinates(self) -> tuple[float, float] | None:
+        if not self.mapx or not self.mapy:
+            return None
+        x, y = float(self.mapx), float(self.mapy)
+        # Both axes must have the same representation. Old projected coordinates,
+        # swapped axes and invalid optional fields must not poison usable search rows.
+        if x > 180 and y > 90 and "." not in self.mapx and "." not in self.mapy:
+            x, y = x / 10_000_000, y / 10_000_000
+        return (x, y) if 124 <= x <= 133 and 32 <= y <= 40 else None
+
+
+def straight_line_m(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Only for ordering observed Korean place coordinates, never travel time."""
+    lon1, lat1, lon2, lat2 = map(math.radians, (*a, *b))
+    value = math.sin((lat2 - lat1) / 2) ** 2 + (
+        math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    )
+    return 6_371_008.8 * 2 * math.asin(math.sqrt(min(1, max(0, value))))
 
 
 class SearchResults(BaseModel):

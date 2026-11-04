@@ -134,3 +134,58 @@ def test_provider_quota_no_automatic_retry(search):
     response = client.post("/places/search", json={"query": "검색"})
     assert response.status_code == 429 and len(calls) == 1
     assert response.json() == {"detail": "place_search_limited"}
+
+
+@pytest.mark.parametrize("x,y", [("127.04", "37.54"), ("1270400000", "375400000")])
+def test_provider_coordinates_are_normalized_and_server_only(x, y):
+    item = places.PlaceResult(title="공공 예시", mapx=x, mapy=y)
+    assert item.coordinates == (127.04, 37.54)
+    assert not {"mapx", "mapy", "coordinates"} & item.model_dump().keys()
+
+
+@pytest.mark.parametrize(
+    "x,y",
+    [
+        (None, None),
+        ("", ""),
+        ("NaN", "37"),
+        ("inf", "37"),
+        (True, "37"),
+        ("37.54", "127.04"),
+        ("311277", "552097"),
+        ("1270400000", "37.54"),
+        ("181", "91"),
+        ([], {}),
+        ("0", "0"),
+        ("1" * 1000, "375400000"),
+    ],
+)
+def test_invalid_coordinates_do_not_discard_a_usable_place(x, y):
+    item = places.PlaceResult(title="좌표 없는 후보", mapx=x, mapy=y)
+    assert item.coordinates is None
+    assert item.model_dump()["title"] == "좌표 없는 후보"
+
+
+def test_authenticated_search_never_exposes_coordinates(search):
+    client, _, _, _, replies = search
+    replies.append(
+        httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"title": "공공 예시", "mapx": "1270400000", "mapy": "375400000"},
+                    {"title": "비정상 좌표", "mapx": [], "mapy": "NaN"},
+                ]
+            },
+        )
+    )
+    result = client.post("/places/search", json={"query": "공공 예시"})
+    assert result.status_code == 200 and len(result.json()["items"]) == 2
+    assert not any(key in result.text for key in ["mapx", "mapy", "1270400000", "coordinates"])
+
+
+def test_straight_line_distance_is_symmetric_but_not_a_travel_estimate():
+    a, b = (127.04, 37.54), (127.041, 37.54)
+    assert places.straight_line_m(a, a) == 0
+    assert 80 < places.straight_line_m(a, b) < 95
+    assert places.straight_line_m(a, b) == pytest.approx(places.straight_line_m(b, a))

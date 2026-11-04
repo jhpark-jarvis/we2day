@@ -142,4 +142,5 @@ async def execute_batch(session, calls, io):
                     actions[index] = generators[index].send(outcome)
             except StopIteration as done:
                 results[index] = done.value
+    session.order_search_results()
     return results

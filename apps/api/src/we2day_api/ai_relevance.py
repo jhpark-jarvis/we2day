@@ -119,7 +119,9 @@ async def enrich_candidates(session, io):
             plain(item.title) + plain(item.category)
         ):
             continue
-        candidate = session.add(item.title, item.roadAddress or item.address, "naver")
+        candidate = session.add(
+            item.title, item.roadAddress or item.address, "naver", coordinates=item.coordinates
+        )
         if not candidate or candidate.source != "naver":
             continue
         candidate.match = "related"
@@ -130,3 +132,4 @@ async def enrich_candidates(session, io):
             session.searches[key].append(candidate.evidence())
         if key in session.search_reports:
             session.search_reports[key]["count"] = len(session.searches[key])
+    session.order_search_results()

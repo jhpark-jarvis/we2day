@@ -23,7 +23,7 @@ from we2day_api.ai_dialogue import DialogueState
 from we2day_api.ai_edits import ActivityEdit, PendingFields
 from we2day_api.ai_intake import IntakeState
 from we2day_api.ai_place_policy import PlacePolicy, SearchArguments, SearchScope, kinds, source_kind
-from we2day_api.places import fetch_places
+from we2day_api.places import fetch_places, straight_line_m
 from we2day_api.plans import Activity, PlanContent
 
 
@@ -277,13 +277,35 @@ def clean(value: str, limit: int) -> str:
     return " ".join("".join(c for c in value if ord(c) >= 32 and ord(c) != 127).split())[:limit]
 
 
+def course_summary(plan: PlanContent) -> dict:
+    costs = [a.cost for a in plan.activities if a.cost is not None]
+    total = sum(costs)
+    unknown = len(plan.activities) - len(costs)
+    return {
+        "known_cost_total": total if costs else None,
+        "known_cost_count": len(costs),
+        "unknown_cost_count": unknown,
+        "cost_complete": bool(plan.activities) and not unknown,
+        "over_budget": bool(costs) and plan.budget is not None and total > plan.budget,
+        "within_budget": (
+            total <= plan.budget
+            if plan.activities and not unknown and plan.budget is not None
+            else None
+        ),
+        "untimed_activity_count": sum(a.time is None for a in plan.activities),
+        "travel_time_verified": False,
+        "stay_time_verified": False,
+    }
+
+
 def check_course(plan: PlanContent) -> list[str]:
     issues, seen, previous, times = [], set(), None, {}
     for index, activity in enumerate(plan.activities, 1):
         if not activity.place.strip():
             issues.append(f"{index}번째 활동의 장소를 선택해 주세요.")
         else:
-            key = re.sub(r"\s+", "", activity.place).casefold()
+            # Keep punctuation/address/branch identity; collapse formatting only.
+            key = re.sub(r"\s+", "", clean(activity.place, 200)).casefold()
             if key in seen:
                 issues.append(f"{index}번째 활동은 앞선 장소와 같아요.")
             seen.add(key)
@@ -298,10 +320,16 @@ def check_course(plan: PlanContent) -> list[str]:
             previous = activity.time
     if not plan.activities:
         issues.append("활동을 추가해 주세요.")
-    costs = [a.cost for a in plan.activities if a.cost is not None]
-    if costs and plan.budget is not None and sum(costs) > plan.budget:
+    summary = course_summary(plan)
+    if summary["over_budget"]:
         issues.append(
-            f"입력한 활동비 합계 {sum(costs):,}원이 전체 예산 {plan.budget:,}원을 넘어요."
+            f"입력한 활동비 합계 {summary['known_cost_total']:,}원이 "
+            f"전체 예산 {plan.budget:,}원을 넘어요."
+        )
+    if summary["known_cost_count"] and summary["unknown_cost_count"]:
+        issues.append(
+            f"확인된 활동비는 {summary['known_cost_total']:,}원이며, "
+            f"{summary['unknown_cost_count']}개 활동의 비용은 미정이에요."
         )
     return issues[:16]
 
@@ -344,6 +372,8 @@ class ToolSession:
         self.plan_updates = {}
         self.needs_place_search = False
         self.candidates: dict[str, Candidate] = {}
+        self.coordinates: dict[str, tuple[float, float]] = {}
+        self.ambiguous_coordinates: set[str] = set()
         self.reports: list[dict] = []
         self.searches: dict[str, list[dict]] = {}
         self.search_reports: dict[str, dict] = {}
@@ -365,13 +395,29 @@ class ToolSession:
         for item in chosen:
             self.chosen_candidate = self.add(item.title, item.address, "user", item.destination)
 
-    def add(self, title, address, source, destination=""):
+    def add(self, title, address, source, destination="", *, coordinates=None):
         title, address = clean(title, 100), clean(address, 180)
         if not title:
             return None
-        for candidate in self.candidates.values():
-            if (candidate.title, candidate.address) == (title, address):
-                return candidate
+        matches = [
+            c
+            for c in self.candidates.values()
+            if (re.sub(r"\s+", "", c.title).casefold(), c.address.casefold())
+            == (re.sub(r"\s+", "", title).casefold(), address.casefold())
+        ]
+        compatible = [
+            c
+            for c in matches
+            if coordinates is None
+            or c.ref not in self.coordinates
+            or straight_line_m(self.coordinates[c.ref], coordinates) <= 25
+        ]
+        # Conflicting coordinates at the same name/address are ambiguous branches.
+        if len(compatible) == 1:
+            candidate = compatible[0]
+            if coordinates is not None:
+                self.coordinates.setdefault(candidate.ref, coordinates)
+            return candidate
         ref = f"p{len(self.candidates) + 1}"
         if not destination:
             if source == "selected":
@@ -388,7 +434,68 @@ class ToolSession:
             destination=clean(destination, 200),
         )
         self.candidates[ref] = candidate
+        if coordinates is not None:
+            self.coordinates[ref] = coordinates
         return candidate
+
+    def ordered(self, candidates):
+        anchors = [
+            c for c in self.candidates.values() if self.selected_usage.get(c.ref) == "anchor"
+        ]
+        activity = getattr(self, "search_anchor", None)
+        if not anchors and activity:
+            anchors = [c for c in self.candidates.values() if c.destination == activity.place]
+        if (
+            len(anchors) != 1
+            or anchors[0].ref not in self.coordinates
+            or anchors[0].ref in self.ambiguous_coordinates
+        ):
+            return list(candidates)
+        origin = self.coordinates[anchors[0].ref]
+        if any(
+            c.title == anchors[0].title
+            and c.address == anchors[0].address
+            and c.ref in self.coordinates
+            and straight_line_m(origin, self.coordinates[c.ref]) > 25
+            for c in self.candidates.values()
+        ):
+            return list(candidates)
+        # Direct evidence always precedes unverified suggestions; unknown distances
+        # retain provider order after known distances within the same evidence tier.
+        return sorted(
+            candidates,
+            key=lambda c: (
+                c.match == "related",
+                c.ref not in self.coordinates,
+                straight_line_m(origin, self.coordinates[c.ref])
+                if c.ref in self.coordinates
+                else 0,
+            ),
+        )
+
+    def observe_coordinates(self, item):
+        # An excluded anchor must stay excluded from candidates, yet its provider
+        # coordinates may resolve an already explicit, exact name/address match.
+        if item.coordinates is None:
+            return
+        identity = clean(item.title, 100), clean(item.roadAddress or item.address, 180)
+        matches = [c for c in self.candidates.values() if (c.title, c.address) == identity]
+        if len(matches) != 1:
+            return
+        ref = matches[0].ref
+        if (
+            ref in self.coordinates
+            and straight_line_m(self.coordinates[ref], item.coordinates) > 25
+        ):
+            self.ambiguous_coordinates.add(ref)
+        else:
+            self.coordinates.setdefault(ref, item.coordinates)
+
+    def order_search_results(self):
+        for rows in self.searches.values():
+            ordered = self.ordered([self.candidates[r["ref"]] for r in rows])
+            order = {c.ref: index for index, c in enumerate(ordered)}
+            rows.sort(key=lambda row: order[row["ref"]])
 
     def seed(self, activity):
         place = activity.place
@@ -453,7 +560,7 @@ class ToolSession:
             kind = self.candidate_kinds.get(item.ref, detected[0] if len(detected) == 1 else "any")
             if self.policy.accepts(item.title, kind):
                 visible.append(item)
-        return visible
+        return self.ordered(visible)
 
     def guard_plan(self, model_plan, resolved):
         scope = self.policy.scope
@@ -562,6 +669,7 @@ class ToolSession:
                 else:
                     action = steps.send(result)
         except StopIteration as done:
+            self.order_search_results()
             return done.value
 
     def _execute_steps(self, name: str, arguments):
@@ -616,18 +724,25 @@ class ToolSession:
                 results = yield ("places", args.query)
                 items = []
                 for item in results.items:
+                    self.observe_coordinates(item)
                     if not self.policy.relevant(item, args):
                         if args.mode != "exact_name" and self.policy.eligible(item, args):
                             self.relevance_pool.append((query, args, item))
                         continue
-                    candidate = self.add(item.title, item.roadAddress or item.address, "naver")
+                    candidate = self.add(
+                        item.title,
+                        item.roadAddress or item.address,
+                        "naver",
+                        coordinates=item.coordinates,
+                    )
                     if candidate:
                         self.fresh_refs.add(candidate.ref)
                         actual = source_kind(item.category)
                         self.candidate_kinds[candidate.ref] = (
                             actual if actual != "any" else args.kind
                         )
-                        items.append(candidate.evidence())
+                        if not any(row["ref"] == candidate.ref for row in items):
+                            items.append(candidate.evidence())
                 self.searches[query] = items
                 report = {"name": name, "status": "ok", "count": len(items)}
                 self.reports.append(report)
@@ -681,7 +796,11 @@ class ToolSession:
                 plan = CheckArguments.model_validate(arguments).plan
                 issues = check_course(self.resolve(plan))
                 self.reports.append({"name": name, "status": "ok", "count": len(issues)})
-                return {"issues": issues, "saved": False}
+                return {
+                    "issues": issues,
+                    "summary": course_summary(self.resolve(plan)),
+                    "saved": False,
+                }
             return {"error": "unknown_tool"}
         except (ValidationError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             self.resolution = "invalid_arguments"

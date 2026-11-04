@@ -696,8 +696,12 @@ async function fixtureLogin(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/account$/);
   await page.goto("/couple");
+  await expect(
+    page.getByRole("button", { name: "새 공간 만들기" }).or(page.getByRole("status")),
+  ).toBeVisible();
   if (await page.getByRole("button", { name: "새 공간 만들기" }).isVisible())
     await page.getByRole("button", { name: "새 공간 만들기" }).click();
+  await expect(page.getByRole("status")).toContainText(/공간이 준비|두 사람이 연결/);
 }
 
 test("place and candidate dialogs preserve composer space, selection and conversation drafts", async ({
