@@ -39,14 +39,8 @@ async def enrich_candidates(session, io):
     pool, inputs = [], []
     seen = set()
     for key, args, item in session.relevance_pool[:20]:
-        target = next(
-            (
-                t
-                for k, q, t in session.policy.queries
-                if k == args.kind and norm(q) in norm(args.query)
-            ),
-            "",
-        )
+        matched = session.policy.query_target(args)
+        target = matched[1] if matched else ""
         identity = (target, plain(item.title), plain(item.category))
         if not target or identity in seen or not session.policy.eligible(item, args):
             continue
@@ -126,12 +120,13 @@ async def enrich_candidates(session, io):
         ):
             continue
         candidate = session.add(item.title, item.roadAddress or item.address, "naver")
-        if not candidate or candidate.ref in session.fresh_refs:
+        if not candidate or candidate.source != "naver":
             continue
         candidate.match = "related"
         session.fresh_refs.add(candidate.ref)
         actual = source_kind(item.category)
         session.candidate_kinds[candidate.ref] = actual if actual != "any" else args.kind
-        session.searches[key].append(candidate.evidence())
+        if not any(row["ref"] == candidate.ref for row in session.searches[key]):
+            session.searches[key].append(candidate.evidence())
         if key in session.search_reports:
             session.search_reports[key]["count"] = len(session.searches[key])

@@ -251,6 +251,20 @@ class PlacePolicy:
     def forbidden(self, title, kind="any"):
         return norm(title) in self.rejected or kind in self.excluded
 
+    def query_target(self, args):
+        """Bind an executed query to one approved goal, including the server area prefix."""
+        matches = set()
+        for kind, query, target in self.queries:
+            if kind != args.kind:
+                continue
+            expected = self.keyword or query
+            if args.area and norm(args.area) not in norm(expected):
+                expected = f"{args.area} {expected}"[:100]
+            if norm(expected) == norm(args.query):
+                matches.add((kind, target))
+        # Truncation or conflicting approved queries must never choose by list order.
+        return next(iter(matches)) if len(matches) == 1 else None
+
     def prepare(self, values, evidence_addresses=()):
         args = SearchArguments.model_validate(values).model_copy()
         approved = any(k == args.kind and norm(q) == norm(args.query) for k, q, _ in self.queries)
@@ -323,10 +337,10 @@ class PlacePolicy:
         if args.kind == "restaurant" and source_kind(category) not in {"restaurant", "any"}:
             return False
         if self.queries:
-            target = next(
-                (t for k, q, t in self.queries if k == args.kind and norm(q) in norm(args.query)),
-                "",
-            )
+            matched = self.query_target(args)
+            if matched is None:
+                return False
+            target = matched[1]
             terms = [
                 norm(t)
                 for t in target.split()

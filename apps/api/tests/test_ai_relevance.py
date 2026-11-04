@@ -168,3 +168,30 @@ def test_predeclared_corpus_has_independent_holdout_and_known_strict_baseline():
         item = PlaceResult(title=case["name"], category=case["category"], address="서울 성수동")
         args = SearchArguments(query="성수동 " + case["target"], area="성수동")
         assert policy.relevant(item, args) == (case["expected"] == "direct")
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_related_classifier_gets_compound_goal_and_preserves_shared_candidate_uncertainty(reverse):
+    session = fixture()
+    session.policy.queries = [("any", "카페", "카페"), ("any", "조용한 카페", "조용한 카페")]
+    if reverse:
+        session.policy.queries.reverse()
+    args = SearchArguments(query="성수동 조용한 카페", area="성수동")
+    key = args.model_dump_json()
+    session.searches[key] = []
+    session.relevance_pool = [
+        (key, args, PlaceResult(title="공공 카페", category="음식점>카페", address="서울 성수동"))
+    ]
+    existing = session.add("공공 카페", "서울 성수동", "naver")
+    session.fresh_refs.add(existing.ref)
+    requests, _ = asyncio.run(
+        run(
+            session,
+            {"decisions": [{"index": 0, "evidence": "카페", "relation": "preference_only"}]},
+        )
+    )
+    rows = json.loads(requests[0]["messages"][1]["content"])
+    assert rows[0]["request"] == "조용한 카페"
+    assert session.visible_candidates() == [existing]
+    assert existing.match == "related"
+    assert session.searches[key][0]["ref"] == existing.ref

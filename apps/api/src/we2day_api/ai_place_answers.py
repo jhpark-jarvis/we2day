@@ -5,6 +5,7 @@ import re
 
 from we2day_api.ai_place_policy import (
     LABELS,
+    SearchArguments,
     area_matches,
     explicit_area,
     kinds,
@@ -92,6 +93,9 @@ def candidate_reply(session, followup=""):
         heading = (
             f"‘{session.policy.keyword}’ 검색 후보예요. 실제 메뉴·시설은 지도에서 확인해 주세요."
         )
+    if session.resolution == "partial":
+        # Candidate cards render the first line; keep partial success visible there too.
+        heading = "요청한 조건 중 일부의 후보만 찾았어요."
     rows = [
         f"{i + 1}. {item.title}" + (f" — {item.address}" if item.address else "")
         for i, item in enumerate(representatives[:4])
@@ -336,12 +340,9 @@ async def read_candidate_request(directive, session, io):
         for key, items in session.searches.items():
             if not items:
                 continue
-            args = json.loads(key)
-            found.update(
-                (k, t)
-                for k, q, t in session.policy.queries
-                if k == args["kind"] and norm(q) in norm(args["query"])
-            )
+            matched = session.policy.query_target(SearchArguments.model_validate_json(key))
+            if matched:
+                found.add(matched)
         complete = required <= found
     if session.resolution not in {"not_allowed", "invalid_arguments", "budget_exhausted"}:
         session.resolution = (
