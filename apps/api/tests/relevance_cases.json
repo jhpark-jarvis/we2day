@@ -173,5 +173,12 @@
     "category": "교육>음악학원",
     "expected": "reject",
     "split": "fresh_holdout"
+  },
+  {
+    "target": "도서관",
+    "name": "고요한 독서실",
+    "category": "교육>독서실",
+    "expected": "reject",
+    "split": "fresh_holdout"
   }
 ]

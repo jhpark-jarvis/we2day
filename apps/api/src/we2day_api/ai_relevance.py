@@ -7,7 +7,7 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from we2day_api.ai_place_policy import norm, plain, source_kind
+from we2day_api.ai_place_policy import kinds, norm, plain, source_kind
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.prompt_bundle import PROMPT
 
@@ -43,6 +43,17 @@ async def enrich_candidates(session, io):
         target = matched[1] if matched else ""
         identity = (target, plain(item.title), plain(item.category))
         if not target or identity in seen or not session.policy.eligible(item, args):
+            continue
+        inferred = kinds(target)
+        primary = args.kind if args.kind != "any" else inferred[0] if len(inferred) == 1 else "any"
+        # A semantic score cannot invent the explicit primary service missing from
+        # a provider's category. Use the existing Kind registry, not venue blacklists.
+        # Direct results have already passed the normal search policy and stay intact.
+        if primary != "any" and source_kind(plain(item.category) or plain(item.title)) != primary:
+            if hasattr(io, "stats"):
+                io.stats.counts["related_kind_blocked"] = (
+                    io.stats.counts.get("related_kind_blocked", 0) + 1
+                )
             continue
         seen.add(identity)
         pool.append((key, args, item))

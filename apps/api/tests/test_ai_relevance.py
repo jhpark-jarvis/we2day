@@ -39,6 +39,179 @@ def fixture():
     return session
 
 
+@pytest.mark.parametrize(
+    "kind,target",
+    [
+        ("library", "도서관"),
+        ("cafe", "카페"),
+        ("restaurant", "식당"),
+        ("park", "공원"),
+        ("museum", "박물관"),
+        ("cinema", "영화"),
+        ("bowling", "볼링"),
+        ("escape", "방탈출"),
+        ("craft", "공방"),
+    ],
+)
+@pytest.mark.parametrize("inferred", [False, True])
+def test_unknown_primary_service_cannot_be_relaxed_by_the_classifier(kind, target, inferred):
+    request_kind = "any" if inferred else kind
+    policy = PlacePolicy(
+        SearchScope(area="성수동", kinds=[request_kind]), queries=[(request_kind, target, target)]
+    )
+    s = ToolSession(None, None, [], [], policy)
+    args = SearchArguments(query="성수동 " + target, area="성수동", kind=request_kind)
+    key = args.model_dump_json()
+    s.searches[key] = []
+    s.relevance_pool = [
+        (key, args, PlaceResult(title="공공 시설", category="다른 주업종", address="서울 성수동"))
+    ]
+    requests, stats = asyncio.run(
+        run(
+            s,
+            {
+                "decisions": [
+                    {"index": 0, "evidence": "다른 주업종", "relation": "same_service"},
+                ]
+            },
+        )
+    )
+    assert not requests and stats.counts["model_calls"] == 0
+    assert not s.visible_candidates()
+
+
+def test_declared_category_cannot_be_overridden_by_a_service_word_in_the_name():
+    s = fixture()
+    s.policy.queries = [("library", "도서관", "도서관")]
+    args = SearchArguments(query="성수동 도서관", area="성수동", kind="library")
+    key = args.model_dump_json()
+    s.searches[key] = []
+    s.relevance_pool = [
+        (
+            key,
+            args,
+            PlaceResult(title="도서관이라는 가게", category="교육>독서실", address="서울 성수동"),
+        )
+    ]
+    requests, _ = asyncio.run(
+        run(
+            s,
+            {
+                "decisions": [
+                    {"index": 0, "evidence": "독서실", "relation": "same_service"},
+                ]
+            },
+        )
+    )
+    assert not requests
+
+
+@pytest.mark.parametrize(
+    "target,category",
+    [
+        ("조용한 카페", "음식점>카페"),
+        ("아이와 도서관", "교육>자료실"),
+        ("편한 식당", "음식점>베트남음식"),
+        ("한적한 공원", "자연>공원"),
+        ("작은 박물관", "문화>미술관"),
+        ("영화", "문화>영화관"),
+        ("볼링", "스포츠>볼링장"),
+        ("방탈출", "놀이>방탈출"),
+        ("공방", "취미>공방"),
+    ],
+)
+def test_compatible_primary_categories_still_reach_the_classifier(target, category):
+    s = ToolSession(
+        None,
+        None,
+        [],
+        [],
+        PlacePolicy(
+            SearchScope(area="성수동", kinds=["any"]),
+            queries=[("any", target, target)],
+        ),
+    )
+    args = SearchArguments(query="성수동 " + target, area="성수동")
+    key = args.model_dump_json()
+    s.searches[key] = []
+    s.relevance_pool = [
+        (key, args, PlaceResult(title="공공 후보", category=category, address="서울 성수동"))
+    ]
+    requests, _ = asyncio.run(
+        run(
+            s,
+            {
+                "decisions": [
+                    {"index": 0, "evidence": category, "relation": "preference_only"},
+                ]
+            },
+        )
+    )
+    assert len(requests) == 1 and len(s.visible_candidates()) == 1
+    assert s.visible_candidates()[0].match == "related"
+
+
+def test_activity_query_is_not_a_literal_ban_on_a_neighboring_business():
+    s = ToolSession(
+        None,
+        None,
+        [],
+        [],
+        PlacePolicy(
+            SearchScope(area="성수동", kinds=["any"]),
+            queries=[("any", "공부할 곳", "공부할 곳")],
+        ),
+    )
+    args = SearchArguments(query="성수동 공부할 곳", area="성수동")
+    key = args.model_dump_json()
+    s.searches[key] = []
+    s.relevance_pool = [
+        (
+            key,
+            args,
+            PlaceResult(title="공공 공부 공간", category="교육>독서실", address="서울 성수동"),
+        )
+    ]
+    requests, _ = asyncio.run(
+        run(
+            s,
+            {
+                "decisions": [
+                    {"index": 0, "evidence": "독서실", "relation": "activity_venue"},
+                ]
+            },
+        )
+    )
+    assert len(requests) == 1 and len(s.visible_candidates()) == 1
+
+
+def test_missing_category_uses_name_but_a_known_direct_candidate_is_never_removed():
+    s = fixture()
+    s.policy.queries = [("any", "조용한 카페", "조용한 카페")]
+    args = SearchArguments(query="성수동 조용한 카페", area="성수동")
+    key = args.model_dump_json()
+    s.searches[key] = []
+    direct = s.add("기존 검증 후보", "서울 성수동 1", "naver")
+    s.fresh_refs.add(direct.ref)
+    s.relevance_pool = [
+        (key, args, PlaceResult(title="공공 카페", address="서울 성수동")),
+        (key, args, PlaceResult(title="넓은 공간", category="주업종 미상", address="서울 성수동")),
+    ]
+    requests, stats = asyncio.run(
+        run(
+            s,
+            {
+                "decisions": [
+                    {"index": 0, "evidence": "카페", "relation": "preference_only"},
+                ]
+            },
+        )
+    )
+    assert len(json.loads(requests[0]["messages"][1]["content"])) == 1
+    assert stats.counts["related_kind_blocked"] == 1
+    assert direct in s.visible_candidates() and direct.match == "direct"
+
+
 async def run(session, answer, *, calls=0, status=200):
     requests = []
     if "related" in answer:
