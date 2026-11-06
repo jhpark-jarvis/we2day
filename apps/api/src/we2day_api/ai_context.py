@@ -59,10 +59,14 @@ def model_messages(system, body, context, scope, directive, session, proposal, t
         messages.append({"role": "user", "content": model_proposal(proposal)})
     # Stored-schedule replies are server-rendered, not model evidence. The user's own
     # explicit text remains intact; a later unrelated model turn must not export reads.
-    history = [message.model_dump() for message in body.messages if not (
-        message.role == "assistant"
-        and re.match(r"^\d{4}-\d{2}-\d{2} 공동 일정\n", message.content)
-    )]
+    history = [
+        message.model_dump()
+        for message in body.messages
+        if not (
+            message.role == "assistant"
+            and re.search(r"(?m)^(?:\d{4}-\d{2}-\d{2} 공동 일정|저장 플랜 조회)\n", message.content)
+        )
+    ]
     if body.brief:
         history[-1]["content"] = latest
     while (

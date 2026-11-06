@@ -5,6 +5,7 @@ import json
 
 from fastapi import HTTPException
 
+from we2day_api.ai_capabilities import BY_NAME, model_result
 from we2day_api.ai_place_policy import SearchArguments
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_tools import weather_requests
@@ -143,4 +144,9 @@ async def execute_batch(session, calls, io):
             except StopIteration as done:
                 results[index] = done.value
     session.order_search_results()
-    return results
+    return [
+        model_result(call["function"]["name"], result)
+        if call["function"]["name"] in BY_NAME
+        else result
+        for call, result in zip(calls, results, strict=True)
+    ]

@@ -8,6 +8,7 @@ import sys
 from collections import Counter
 
 COUNTERS = {
+    "selection_invalid",
     "model_calls",
     "tool_calls",
     "server_responses",

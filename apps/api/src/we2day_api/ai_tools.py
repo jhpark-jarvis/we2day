@@ -19,6 +19,7 @@ from pydantic import (
     model_serializer,
 )
 
+from we2day_api.ai_capabilities import definitions
 from we2day_api.ai_dialogue import DialogueState
 from we2day_api.ai_edits import ActivityEdit, PendingFields
 from we2day_api.ai_intake import IntakeState
@@ -241,35 +242,13 @@ def fetch_weather(arguments: WeatherArguments) -> dict:
         return done.value
 
 
-def definition(name, description, arguments):
-    return {
-        "type": "function",
-        "function": {
-            "name": name,
-            "description": description,
-            "parameters": arguments.model_json_schema(),
-        },
+TOOLS = definitions(
+    {
+        "get_weather": WeatherArguments,
+        "search_places": SearchArguments,
+        "lookup_selected_places": EmptyArguments,
     }
-
-
-TOOLS = [
-    definition(
-        "get_weather",
-        "한국 도시 일별 예보. 날씨 필요시만 사용. 구/주소 대신 시 이름(영문 권장).",
-        WeatherArguments,
-    ),
-    definition(
-        "search_places",
-        "장소 검색. exact_name은 고유 이름만(name), "
-        "category/nearby는 한 업종(kind)과 지역(area). 현재 요청 범위만 검색. 영업정보 미확인.",
-        SearchArguments,
-    ),
-    definition(
-        "lookup_selected_places",
-        "사용자가 이 요청에 명시 선택한 자주 가는 곳/위시만 읽기. 다른 DB 조회 불가.",
-        EmptyArguments,
-    ),
-]
+)
 
 
 def clean(value: str, limit: int) -> str:

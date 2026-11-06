@@ -587,6 +587,18 @@ async def interpret(control, latest, settings, client, budget, stats):
             if isinstance(value, str)
             else Action.model_validate(value)
         )
+        apply_action(control, latest, action)
+    except (ValueError, KeyError, TypeError, IndexError, ValidationError):
+        control.directive.ask(
+            "target", "원하는 지역과 활동을 조금 더 구체적으로 알려주세요.", resume="search"
+        )
+        control.reason = "clarify"
+
+
+def apply_action(control, latest, action):
+    """Apply a typed proposal using the same user-grounding and state checks."""
+    legacy_view = saved_refinement(control.context, control.directive.scope)
+    try:
         scope = control.directive.scope
         # A proposed location must already be user-supplied, never a model geocode.
         if (
@@ -717,7 +729,9 @@ async def interpret(control, latest, settings, client, budget, stats):
             directive.scope.search_only = action.operation == "search"
             directive.slots["region"] = directive.scope.area
             directive.allowed_tools = {"search_places"}
-            if action.operation == "plan" and not control.context.get("date"):
+            if action.operation == "plan" and not directive.slots.get(
+                "date", control.context.get("date")
+            ):
                 directive.ask(
                     "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume="plan"
                 )

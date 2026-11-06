@@ -20,6 +20,7 @@ LIMIT = 10
 class ScheduleRead:
     date: str = ""
     question: str = ""
+    reason: str = ""
 
 
 def request_read(text, context, version, today):
@@ -55,35 +56,52 @@ def request_read(text, context, version, today):
         return ScheduleRead(
             question=("여기서는 공동 약속과 코스만 조회해요. 개인 일정은 달력에서 확인해 주세요.")
         )
+    return schedule_date(text, context, version, today)
+
+
+def schedule_date(text, context, version, today):
+    """Date validation shared by legacy intent and model-selected reads."""
+    previous = context.get("schedule_read")
+    previous = previous if isinstance(previous, dict) and previous.get("basis") == version else {}
     values = set()
     for m in DATE_TOKEN.finditer(text):
         year, month, day = (m[1], m[2], m[3]) if m[1] else (m[4], m[5], m[6])
         try:
             values.add(date(int(year or today.year), int(month), int(day)).isoformat())
         except ValueError:
-            return ScheduleRead(question="날짜를 확인해 주세요. 조회할 날짜 하나를 알려주세요.")
+            return ScheduleRead(
+                question="날짜를 확인해 주세요. 조회할 날짜 하나를 알려주세요.",
+                reason="invalid_date",
+            )
     for word, shift in (("오늘", 0), ("내일", 1), ("모레", 2), ("어제", -1)):
         if word in text:
             values.add((today + timedelta(days=shift)).isoformat())
     if len(values) > 1 or re.search(r"또는|아니면|혹은|부터|까지|이번\s*주말|다음\s*주말", text):
-        return ScheduleRead(question="어느 날짜의 공동 일정을 볼까요? 날짜 하나를 알려주세요.")
+        return ScheduleRead(
+            question="어느 날짜의 공동 일정을 볼까요? 날짜 하나를 알려주세요.",
+            reason="ambiguous_date",
+        )
     if not values:
         value, question = date_value(text, today)
         if question:
-            return ScheduleRead(question=question)
+            return ScheduleRead(question=question, reason="ambiguous_date")
         if value:
             values.add(value)
     target = next(iter(values), "")
     if not target and previous:
         target = previous.get("date", "")
     if not target:
-        return ScheduleRead(question="어느 날짜의 공동 일정을 볼까요? 날짜를 알려주세요.")
+        return ScheduleRead(
+            question="어느 날짜의 공동 일정을 볼까요? 날짜를 알려주세요.", reason="missing_date"
+        )
     try:
         parsed = date.fromisoformat(target)
         if not 2000 <= parsed.year <= 2100:
             raise ValueError
     except (TypeError, ValueError):
-        return ScheduleRead(question="날짜를 확인해 주세요. 조회할 날짜 하나를 알려주세요.")
+        return ScheduleRead(
+            question="날짜를 확인해 주세요. 조회할 날짜 하나를 알려주세요.", reason="invalid_date"
+        )
     return ScheduleRead(date=target)
 
 

@@ -16,10 +16,15 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from we2day_api.ai_capabilities import QUESTIONS
+from we2day_api.ai_capability_reads import execute_reads
+from we2day_api.ai_capability_router import apply_selection, direct_request, valid_weather
+from we2day_api.ai_capability_router import select as select_capability
 from we2day_api.ai_context import model_messages
 from we2day_api.ai_control import interpret, prepare, reduce_context, restore_saved_area
 from we2day_api.ai_dialogue import activity_target, merge_context
 from we2day_api.ai_dialogue import explicit_date as explicit_date
+from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, window_checks
 from we2day_api.ai_place_answers import (
     candidate_reply,
@@ -688,13 +693,24 @@ async def _finish_result(body, latest, answer, candidates, store, stats, lease):
     if len(json.dumps(stored_result, ensure_ascii=False).encode()) > 32768:
         raise HTTPException(422, "ai_context_too_long")
     with stats.span("persist"):
-        saved = await store.rpc("finish_ai_planner_turn", {
-            "p_id": str(body.conversation_id), "p_request": str(body.request_id),
-            "p_lease": lease, "p_version": body.version, "p_user": latest,
-            "p_result": stored_result, "p_prompt": PROMPT_VERSION,
-        })
-    return SavedChatResult(**saved["result"], conversation_id=body.conversation_id,
-                           version=saved["version"], candidates=candidates)
+        saved = await store.rpc(
+            "finish_ai_planner_turn",
+            {
+                "p_id": str(body.conversation_id),
+                "p_request": str(body.request_id),
+                "p_lease": lease,
+                "p_version": body.version,
+                "p_user": latest,
+                "p_result": stored_result,
+                "p_prompt": PROMPT_VERSION,
+            },
+        )
+    return SavedChatResult(
+        **saved["result"],
+        conversation_id=body.conversation_id,
+        version=saved["version"],
+        candidates=candidates,
+    )
 
 
 async def _chat(body, settings, store, client, budget, stats):
@@ -737,16 +753,95 @@ async def _chat(body, settings, store, client, budget, stats):
             proposal = PlanContent.model_validate(proposal) if proposal else None
         today = datetime.now(ZoneInfo("Asia/Seoul")).date()
         before_context = context.model_dump()
-        saved_request = None if body.brief else request_read(
-            latest, before_context, body.version, today
+        selection, private_replies, private_reports, pending = None, [], [], None
+
+        async def terminal(reply, reports):
+            nonlocal finished
+            if private_replies:
+                reply = "\n\n".join([*private_replies, *([reply] if reply else [])])[:3900]
+            stats.counts.update(server_responses=1, executed_tools=len(reports))
+            answer = ChatResult(
+                reply=reply,
+                tools=reports,
+                context=context,
+                prompt_version=PROMPT_VERSION,
+                prompt_sha256=PROMPT_SHA256,
+            )
+            stats.stage("validate")
+            result = await _finish_result(body, latest, answer, [], store, stats, lease)
+            finished = True
+            return result
+
+        explicit_ui = (
+            body.brief
+            or body.chosen_places
+            or (
+                body.selected_places
+                and latest in {"선택한 장소 주변에서 찾아줘.", "선택한 장소를 코스에 넣어줘."}
+            )
+            or latest.startswith("선택한 장소:")
+            or cancel_request(latest)
+        )
+        local_request = (
+            direct_request(body, before_context, proposal, today)
+            if getattr(settings, "ai_capabilities_enabled", False) and not explicit_ui
+            else None
+        )
+        if (
+            getattr(settings, "ai_capabilities_enabled", False)
+            and not explicit_ui
+            and not local_request
+        ):
+            if not await store.rpc("reserve_ai_planner_request"):
+                raise HTTPException(429, "ai_rate_limited")
+            selection = await select_capability(
+                body, before_context, proposal, today, settings, client, budget, stats
+            )
+            if selection.invalid:
+                return await terminal(
+                    "요청한 작업을 구분하지 못했어요. 날짜나 원하는 작업을 조금 더 알려주세요.",
+                    [],
+                )
+            private_replies, private_reports, pending = await execute_reads(
+                selection, latest, before_context, body.version, today, store, stats
+            )
+            if pending is not None:
+                context.schedule_read = pending
+            if all(n in {"read_shared_calendar", "read_shared_plan"} for n, _ in selection.calls):
+                return await terminal("", private_reports)
+            question = next((a["field"] for n, a in selection.calls if n == "ask_user"), None)
+            if question == "region":
+                # Preserve the typed target when asking for its missing location.
+                args = selection.calls[0][1]
+                targets = args["targets"] or [LABELS[k] for k in kinds(latest)]
+                if not targets or len(targets) > 4:
+                    return await terminal(QUESTIONS["region"], [])
+                selection.calls = [
+                    (
+                        "search_places",
+                        {"query": t, "name": "", "mode": "category", "kind": "any", "area": ""},
+                    )
+                    for t in targets
+                ]
+            elif question:
+                return await terminal(QUESTIONS[question], [])
+        saved_request = (
+            None
+            if body.brief or getattr(settings, "ai_capabilities_enabled", False)
+            else request_read(latest, before_context, body.version, today)
         )
         if saved_request:
             reply, reports = await read_schedule(saved_request, store, stats)
             # Keep the user's editing proposal/conditions separate from a viewed schedule date.
             context.schedule_read = {"basis": body.version + 1, "date": saved_request.date}
             stats.counts.update(server_responses=1, planned_tools=1, executed_tools=len(reports))
-            answer = ChatResult(reply=reply, tools=reports, context=context,
-                                prompt_version=PROMPT_VERSION, prompt_sha256=PROMPT_SHA256)
+            answer = ChatResult(
+                reply=reply,
+                tools=reports,
+                context=context,
+                prompt_version=PROMPT_VERSION,
+                prompt_sha256=PROMPT_SHA256,
+            )
             stats.stage("validate")
             result = await _finish_result(body, latest, answer, [], store, stats, lease)
             finished = True
@@ -767,11 +862,26 @@ async def _chat(body, settings, store, client, budget, stats):
             before_context["dialogue"]["pending"] = None
         if proposal and not before_context.get("date") and not context.dialogue.cleared_date:
             before_context["date"] = proposal.date
-        decision = prepare(body, before_context, proposal, today)
+        decision = local_request or prepare(body, before_context, proposal, today)
+        if selection:
+            decision.model_reserved = True
+            try:
+                apply_selection(selection, decision, latest)
+            except ValueError:
+                return await terminal("검색할 지역과 활동을 다시 확인해 주세요.", private_reports)
+            if any(n in {"get_weather", "lookup_selected_places"} for n, _ in selection.calls):
+                decision.interpret = False
+                decision.directive.reply = ""
+            if all(
+                n in {"get_weather", "read_shared_calendar", "read_shared_plan"}
+                for n, _ in selection.calls
+            ):
+                decision.directive.intent = decision.directive.state.intent = "weather"
+                decision.directive.allowed_tools = {"get_weather"}
         await restore_saved_area(decision, body, store, stats)
         before_context, directive = decision.context, decision.directive
         if decision.interpret:
-            if not await store.rpc("reserve_ai_planner_request"):
+            if not decision.model_reserved and not await store.rpc("reserve_ai_planner_request"):
                 raise HTTPException(429, "ai_rate_limited")
             decision.model_reserved = True
             await interpret(decision, latest, settings, client, budget, stats)
@@ -818,6 +928,7 @@ async def _chat(body, settings, store, client, budget, stats):
             body.chosen_places if directive.intent in {"select", "plan"} else [],
             policy,
         )
+        session.calls = len(private_reports)
         session.previous_plan = proposal
         session.search_anchor = current_anchor(spec, proposal) if spec else None
         session.operation = directive.intent
@@ -872,7 +983,26 @@ async def _chat(body, settings, store, client, budget, stats):
             before_context.get("place_search"),
         )
         io = ToolIO(settings, client, store, budget, stats)
+        if selection:
+            calls = []
+            for name, args in selection.calls:
+                if name == "get_weather":
+                    if not valid_weather(args, latest, before_context, today):
+                        return await terminal(
+                            "날씨를 확인할 도시와 날짜를 알려주세요.", private_reports
+                        )
+                    session.allowed_tools.add(name)
+                elif name == "lookup_selected_places":
+                    session.allowed_tools.add(name)
+                else:
+                    continue
+                calls.append({"function": {"name": name, "arguments": json.dumps(args)}})
+            if calls:
+                with stats.span("tools"):
+                    await execute_batch(session, calls, io)
         await read_candidate_request(directive, session, io)
+        if selection and not any(n == "continue_planning" for n, _ in selection.calls):
+            session.direct_final = True
         if (
             spec
             and directive.intent == "search"
@@ -967,6 +1097,9 @@ async def _chat(body, settings, store, client, budget, stats):
             answer.plan.transport = body.brief.transport
         if directive.notices:
             answer.reply = "\n".join([*directive.notices, answer.reply])[:4000]
+        if private_replies:
+            answer.reply = "\n\n".join([*private_replies, answer.reply])[:3900]
+            answer.tools = (private_reports + answer.tools)[:9]
         answer.context = StoredContext.model_validate(
             reduce_context(
                 before_context,
@@ -977,6 +1110,8 @@ async def _chat(body, settings, store, client, budget, stats):
                 decision.reason,
             )
         )
+        if pending is not None:
+            answer.context.schedule_read = pending
         stats.counts["selected_count"] = len(body.selected_places)
         stats.counts["planned_tools"] = len(directive.allowed_tools)
         stats.counts["executed_tools"] = len(session.reports)
