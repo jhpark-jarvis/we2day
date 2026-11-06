@@ -626,7 +626,11 @@ export function AiPlanner({ available, today }: { available: boolean; today: str
         body: JSON.stringify({ ...payload, request_id: requestId }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(110000)]),
       });
-      const result = await readAiResponse<ChatResponse>(response, setProgressStage);
+      const result = await readAiResponse<ChatResponse>(
+        response,
+        setProgressStage,
+        controller.signal,
+      );
       conversation.current.version = result.version;
       if (newDraftId.current === conversation.current.id) newDraftId.current = crypto.randomUUID();
       retry.current = null;

@@ -29,6 +29,7 @@ const streamErrors: Record<string, string> = {
 export async function readAiResponse<T>(
   response: Response,
   progress: (stage: AiStage) => void,
+  signal?: AbortSignal,
 ): Promise<T> {
   if (!response.ok) {
     const value = await response.json().catch(() => null);
@@ -41,6 +42,10 @@ export async function readAiResponse<T>(
     });
   const reader = response.body?.getReader();
   if (!reader) throw new AiResponseError("처리 상태를 받지 못했어요.");
+  const abort = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener("abort", abort, { once: true });
   const decoder = new TextDecoder();
   let buffer = "",
     bytes = 0,
@@ -83,8 +88,10 @@ export async function readAiResponse<T>(
     }
   }
   try {
+    if (signal?.aborted) throw new AiResponseError(streamErrors.ai_request_cancelled);
     while (true) {
       const { done, value } = await reader.read();
+      if (signal?.aborted) throw new AiResponseError(streamErrors.ai_request_cancelled);
       if (done) break;
       bytes += value.byteLength;
       if (bytes > 524288)
@@ -105,7 +112,9 @@ export async function readAiResponse<T>(
     if (error instanceof AiResponseError) throw error;
     throw new AiResponseError("연결이 끊겼어요. 같은 요청으로 다시 시도해 주세요.");
   } finally {
-    await reader.cancel().catch(() => undefined);
+    signal?.removeEventListener("abort", abort);
+    // Releasing UI state must not wait for a browser's network cancellation handshake.
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }
