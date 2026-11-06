@@ -2,6 +2,32 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
+test("saved shared schedule replies and followup dates display without creating a course", async ({ page }) => {
+  await fixtureLogin(page);
+  const posts: Record<string, unknown>[] = [];
+  await page.route("**/api/ai/planner**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] });
+    posts.push(route.request().postDataJSON());
+    const date = posts.length === 1 ? "2026-11-06" : "2026-11-07";
+    return route.fulfill({ json: {
+      reply: `${date} 공동 일정\n• 19:00 저녁 약속 — 샘플 식당\n  · 20:00 카페 — ${"긴 장소 주소 ".repeat(20)}\n• 미확정 초안: 주말 코스`,
+      plan: null, checks: [], tools: [{ name: "read_shared_schedule", status: "ok", count: 2 }],
+      context: { schedule_read: { basis: posts.length, date } }, version: posts.length,
+    } });
+  });
+  await page.goto("/plans/ai");
+  await page.getByRole("button", { name: "바로 대화", exact: true }).click();
+  await page.getByLabel("위투 AI에게 보낼 내용", { exact: true }).fill("오늘 일정 브리핑해줘");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(page.getByText(/2026-11-06 공동 일정/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "초안 저장", exact: true })).toHaveCount(0);
+  await page.getByLabel("위투 AI에게 보낼 내용", { exact: true }).fill("그럼 내일은?");
+  await page.getByRole("button", { name: "메시지 전송", exact: true }).click();
+  await expect(page.getByText(/2026-11-07 공동 일정/)).toBeVisible();
+  expect(posts).toHaveLength(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("related candidates disclose uncertainty and require an explicit choice", async ({ page }) => {
   await fixtureLogin(page);
   const posts: Record<string, unknown>[] = [];

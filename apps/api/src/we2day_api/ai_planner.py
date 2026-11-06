@@ -35,6 +35,7 @@ from we2day_api.ai_runtime import (
     bounded_response,
     with_disconnect,
 )
+from we2day_api.ai_saved_schedule import read_schedule, request_read
 from we2day_api.ai_search_followups import pending_promise, saved_refinement
 from we2day_api.ai_search_spec import current_anchor, saved_spec, search_queries
 from we2day_api.ai_stream import events
@@ -680,6 +681,22 @@ def _select_place(directive, session, context, previous_scope, latest, previous_
     )
 
 
+async def _finish_result(body, latest, answer, candidates, store, stats, lease):
+    if not body.conversation_id:
+        return SavedChatResult(**answer.model_dump(), candidates=candidates)
+    stored_result = answer.model_dump(mode="json")
+    if len(json.dumps(stored_result, ensure_ascii=False).encode()) > 32768:
+        raise HTTPException(422, "ai_context_too_long")
+    with stats.span("persist"):
+        saved = await store.rpc("finish_ai_planner_turn", {
+            "p_id": str(body.conversation_id), "p_request": str(body.request_id),
+            "p_lease": lease, "p_version": body.version, "p_user": latest,
+            "p_result": stored_result, "p_prompt": PROMPT_VERSION,
+        })
+    return SavedChatResult(**saved["result"], conversation_id=body.conversation_id,
+                           version=saved["version"], candidates=candidates)
+
+
 async def _chat(body, settings, store, client, budget, stats):
     lease = str(uuid4())
     acquired, finished = False, False
@@ -720,6 +737,21 @@ async def _chat(body, settings, store, client, budget, stats):
             proposal = PlanContent.model_validate(proposal) if proposal else None
         today = datetime.now(ZoneInfo("Asia/Seoul")).date()
         before_context = context.model_dump()
+        saved_request = None if body.brief else request_read(
+            latest, before_context, body.version, today
+        )
+        if saved_request:
+            reply, reports = await read_schedule(saved_request, store, stats)
+            # Keep the user's editing proposal/conditions separate from a viewed schedule date.
+            context.schedule_read = {"basis": body.version + 1, "date": saved_request.date}
+            stats.counts.update(server_responses=1, planned_tools=1, executed_tools=len(reports))
+            answer = ChatResult(reply=reply, tools=reports, context=context,
+                                prompt_version=PROMPT_VERSION, prompt_sha256=PROMPT_SHA256)
+            stats.stage("validate")
+            result = await _finish_result(body, latest, answer, [], store, stats, lease)
+            finished = True
+            return result
+        before_context.pop("schedule_read", None)
         if (
             context.intake
             and context.intake.pending
@@ -955,32 +987,9 @@ async def _chat(body, settings, store, client, budget, stats):
             dict.fromkeys(answer.checks + window_checks(answer.plan or proposal, context.intake))
         )[:16]
         candidates = session.visible_candidates()
-        if body.conversation_id:
-            stored_result = answer.model_dump(mode="json")
-            # Match the existing PostgreSQL JSONB text limit before attempting a commit.
-            if len(json.dumps(stored_result, ensure_ascii=False).encode()) > 32768:
-                raise HTTPException(422, "ai_context_too_long")
-            with stats.span("persist"):
-                saved = await store.rpc(
-                    "finish_ai_planner_turn",
-                    {
-                        "p_id": str(body.conversation_id),
-                        "p_request": str(body.request_id),
-                        "p_lease": lease,
-                        "p_version": body.version,
-                        "p_user": latest,
-                        "p_result": stored_result,
-                        "p_prompt": PROMPT_VERSION,
-                    },
-                )
-            finished = True
-            return SavedChatResult(
-                **saved["result"],
-                conversation_id=body.conversation_id,
-                version=saved["version"],
-                candidates=candidates,
-            )
-        return SavedChatResult(**answer.model_dump(), candidates=candidates)
+        result = await _finish_result(body, latest, answer, candidates, store, stats, lease)
+        finished = True
+        return result
     finally:
         # No business write after cancellation/deadline. Expiry recovers abandoned leases.
         if acquired and not finished:

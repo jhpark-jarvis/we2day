@@ -1,6 +1,7 @@
 """Small model-facing views; persistence and caller-scoped evidence remain intact."""
 
 import json
+import re
 
 from fastapi import HTTPException
 
@@ -56,7 +57,12 @@ def model_messages(system, body, context, scope, directive, session, proposal, t
     ]
     if proposal:
         messages.append({"role": "user", "content": model_proposal(proposal)})
-    history = [message.model_dump() for message in body.messages]
+    # Stored-schedule replies are server-rendered, not model evidence. The user's own
+    # explicit text remains intact; a later unrelated model turn must not export reads.
+    history = [message.model_dump() for message in body.messages if not (
+        message.role == "assistant"
+        and re.match(r"^\d{4}-\d{2}-\d{2} 공동 일정\n", message.content)
+    )]
     if body.brief:
         history[-1]["content"] = latest
     while (
