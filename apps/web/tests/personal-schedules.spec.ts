@@ -74,7 +74,8 @@ test("personal schedules share read access, restrict edits and keep independent 
       expect(await number.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
         "rgba(0, 0, 0, 0)",
       );
-      expect(await number.evaluate((el) => getComputedStyle(el).outlineWidth)).toBe("2px");
+      expect(await number.evaluate((el) => getComputedStyle(el).borderWidth)).toBe("1px");
+      expect(await number.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("none");
       const circle = await number.boundingBox();
       const dot = await day.locator(".day-personal-dot").boundingBox();
       if (!circle || !dot) throw new Error("calendar markers missing");

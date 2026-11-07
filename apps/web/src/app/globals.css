@@ -140,7 +140,7 @@ button { appearance: none; color: var(--foreground); }
 .calendar-day.has-event .day-number { background: color-mix(in srgb, var(--accent) 17%, var(--background)); }
 .calendar-day.sunday { color: #ac544b; }
 .calendar-day[aria-current="date"] .day-number { border: 1px solid var(--line); }
-.calendar-day[aria-pressed="true"] .day-number { outline: 2px solid var(--foreground); outline-offset: 2px; }
+.calendar-day[aria-pressed="true"] .day-number { border: 1px solid var(--control-border); }
 .calendar-caption { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 12px; color: var(--muted); font-size: 12px; }
 .calendar-legend { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px 18px; border-top: 0; border-bottom: 1px solid var(--line); padding: 12px 0 16px; list-style: none; }
 .calendar-legend > li { display: inline-flex; align-items: center; gap: 6px; }
