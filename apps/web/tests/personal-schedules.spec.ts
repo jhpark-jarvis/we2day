@@ -13,6 +13,7 @@ test("personal schedules share read access, restrict edits and keep independent 
   const open = async (view: Page, path: string) => {
     await view.waitForLoadState("networkidle");
     await view.goto(path);
+    await view.waitForLoadState("networkidle");
   };
   try {
     const partner = await context.newPage();
@@ -44,6 +45,7 @@ test("personal schedules share read access, restrict edits and keep independent 
     await expect(page.getByLabel("만날 장소 (선택)")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "코스 등록", exact: true })).toHaveCount(0);
     await page.getByLabel("일정 이름", { exact: true }).fill("개인 일정 합성 예시");
+    await page.locator('input[type="time"]').fill("10:00");
     const date = await page.getByLabel("날짜", { exact: true }).inputValue();
     await page.getByRole("button", { name: "일정 저장", exact: true }).click();
     await expect(page.getByRole("button", { name: /개인 일정 합성 예시/ })).toBeVisible();
@@ -51,20 +53,41 @@ test("personal schedules share read access, restrict edits and keep independent 
     await expect(day).toHaveClass(/has-personal/);
     expect(
       await day.locator(".day-label").evaluate((el) => getComputedStyle(el).textDecorationLine),
-    ).toBe("underline");
-    await expect(day.locator(".day-dot.has-event")).toHaveCount(0);
+    ).toBe("none");
+    await expect(day.locator(".day-personal-dot")).toBeVisible();
+    await expect(day).not.toHaveClass(/has-event/);
     await page.getByLabel("이 날 만났어요", { exact: true }).check();
     await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
     await expect(day.locator(".day-check")).toBeVisible();
+    await expect(page.locator(".agenda-meeting")).toHaveText("만난 날");
     await expect(day).toHaveAttribute("aria-label", /만난 날.*개인 일정 있음/);
     await page.getByRole("button", { name: "약속 추가하기", exact: true }).click();
     await page.getByLabel("약속 이름", { exact: true }).fill("공동 약속 합성 예시");
+    await page.locator('input[type="time"]').fill("14:00");
     await page.getByRole("button", { name: "약속 저장하기", exact: true }).click();
-    await expect(day.locator(".day-dot.has-event")).toHaveCount(1);
+    await expect(day).toHaveClass(/has-event/);
     await expect(day.locator(".day-check")).toBeVisible();
     await expect(day).toHaveClass(/has-personal/);
     for (const width of [320, 393, 1280]) {
       await page.setViewportSize({ width, height: 852 });
+      const number = day.locator(".day-number");
+      expect(await number.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
+        "rgba(0, 0, 0, 0)",
+      );
+      expect(await number.evaluate((el) => getComputedStyle(el).outlineWidth)).toBe("2px");
+      const circle = await number.boundingBox();
+      const dot = await day.locator(".day-personal-dot").boundingBox();
+      if (!circle || !dot) throw new Error("calendar markers missing");
+      expect(dot.y).toBeGreaterThan(circle.y + circle.height);
+      const agenda = page.getByRole("region", { name: "선택한 날짜의 약속", exact: true });
+      await expect(agenda.locator(".appointment-kind")).toHaveText(["개인", "데이트"]);
+      await expect(agenda.locator(".appointment-title")).toHaveText([
+        "개인 일정 합성 예시",
+        "공동 약속 합성 예시",
+      ]);
+      await expect(agenda.locator(".appointment-row time")).toHaveText(["10:00", "14:00"]);
+      await expect(agenda.getByRole("heading")).toHaveText(/\d+월 \d+일.*요일/);
+      await expect(agenda.getByRole("link", { name: /데이트 코스/ })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
@@ -101,7 +124,13 @@ test("personal schedules share read access, restrict edits and keep independent 
     await expect(page.getByRole("button", { name: /수정한 개인 일정/ })).toHaveCount(0);
     await expect(day).not.toHaveClass(/has-personal/);
     await expect(day.locator(".day-check")).toBeVisible();
-    await expect(day.locator(".day-dot.has-event")).toHaveCount(1);
+    await expect(day).toHaveClass(/has-event/);
+    await expect(day.locator(".day-personal-dot")).toHaveCount(0);
+    await page.getByLabel("이 날 만났어요", { exact: true }).uncheck();
+    await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
+    await expect(day.locator(".day-check")).toHaveCount(0);
+    await expect(page.locator(".agenda-meeting")).toHaveCount(0);
+    await expect(day).toHaveClass(/has-event/);
   } finally {
     await context.close();
   }

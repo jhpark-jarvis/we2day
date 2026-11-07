@@ -10,6 +10,7 @@ import {
   MapPin,
   Pencil,
   RefreshCw,
+  Route,
   Trash2,
   X,
 } from "lucide-react";
@@ -546,7 +547,7 @@ export function CalendarWorkspace({
                     !preview && meetings.some((meeting) => meeting.date === key && meeting.met);
                 return (
                   <button
-                    className={`calendar-day${(leading + i) % 7 === 0 ? " sunday" : ""}${hasMet ? " has-meeting" : ""}${hasPersonal ? " has-personal" : ""}`}
+                    className={`calendar-day${(leading + i) % 7 === 0 ? " sunday" : ""}${hasEvent ? " has-event" : ""}${hasMet ? " has-meeting" : ""}${hasPersonal ? " has-personal" : ""}`}
                     key={key}
                     type="button"
                     aria-label={`${month + 1}월 ${value}일${hasEvent ? ", 약속 있음" : ""}${hasMet ? ", 만난 날" : ""}${hasPersonal ? ", 개인 일정 있음" : ""}`}
@@ -566,20 +567,28 @@ export function CalendarWorkspace({
                       {hasMet && (
                         <Check className="day-check" size={12} strokeWidth={3} aria-hidden="true" />
                       )}
-                      <span
-                        className={`day-dot${hasEvent ? " has-event" : ""}`}
-                        aria-hidden="true"
-                      />
+                    </span>
+                    <span className="day-indicators" aria-hidden="true">
+                      {hasPersonal && <span className="day-personal-dot" />}
                     </span>
                   </button>
                 );
               })}
             </div>
-            <p className="calendar-caption">
-              {preview || status !== "ready"
-                ? "함께할 날들"
-                : "점은 공동 약속 · 밑줄은 개인 일정 · 체크는 만난 날"}
-            </p>
+            <ul className="calendar-caption calendar-legend" aria-label="달력 표시">
+              <li>
+                <span className="calendar-legend-date" aria-hidden="true" />
+                데이트
+              </li>
+              <li>
+                <span className="day-personal-dot" aria-hidden="true" />
+                개인
+              </li>
+              <li>
+                <Check size={13} aria-hidden="true" />
+                만난 날
+              </li>
+            </ul>
           </section>
           <div className="day-workspace">
             <section className="agenda" aria-label="선택한 날짜의 약속">
@@ -587,15 +596,25 @@ export function CalendarWorkspace({
                 <h2 aria-live="polite">
                   {month + 1}월 {day}일 <small>{weekday}요일</small>
                 </h2>
-                <span className="muted">일정 {dayEvents.length}</span>
-              </header>
-              {!preview && status === "ready" && (
-                <div className="calendar-toolbar agenda-actions">
-                  <Link className="text-button" href={`/today?date=${selected}`}>
-                    {selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
-                  </Link>
+                <div className="agenda-header-actions">
+                  {meetings.some((meeting) => meeting.date === selected && meeting.met) && (
+                    <span className="agenda-meeting">
+                      <Check size={14} aria-hidden="true" />
+                      만난 날
+                    </span>
+                  )}
+                  {!preview && status === "ready" && (
+                    <Link
+                      className="icon-button"
+                      href={`/today?date=${selected}`}
+                      aria-label={selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
+                      title={selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
+                    >
+                      <Route size={18} aria-hidden="true" />
+                    </Link>
+                  )}
                 </div>
-              )}
+              </header>
               {dayEvents.length ? (
                 dayEvents.map((event) => (
                   <button
@@ -604,15 +623,13 @@ export function CalendarWorkspace({
                     key={event.id}
                     onClick={() => setDetail(event)}
                   >
-                    <time>{event.time}</time>
-                    <span>
-                      <strong>{event.title}</strong>
-                      <small>
-                        {event.kind === "personal"
-                          ? `개인 일정 · ${names[event.created_by || ""] || "이름 미설정"}${event.note ? ` · ${event.note}` : ""}`
-                          : event.note}
-                      </small>
+                    <span
+                      className={`appointment-kind${event.kind === "personal" ? " personal" : ""}`}
+                    >
+                      {event.kind === "personal" ? "개인" : "데이트"}
                     </span>
+                    <time>{event.time}</time>
+                    <strong className="appointment-title">{event.title}</strong>
                     <ChevronRight size={16} aria-hidden="true" />
                   </button>
                 ))

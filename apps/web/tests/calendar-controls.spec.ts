@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("calendar controls center day labels independently of dots and keep refresh in its section", async ({
+test("calendar controls keep tinted day labels centered and refresh in its section", async ({
   page,
 }, testInfo) => {
   test.setTimeout(180_000);
@@ -33,9 +33,7 @@ test("calendar controls center day labels independently of dots and keep refresh
   await page.getByLabel("약속 이름").fill("달력 표시 확인용 예시");
   await page.getByRole("button", { name: "약속 저장하기", exact: true }).click();
   await expect(page.getByRole("button", { name: /달력 표시 확인용 예시/ })).toBeVisible();
-  await expect(
-    calendar.locator('.calendar-day[aria-current="date"] .day-dot.has-event'),
-  ).toHaveCount(1);
+  await expect(calendar.locator('.calendar-day[aria-current="date"]')).toHaveClass(/has-event/);
   await centered('.calendar-day[aria-current="date"]');
   await calendar.locator(".calendar-day").first().click();
   await centered('.calendar-day[aria-pressed="true"]');
@@ -87,15 +85,18 @@ test("calendar controls center day labels independently of dots and keep refresh
   await selectedDay.press("Tab");
   await expect(selectedDay).not.toBeFocused();
   await page.goto("/?date=2024-02-29");
+  await page.waitForLoadState("networkidle");
   await selectedDay.focus();
   await selectedDay.press("Shift+PageDown");
   await expect(selectedDay).toHaveAttribute("data-date", "2025-02-28");
   await expect(selectedDay).toBeFocused();
   await page.goto("/?date=2000-01-01");
+  await page.waitForLoadState("networkidle");
   await selectedDay.focus();
   await selectedDay.press("ArrowLeft");
   await expect(selectedDay).toHaveAttribute("data-date", "2000-01-01");
   await page.goto("/?date=2100-12-31");
+  await page.waitForLoadState("networkidle");
   await selectedDay.focus();
   await selectedDay.press("ArrowRight");
   await expect(selectedDay).toHaveAttribute("data-date", "2100-12-31");
