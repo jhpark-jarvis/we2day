@@ -5,7 +5,9 @@ import json
 
 from fastapi import HTTPException
 
-STAGES = frozenset({"accepted", "context", "model", "search", "tools", "validate", "persist"})
+STAGES = frozenset(
+    {"accepted", "context", "model", "selection_repair", "search", "tools", "validate", "persist"}
+)
 
 
 def frame(event, data):

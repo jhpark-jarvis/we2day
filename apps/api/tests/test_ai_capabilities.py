@@ -121,9 +121,9 @@ class Flow:
 
         monkeypatch.setattr(ai_planner, "ToolIO", IO)
 
-    async def send(self, text, *calls, status=None, selected=None):
+    async def send(self, text, *calls, status=None, selected=None, responses=None):
         self.history.append({"role": "user", "content": text})
-        self.replies = [status or native(*calls)]
+        self.replies = list(responses) if responses is not None else [status or native(*calls)]
 
         def provider(request):
             data = json.loads(request.content)
@@ -312,9 +312,17 @@ def test_explicit_saved_plan_title_is_read_and_rendered_locally(monkeypatch):
 )
 def test_unavailable_functions_and_ungrounded_ids_never_access_data(monkeypatch, name, args):
     flow = Flow(monkeypatch)
-    r = asyncio.run(flow.send("알아서 해줘", (name, args)))
-    assert not flow.reads and r.plan is None
-    assert flow.stats[-1]["model_calls"] == 1
+    if name == "read_shared_plan":
+        r = asyncio.run(flow.send("알아서 해줘", (name, args)))
+        assert r.plan is None
+    else:
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(
+                flow.send("알아서 해줘", responses=[native((name, args)), native((name, args))])
+            )
+        assert error.value.detail == "ai_selection_failed"
+    assert not flow.reads and not flow.queries
+    assert len(flow.models) == (2 if name == "read_shared_calendar" else 1)
 
 
 @pytest.mark.parametrize("field", ["unsupported", "save", "selection"])
@@ -360,8 +368,10 @@ def test_selector_does_not_use_assistant_or_private_context_extras(monkeypatch):
 )
 def test_untyped_or_truncated_selection_does_not_claim_execution(monkeypatch, response):
     flow = Flow(monkeypatch)
-    r = asyncio.run(flow.send("오늘 뭐 잡혔어", status=response))
-    assert "구분하지 못" in r.reply and not flow.reads
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(flow.send("오늘 뭐 잡혔어", responses=[response, response]))
+    assert error.value.detail == "ai_selection_failed" and not flow.reads
+    assert len(flow.models) == 2 and flow.store.version == 0
 
 
 def test_weather_and_private_read_do_not_mix_model_projections(monkeypatch):
@@ -469,8 +479,10 @@ def test_duplicate_calls_execute_once_and_conflicting_calls_do_not_read(monkeypa
     r = asyncio.run(flow.send("오늘 약속", call, call))
     assert r.tools[0]["status"] == "ok" and len(flow.reads) == 2
     flow.reads.clear()
-    r = asyncio.run(flow.send("오늘 약속", call, ("ask_user", {"field": "target"})))
-    assert "구분하지 못" in r.reply and not flow.reads
+    conflict = native(call, ("ask_user", {"field": "target"}))
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(flow.send("오늘 약속", responses=[conflict, conflict]))
+    assert error.value.detail == "ai_selection_failed" and not flow.reads
 
 
 def test_native_selection_cancellation_releases_lease_without_completion(monkeypatch):

@@ -12,20 +12,28 @@ const server = http.createServer(async (req, res) => {
     const item = pending.get(mode);
     res.setHeader("Content-Type", "application/json");
     if (url.pathname === "/fixture/state")
-      return res.end(JSON.stringify({ pending: Boolean(item), closed: closed.has(mode) }));
+      return res.end(
+        JSON.stringify({
+          pending: Boolean(item),
+          closed: closed.has(mode),
+          request_id: item?.body.request_id,
+        }),
+      );
     if (!item) {
       res.statusCode = 409;
       return res.end("{}");
     }
     if (url.pathname === "/fixture/advance") {
       const stage = url.searchParams.get("stage");
-      if (!["model", "validate", "persist"].includes(stage)) {
+      if (!["model", "selection_repair", "validate", "persist"].includes(stage)) {
         res.statusCode = 422;
         return res.end("{}");
       }
       item.res.write(frame("progress", { stage }));
     } else if (url.pathname === "/fixture/finish") {
       if (mode === "실패") item.res.end(frame("error", { code: "ai_timeout", status: 503 }));
+      else if (mode === "선택오류")
+        item.res.end(frame("error", { code: "ai_selection_failed", status: 502 }));
       else if (mode === "끊김") item.res.destroy();
       else {
         const result = {
@@ -68,7 +76,7 @@ const server = http.createServer(async (req, res) => {
   const body = raw.length ? JSON.parse(raw.toString()) : null;
   const mode = body?.messages
     ?.at(-1)
-    ?.content?.match(/^합성 SSE (정상|실패|끊김|중단|구버전)$/)?.[1];
+    ?.content?.match(/^합성 SSE (정상|실패|선택오류|끊김|중단|구버전)$/)?.[1];
   if (req.url === "/ai/planner" && mode) {
     if (
       req.headers.accept !== "text/event-stream" ||

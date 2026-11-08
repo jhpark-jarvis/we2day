@@ -2,6 +2,7 @@ export const AI_STAGES = {
   accepted: "요청을 받았어요.",
   context: "이전 대화와 조건을 확인하고 있어요.",
   model: "조건에 맞춰 답변을 구성하고 있어요.",
+  selection_repair: "요청을 다시 확인하고 있어요.",
   search: "네이버에서 장소 후보를 검색하고 있어요.",
   tools: "필요한 정보를 확인하고 있어요.",
   validate: "장소 근거와 코스 조건을 검사하고 있어요.",
@@ -24,6 +25,7 @@ const streamErrors: Record<string, string> = {
   version_conflict: "다른 곳에서 대화가 바뀌었어요. 대화 내역을 다시 열어 주세요.",
   ai_context_too_long: "대화가 길어요. 필요한 초안을 저장하고 새 대화를 시작해 주세요.",
   ai_invalid_response: "답변을 확인하지 못했어요. 같은 요청으로 다시 시도해 주세요.",
+  ai_selection_failed: "요청을 처리하지 못했어요. 다시 시도해 주세요.",
 };
 
 export async function readAiResponse<T>(

@@ -807,10 +807,7 @@ async def _chat(body, settings, store, client, budget, stats):
                 body, before_context, proposal, today, settings, client, budget, stats
             )
             if selection.invalid:
-                return await terminal(
-                    "요청한 작업을 구분하지 못했어요. 날짜나 원하는 작업을 조금 더 알려주세요.",
-                    [],
-                )
+                raise HTTPException(502, "ai_selection_failed")
             private_replies, private_reports, pending = await execute_reads(
                 selection, latest, before_context, body.version, today, store, stats
             )

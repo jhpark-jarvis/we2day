@@ -87,7 +87,9 @@ CAPABILITIES = (
         "places.search",
         "search_places",
         "장소 후보 검색. exact_name은 사용자 고유 이름(name), category/nearby는 "
-        "원문 목표 query·업종kind·사용자가 알려준 지역area. 지역 모르면 빈값. 영업 미확인.",
+        "모든 원문 목표를 targets 배열로 전달, query는 첫 목표. "
+        "업종kind(분류 없으면 any)·사용자가 알려준 지역area. "
+        "현재 활동 주변 검색도 이 도구: anchor_ref에 해당 활동ref, 지역 모르면 빈값. 영업 미확인.",
         "read",
         "public",
         "session",
@@ -125,7 +127,8 @@ CAPABILITIES = (
         "continue_planning",
         "현재 제안의 시간/비용/순서/장소 수정, 선택/되묻기 답변/재시도, 잡담·사용법. "
         "기능 설명·무엇을 할 수 있는지 묻는 질문도 포함. "
-        "일정 DB 조회와 장소검색은 해당 도구 사용. 업무 저장은 사용자 버튼.",
+        "새 장소 후보/활동 주변 검색은 search_places. 일정 DB 조회도 해당 도구 사용. "
+        "조건 질문의 답변/기존 검색 재시도는 계속 처리. 업무 저장은 사용자 버튼.",
         "control",
         "current",
         "planner",

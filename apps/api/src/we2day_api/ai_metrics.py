@@ -7,6 +7,8 @@ import re
 import sys
 from collections import Counter
 
+from we2day_api.ai_selection import ERRORS, FIELDS
+
 COUNTERS = {
     "selection_invalid",
     "model_calls",
@@ -30,6 +32,28 @@ COUNTERS = {
     "executed_tools",
     "control_version",
     "optional_normalizations",
+    "selection_attempts",
+    "selection_valid",
+    "selection_first_valid",
+    "selection_first_invalid",
+    "selection_repair_attempts",
+    "selection_repaired",
+    "selection_failed",
+}
+COUNTERS |= {"selection_error_" + name for name in ERRORS}
+COUNTERS |= {"selection_field_" + name for name in FIELDS}
+COUNTERS |= {
+    "selection_tool_" + name
+    for name in (
+        "read_shared_calendar",
+        "read_shared_plan",
+        "search_places",
+        "lookup_selected_places",
+        "get_weather",
+        "propose_course",
+        "continue_planning",
+        "ask_user",
+    )
 }
 CATEGORIES = {
     "ai_timeout",
@@ -38,6 +62,7 @@ CATEGORIES = {
     "ai_rate_limited",
     "ai_unavailable",
     "ai_invalid_response",
+    "ai_selection_failed",
     "ai_context_too_long",
     "version_conflict",
 }
@@ -106,10 +131,27 @@ def aggregate(lines, *, limit=100_000):
         statuses, counts = dict(group["statuses"]), dict(group["counts"])
         requests = sum(statuses.values())
         searches = counts.get("search_calls", 0)
+        selections = counts.get("selection_first_valid", 0) + counts.get(
+            "selection_first_invalid", 0
+        )
         result[version] = {
             "requests": requests,
             "statuses": statuses,
             "success_rate": round(statuses.get("ok", 0) / requests, 4),
+            # Legacy field retained for monitors; neither rate is semantic task accuracy.
+            "processing_success_rate": round(statuses.get("ok", 0) / requests, 4),
+            "selection": {
+                "requests": selections,
+                "first_valid_rate": round(counts.get("selection_first_valid", 0) / selections, 4)
+                if selections
+                else None,
+                "final_valid_rate": round(counts.get("selection_valid", 0) / selections, 4)
+                if selections
+                else None,
+                "repair_attempts": counts.get("selection_repair_attempts", 0),
+                "recovered": counts.get("selection_repaired", 0),
+                "failed": counts.get("selection_failed", 0),
+            },
             "latency_ms": {
                 "observations": len(group["ms"]),
                 "p50": percentile(group["ms"], 0.5),

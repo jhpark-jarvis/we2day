@@ -1,12 +1,13 @@
 """One bounded native tool-selection call, before any shared-business read."""
 
 import json
-from dataclasses import dataclass, field
+import time
 from datetime import date
+from typing import Annotated
 
 import httpx
 from fastapi import HTTPException
-from pydantic import Field, ValidationError
+from pydantic import ConfigDict, Field
 
 from we2day_api.ai_capabilities import (
     BY_NAME,
@@ -20,19 +21,39 @@ from we2day_api.ai_control import Action, apply_action
 from we2day_api.ai_control import prepare as prepare_control
 from we2day_api.ai_location import pending_location
 from we2day_api.ai_model import model_parameters
-from we2day_api.ai_place_policy import SearchArguments, norm
+from we2day_api.ai_place_policy import SearchArguments, norm, relational_area
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_saved_schedule import schedule_date
+from we2day_api.ai_search_spec import referenced_anchor
+from we2day_api.ai_selection import REPAIRABLE, Selection, parse_selection, record_selection
 from we2day_api.ai_tools import EmptyArguments, WeatherArguments
 from we2day_api.prompt_bundle import PROMPT
 
 
 class PlaceSelectionArguments(SearchArguments):
+    # Older stored/internal selections still parse query-only. New model requests
+    # must supply all targets in one call, independent of parallel-call support.
+    model_config = ConfigDict(
+        extra="forbid", strict=True, json_schema_extra={"required": ["query", "targets"]}
+    )
     query: str = Field(
         min_length=1,
-        max_length=100,
+        max_length=50,
         description=(
             "검색할 장소·음식·시설 이름의 짧은 명사구. 먹을/마실/갈 만한 곳·요청 동사·지역 제외."
+        ),
+    )
+    anchor_ref: str = Field(
+        default="",
+        pattern=r"^(?:activity_[1-8])?$",
+        description="현재 요청이 참조한 current_proposal 활동의 ref. 지역명 아님. 모호하면 빈 값.",
+    )
+    targets: list[Annotated[str, Field(min_length=1, max_length=50)]] = Field(
+        default_factory=list,
+        max_length=4,
+        description=(
+            "현재 요청의 장소·음식·시설 명사구 전부. "
+            "여러 목표는 각각 원소로, query는 첫 원소. 정확명은 이름 하나만."
         ),
     )
 
@@ -47,13 +68,6 @@ MODELS = {
     "continue_planning": EmptyArguments,
     "ask_user": ClarifyArguments,
 }
-
-
-@dataclass
-class Selection:
-    calls: list[tuple[str, dict]] = field(default_factory=list)
-    invalid: bool = False
-    invalid_reason: str = ""
 
 
 def direct_request(body, context, proposal, today):
@@ -105,7 +119,8 @@ def selection_messages(body, context, proposal, today):
             "date": proposal.date,
             "budget": proposal.budget,
             "activities": [
-                {"title": a.title, "time": a.time, "place": a.place} for a in proposal.activities
+                {"ref": f"activity_{i + 1}", "title": a.title, "time": a.time, "place": a.place}
+                for i, a in enumerate(proposal.activities)
             ],
         }
         if proposal
@@ -117,7 +132,9 @@ def selection_messages(body, context, proposal, today):
     ]
 
 
-async def select(body, context, proposal, today, settings, client, budget, stats):
+async def _select_once(
+    body, context, proposal, today, settings, client, budget, stats, *, seconds, repair=None
+):
     inputs = {
         **model_parameters(settings),
         "messages": selection_messages(body, context, proposal, today),
@@ -126,6 +143,24 @@ async def select(body, context, proposal, today, settings, client, budget, stats
         "temperature": 0,
         "max_tokens": 768,
     }
+    if repair:
+        # Fixed categories/field names only; never feed rejected arguments back to the model.
+        inputs["messages"].append(
+            {
+                "role": "system",
+                "content": json.dumps(
+                    {
+                        "selection_retry": repair.invalid_reason,
+                        "invalid_fields": repair.invalid_fields,
+                        "instruction": (
+                            "Return a valid selection for the SAME current request. "
+                            "Follow the supplied schemas and permitted combinations. "
+                            "Do not invent missing user facts."
+                        ),
+                    }
+                ),
+            }
+        )
     encoded = json.dumps(inputs, ensure_ascii=False, separators=(",", ":")).encode()
     if len(encoded) > 48000 or stats.counts.get("model_calls", 0) >= 3:
         raise HTTPException(422, "ai_context_too_long")
@@ -133,13 +168,15 @@ async def select(body, context, proposal, today, settings, client, budget, stats
     stats.counts["request_bytes"] += len(encoded)
     try:
         with stats.span("model"):
+            if repair:
+                stats.stage("selection_repair")
             status, raw = await bounded_response(
                 client,
                 "POST",
                 f"https://api.cloudflare.com/client/v4/accounts/{settings.cloudflare_account_id}/ai/v1/chat/completions",
                 budget,
                 limit=16000,
-                seconds=18,
+                seconds=seconds,
                 content=encoded,
                 headers={
                     "Authorization": f"Bearer {settings.cloudflare_api_token}",
@@ -164,41 +201,45 @@ async def select(body, context, proposal, today, settings, client, budget, stats
     try:
         payload = json.loads(raw)
         result = payload.get("result", payload)
-        stats.usage(result)
-        choice = result["choices"][0]
-        if choice.get("finish_reason") == "length":
-            raise ValueError("Incomplete capability selection")
-        calls = choice["message"].get("tool_calls") or []
-        if not 1 <= len(calls) <= 4:
-            raise ValueError("A typed tool selection is required")
-        selected = Selection()
-        seen = set()
-        for call in calls:
-            fn = call["function"]
-            name, arguments = fn["name"], fn.get("arguments", {})
-            if name not in MODELS or (BY_NAME[name].selected_required and not body.selected_places):
-                raise ValueError("Capability unavailable")
-            args = (
-                MODELS[name].model_validate_json(arguments)
-                if isinstance(arguments, str)
-                else MODELS[name].model_validate(arguments)
-            ).model_dump()
-            key = name, json.dumps(args, sort_keys=True)
-            if key not in seen:
-                seen.add(key)
-                selected.calls.append((name, args))
-        # A route cannot both ask/continue and silently execute unrelated work.
-        if len(selected.calls) > 1 and any(
-            n in {"ask_user", "continue_planning", "propose_course"} for n, _ in selected.calls
-        ):
-            raise ValueError("Conflicting task selection")
-        return selected
-    except ValidationError:
-        stats.counts["selection_invalid"] = 1
-        return Selection(invalid=True, invalid_reason="arguments")
-    except (ValueError, TypeError, KeyError, IndexError):
-        stats.counts["selection_invalid"] = 1
-        return Selection(invalid=True, invalid_reason="shape")
+        if isinstance(result, dict):
+            stats.usage(result)
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return parse_selection(raw, MODELS, BY_NAME, selected=bool(body.selected_places))
+
+
+async def select(body, context, proposal, today, settings, client, budget, stats) -> Selection:
+    deadline = time.monotonic() + 18
+    selection = await _select_once(
+        body, context, proposal, today, settings, client, budget, stats, seconds=18
+    )
+    record_selection(stats, selection, attempt=0, names=MODELS)
+    # Leave one of the three calls and its normal completion time for the actual task.
+    if (
+        selection.invalid
+        and selection.invalid_reason in REPAIRABLE
+        and stats.counts.get("model_calls", 0) < 2
+        and deadline - time.monotonic() >= 2
+        and budget.remaining() >= 30
+    ):
+        stats.counts["selection_repair_attempts"] = 1
+        stats.stage("selection_repair")
+        selection = await _select_once(
+            body,
+            context,
+            proposal,
+            today,
+            settings,
+            client,
+            budget,
+            stats,
+            seconds=deadline - time.monotonic(),
+            repair=selection,
+        )
+        record_selection(stats, selection, attempt=1, names=MODELS)
+    if selection.invalid:
+        stats.counts["selection_failed"] = 1
+    return selection
 
 
 def apply_selection(selection, decision, latest):
@@ -212,8 +253,18 @@ def apply_selection(selection, decision, latest):
         if action.operation != "plan":
             raise ValueError("Only a current proposal may be requested")
     else:
-        targets, area = [], ""
+        targets, area, anchor = [], "", ""
         for args in searches:
+            ref = args.get("anchor_ref", "")
+            if ref:
+                index, required = referenced_anchor(latest, decision.proposal)
+                if not required or index is None or ref != f"activity_{index + 1}":
+                    raise ValueError("Ungrounded activity reference")
+                if anchor and anchor != ref:
+                    raise ValueError("Conflicting anchors")
+                anchor = ref
+            if relational_area(args["area"]):
+                args = {**args, "area": ""}
             query = (
                 (args["name"] or args["query"]) if args["mode"] == "exact_name" else args["query"]
             )
@@ -222,15 +273,22 @@ def apply_selection(selection, decision, latest):
                 outside_name = latest.replace(query, "") + " " + decision.context.get("region", "")
                 if norm(args["area"]) not in norm(outside_name):
                     args = {**args, "area": ""}
+            requested = args.get("targets") or [query]
+            if args["mode"] == "exact_name":
+                if len(requested) != 1:
+                    raise ValueError("Exact name requires one target")
+                requested = [query]
             if args["area"]:
                 if area and norm(area) != norm(args["area"]):
                     raise ValueError("Conflicting areas")
                 area = args["area"]
-                query = query.replace(area, "").strip()
-            if not query or len(query) > 50:
-                raise ValueError("Invalid target")
-            targets.append(query)
-        action = Action(operation="search", area=area, targets=targets)
+            for target in requested:
+                target = target.replace(args["area"], "").strip() if args["area"] else target
+                if not target or len(target) > 50:
+                    raise ValueError("Invalid target")
+                if target not in targets:
+                    targets.append(target)
+        action = Action(operation="search", area=area, targets=targets, anchor_ref=anchor)
     apply_action(decision, latest, action)
     decision.interpret = False
 

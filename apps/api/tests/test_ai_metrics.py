@@ -72,3 +72,29 @@ def test_runtime_error_categories_are_fixed_and_never_reflect_details(caplog):
     assert aggregate(caplog.text.splitlines())["versions"][VERSION]["error_categories"] == {
         "ai_provider_limited": 1
     }
+
+
+def test_processing_and_selection_rates_are_not_reported_as_task_accuracy():
+    value = aggregate(
+        [
+            line(selection_first_valid=1, selection_valid=1),
+            line(
+                selection_first_invalid=1,
+                selection_valid=1,
+                selection_repair_attempts=1,
+                selection_repaired=1,
+            ),
+            line(
+                status=502,
+                selection_first_invalid=1,
+                selection_failed=1,
+                error_category="ai_selection_failed",
+            ),
+            line(server_responses=1),
+        ]
+    )["versions"][VERSION]
+    assert value["selection"]["first_valid_rate"] == 0.3333
+    assert value["selection"]["final_valid_rate"] == 0.6667
+    assert value["selection"]["recovered"] == 1 and value["selection"]["failed"] == 1
+    assert value["processing_success_rate"] == 0.75
+    assert "task_accuracy" not in value

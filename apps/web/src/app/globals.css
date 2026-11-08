@@ -816,7 +816,7 @@ body:has(.appointment-delete-dialog[open]) { overflow: hidden; }
 .we2-speaker { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .74rem; margin-bottom: 7px; }
 .we2-status { height:44px; flex-shrink:0; display:flex; align-items:center; gap:6px; padding-inline:16px; color:var(--muted); font-size:.76rem; overflow-y:auto; }
 .we2-status > span { display:flex; align-items:center; gap:6px; }
-.we2-status p { flex:1; min-width:0; margin:0; line-height:1.6; overflow-wrap:anywhere; }
+.we2-status p { flex:1; min-width:0; max-height:100%; margin:0; line-height:1.6; overflow-wrap:anywhere; overflow-y:auto; overscroll-behavior:contain; }
 .we2-status.has-error { color:var(--accent); }
 .we2-status .icon-button { flex-shrink:0; }
 .we2-input-area { flex-shrink:0; padding:0 16px 12px; }

@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import type { PlanningBrief } from "../src/lib/ai-intake";
 import type { PlanContent } from "../src/lib/plans";
 
-test("saved shared schedule replies and followup dates display without creating a course", async ({ page }) => {
+test("saved shared schedule replies and followup dates display without creating a course", async ({
+  page,
+}) => {
   await fixtureLogin(page);
   const posts: Record<string, unknown>[] = [];
   await page.route("**/api/ai/planner**", async (route) => {
@@ -10,11 +12,18 @@ test("saved shared schedule replies and followup dates display without creating 
     posts.push(route.request().postDataJSON());
     const date = posts.length === 1 ? "2026-11-06" : "2026-11-07";
     const named = posts.length === 3;
-    return route.fulfill({ json: {
-      reply: `${named ? "저장 플랜 조회\n" : ""}${date} 공동 일정\n• 19:00 저녁 약속 — 샘플 식당\n  · 20:00 카페 — ${"긴 장소 주소 ".repeat(20)}\n• 미확정 초안: 주말 코스`,
-      plan: null, checks: [], tools: [{ name: named ? "read_shared_plan" : "read_shared_schedule", status: "ok", count: 2 }],
-      context: { schedule_read: { basis: posts.length, date } }, version: posts.length,
-    } });
+    return route.fulfill({
+      json: {
+        reply: `${named ? "저장 플랜 조회\n" : ""}${date} 공동 일정\n• 19:00 저녁 약속 — 샘플 식당\n  · 20:00 카페 — ${"긴 장소 주소 ".repeat(20)}\n• 미확정 초안: 주말 코스`,
+        plan: null,
+        checks: [],
+        tools: [
+          { name: named ? "read_shared_plan" : "read_shared_schedule", status: "ok", count: 2 },
+        ],
+        context: { schedule_read: { basis: posts.length, date } },
+        version: posts.length,
+      },
+    });
   });
   await page.goto("/plans/ai");
   await page.getByRole("button", { name: "바로 대화", exact: true }).click();
@@ -30,7 +39,9 @@ test("saved shared schedule replies and followup dates display without creating 
   await expect(page.getByText(/저장 플랜 조회/)).toBeVisible();
   await expect(page.getByRole("button", { name: "초안 저장", exact: true })).toHaveCount(0);
   expect(posts).toHaveLength(3);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.screenshot({ path: test.info().outputPath("shared-read.png"), fullPage: true });
 });
 
@@ -276,8 +287,9 @@ test("a pending anchor replaces old candidates even when the category and area s
 test("real BFF streams progress before a final card response and keeps failures recoverable", async ({
   page,
   request,
-}) => {
+}, testInfo) => {
   test.setTimeout(180_000);
+  const initialViewport = page.viewportSize();
   await fixtureLogin(page);
   await page.goto("/plans/ai");
   await page.getByRole("button", { name: "바로 대화", exact: true }).click();
@@ -291,6 +303,7 @@ test("real BFF streams progress before a final card response and keeps failures 
   await expect(page.locator(".we2-assistant")).toHaveCount(0);
   for (const [stage, label] of [
     ["model", "답변을 구성"],
+    ["selection_repair", "요청을 다시 확인"],
     ["validate", "코스 조건을 검사"],
     ["persist", "결과를 저장"],
   ]) {
@@ -321,7 +334,8 @@ test("real BFF streams progress before a final card response and keeps failures 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await dialog.getByRole("button", { name: "장소 후보 닫기", exact: true }).click();
   await expect(input).toHaveValue("후보 선택과 별개인 미전송 입력");
-  for (const mode of ["실패", "끊김", "중단"]) {
+  if (initialViewport) await page.setViewportSize(initialViewport);
+  for (const mode of ["실패", "선택오류", "끊김", "중단"]) {
     await input.fill(`합성 SSE ${mode}`);
     await input.press("Enter");
     await expect(page.getByRole("status")).toContainText("네이버에서 장소 후보를 검색하고 있어요.");
@@ -330,12 +344,27 @@ test("real BFF streams progress before a final card response and keeps failures 
     await expect(page.locator(".we2-status [role=alert]")).toContainText(
       mode === "실패"
         ? "오래 걸려 중단"
-        : mode === "끊김"
-          ? "연결이 끊겼어요"
-          : "요청을 중단했어요",
+        : mode === "선택오류"
+          ? "요청을 처리하지 못했어요"
+          : mode === "끊김"
+            ? "연결이 끊겼어요"
+            : "요청을 중단했어요",
     );
     await expect(input).toHaveValue(`합성 SSE ${mode}`);
     await expect(page.getByRole("button", { name: "메시지 다시 전송", exact: true })).toBeEnabled();
+    if (mode === "선택오류") {
+      const alert = page.locator(".we2-status [role=alert]");
+      expect(await alert.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(
+        true,
+      );
+      await input.evaluate((element) => element.blur());
+      await page.screenshot({ path: testInfo.outputPath("selection-failure.png") });
+      await page.getByRole("button", { name: "메시지 다시 전송", exact: true }).click();
+      await expect(page.getByRole("status")).toContainText("네이버에서 장소 후보를 검색");
+      await request.post(`http://127.0.0.1:8101/fixture/finish?case=${mode}`);
+      await expect(page.locator(".we2-status [role=alert]")).toContainText("처리하지 못했어요");
+      await expect(input).toHaveValue(`합성 SSE ${mode}`);
+    }
     await expect
       .poll(
         async () =>

@@ -16,6 +16,7 @@ const errors: Record<string, string> = {
   ai_request_cancelled: "대화 요청을 중단했어요.",
   ai_unavailable: "AI에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
   ai_invalid_response: "답변을 완성하지 못했어요. 요청을 짧게 나눠 다시 시도해 주세요.",
+  ai_selection_failed: "요청을 처리하지 못했어요. 다시 시도해 주세요.",
   agent_connection_limit: "사용 가능한 연결 키는 최대 5개예요. 기존 키를 폐기해 주세요.",
   invalid_agent_connection: "연결 이름을 1~60자로 입력해 주세요.",
   agent_connection_not_found: "연결 키를 찾지 못했어요. 목록을 새로고침해 주세요.",
