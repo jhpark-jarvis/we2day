@@ -488,7 +488,14 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         and not re.search(r"(?:코스|플랜).{0,10}(?:만들지|짜지|반영하지|아직|말고|나중)", clause)
         for clause in re.split(r"[.!?\n]", positive)
     )
-    edit_request = bool(re.search(r"바꿔|바꾸|변경|수정|고쳐|으로\s*해\s*줘|로\s*해\s*줘", text))
+    labeled_title = re.fullmatch(
+        r"\s*(?:제목|(?:코스|플랜)\s*(?:이름|명칭))\s*[:：]\s*([^\n]{1,100}?)\s*", text
+    )
+    edit_request = bool(
+        re.search(r"바꿔|바꾸|변경|수정|고쳐|으로\s*해\s*줘|로\s*해\s*줘", text)
+        or proposal
+        and labeled_title
+    )
     adding = bool(
         proposal
         and re.search(r"추가|넣어|포함", positive)
@@ -744,7 +751,9 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
                 changed = True
         if title_field or pending_field == "title":
             match = re.search(r"[\"'‘“]([^\"'’”]{1,100})[\"'’”]", text)
-            if match:
+            if labeled_title:
+                title = labeled_title[1].strip(" '\"‘’“”")
+            elif match:
                 title = match[1]
             else:
                 match = re.search(

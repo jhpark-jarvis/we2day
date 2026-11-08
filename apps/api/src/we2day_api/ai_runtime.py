@@ -13,6 +13,10 @@ from we2day_api.data import DataAPI, data_response
 from we2day_api.timing import current_timings
 from we2day_api.upstream import BorrowedAsyncTransport
 
+MODEL_ROLES = frozenset(
+    {"selection", "selection_repair", "interpretation", "relevance", "completion"}
+)
+
 
 class RunStats:
     def __init__(self, version, progress=None):
@@ -42,12 +46,31 @@ class RunStats:
             if timing:
                 timing.add("ai_" + label, elapsed)
 
-    def usage(self, payload):
+    @contextmanager
+    def inference(self, role):
+        if role not in MODEL_ROLES:
+            raise ValueError("Invalid inference role")
+        key = f"{role}_model_calls"
+        self.counts[key] = self.counts.get(key, 0) + 1
+        start = time.monotonic()
+        try:
+            with self.span("model"):
+                yield
+        finally:
+            key = f"model_{role}"
+            self.durations[key] = self.durations.get(key, 0) + (time.monotonic() - start) * 1000
+
+    def usage(self, payload, *, role=None):
+        if role is not None and role not in MODEL_ROLES:
+            raise ValueError("Invalid inference role")
         usage = payload.get("usage", {})
         for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
             value = usage.get(key) if isinstance(usage, dict) else None
             if type(value) is int and 0 <= value <= 2_147_483_647:
                 self.counts[key] = self.counts.get(key, 0) + value
+                if role:
+                    scoped = f"{role}_{key}"
+                    self.counts[scoped] = self.counts.get(scoped, 0) + value
         details = usage.get("prompt_tokens_details", {}) if isinstance(usage, dict) else {}
         cached = details.get("cached_tokens") if isinstance(details, dict) else None
         if type(cached) is int and 0 <= cached <= 2_147_483_647:

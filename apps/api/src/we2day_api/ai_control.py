@@ -555,7 +555,7 @@ async def interpret(control, latest, settings, client, budget, stats):
     encoded = json.dumps(inputs, ensure_ascii=False, separators=(",", ":")).encode()
     stats.counts["request_bytes"] += len(encoded)
     try:
-        with stats.span("model"):
+        with stats.inference("interpretation"):
             status, raw = await bounded_response(
                 client,
                 "POST",
@@ -579,7 +579,7 @@ async def interpret(control, latest, settings, client, budget, stats):
         )
     try:
         payload = json.loads(raw)
-        stats.usage(payload)
+        stats.usage(payload, role="interpretation")
         if payload["choices"][0].get("finish_reason") == "length":
             raise ValueError("Incomplete interpretation")
         value = payload["choices"][0]["message"]["content"]

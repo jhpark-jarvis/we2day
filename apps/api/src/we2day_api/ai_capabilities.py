@@ -1,9 +1,13 @@
 """Static capability contracts. Caller data and authorization are never cached here."""
 
+import json
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from we2day_api.ai_wire import compact_schema
 
 
 class CalendarReadArguments(BaseModel):
@@ -217,17 +221,29 @@ def model_result(name, data):
     return {**data, **result.model_dump()}
 
 
+@lru_cache(maxsize=8)
+def _definition_json(models):
+    """Only static classes/metadata; no caller, selected IDs or business data."""
+    return {
+        name: json.dumps(
+            compact_schema(model.model_json_schema()), ensure_ascii=False, separators=(",", ":")
+        )
+        for name, model in models
+    }
+
+
 def definitions(models, names=None, *, selected=True):
     selected_names = set(models) if names is None else set(names)
     if selected_names - BY_NAME.keys():
         raise ValueError("Unregistered capability")
+    templates = _definition_json(tuple(models.items()))
     return [
         {
             "type": "function",
             "function": {
                 "name": c.name,
                 "description": c.description,
-                "parameters": models[c.name].model_json_schema(),
+                "parameters": json.loads(templates[c.name]),
             },
         }
         for c in CAPABILITIES

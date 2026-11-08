@@ -7,6 +7,7 @@ import re
 import sys
 from collections import Counter
 
+from we2day_api.ai_runtime import MODEL_ROLES
 from we2day_api.ai_selection import ERRORS, FIELDS
 
 COUNTERS = {
@@ -42,6 +43,11 @@ COUNTERS = {
 }
 COUNTERS |= {"selection_error_" + name for name in ERRORS}
 COUNTERS |= {"selection_field_" + name for name in FIELDS}
+COUNTERS |= {
+    f"{role}_{name}"
+    for role in MODEL_ROLES
+    for name in ("model_calls", "prompt_tokens", "completion_tokens", "total_tokens")
+}
 COUNTERS |= {
     "selection_tool_" + name
     for name in (
@@ -109,6 +115,7 @@ def aggregate(lines, *, limit=100_000):
                     "observations": Counter(),
                     "ms": [],
                     "errors": Counter(),
+                    "role_ms": {role: [] for role in MODEL_ROLES},
                 },
             )
             group["statuses"][str(status)] += 1
@@ -120,6 +127,16 @@ def aggregate(lines, *, limit=100_000):
             elapsed = value.get("total_ms")
             if type(elapsed) in {float, int} and math.isfinite(elapsed) and 0 <= elapsed <= 300_000:
                 group["ms"].append(elapsed)
+            durations = value.get("ms")
+            if isinstance(durations, dict):
+                for role in MODEL_ROLES:
+                    elapsed = durations.get(f"model_{role}")
+                    if (
+                        type(elapsed) in {float, int}
+                        and math.isfinite(elapsed)
+                        and 0 <= elapsed <= 300_000
+                    ):
+                        group["role_ms"][role].append(elapsed)
             category = value.get("error_category")
             if isinstance(category, str) and category in CATEGORIES:
                 group["errors"][category] += 1
@@ -159,6 +176,20 @@ def aggregate(lines, *, limit=100_000):
             },
             "counts": counts,
             "counter_observations": dict(group["observations"]),
+            "roles": {
+                role: {
+                    "model_calls": counts.get(f"{role}_model_calls"),
+                    "prompt_tokens": counts.get(f"{role}_prompt_tokens"),
+                    "completion_tokens": counts.get(f"{role}_completion_tokens"),
+                    "request_latency_ms": {
+                        "observations": len(group["role_ms"][role]),
+                        "p50": percentile(group["role_ms"][role], 0.5),
+                        "p95": percentile(group["role_ms"][role], 0.95),
+                    },
+                }
+                for role in sorted(MODEL_ROLES)
+                if f"{role}_model_calls" in counts or group["role_ms"][role]
+            },
             "error_categories": dict(group["errors"]),
             "search_success_rate": round(counts.get("search_successes", 0) / searches, 4)
             if searches

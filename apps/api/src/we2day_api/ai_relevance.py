@@ -84,7 +84,7 @@ async def enrich_candidates(session, io):
     io.stats.counts["model_calls"] += 1
     io.stats.counts["request_bytes"] += len(encoded)
     try:
-        with io.stats.span("model"):
+        with io.stats.inference("relevance"):
             status, raw = await bounded_response(
                 io.client,
                 "POST",
@@ -102,7 +102,7 @@ async def enrich_candidates(session, io):
         if status != 200:
             return
         payload = json.loads(raw)
-        io.stats.usage(payload)
+        io.stats.usage(payload, role="relevance")
         choice = payload["choices"][0]
         if choice.get("finish_reason") == "length":
             return

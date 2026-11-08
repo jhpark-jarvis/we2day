@@ -226,7 +226,7 @@ async def complete(
             encoded = json.dumps(inputs, ensure_ascii=False, separators=(",", ":")).encode()
             stats.counts["model_calls"] += 1
             stats.counts["request_bytes"] += len(encoded)
-            with stats.span("model"):
+            with stats.inference("completion"):
                 status_code, raw = await bounded_response(
                     client,
                     "POST",
@@ -258,7 +258,7 @@ async def complete(
             if payload.get("success") is False:
                 raise HTTPException(503, "ai_unavailable")
             result = payload.get("result", payload)
-            stats.usage(payload if "usage" in payload else result)
+            stats.usage(payload if "usage" in payload else result, role="completion")
             if "choices" in result:
                 message = result["choices"][0]["message"]
                 truncated = result["choices"][0].get("finish_reason") == "length"

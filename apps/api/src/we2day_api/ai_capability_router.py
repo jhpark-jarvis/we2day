@@ -19,12 +19,13 @@ from we2day_api.ai_capabilities import (
 )
 from we2day_api.ai_control import Action, apply_action
 from we2day_api.ai_control import prepare as prepare_control
+from we2day_api.ai_dialogue import social_turn
 from we2day_api.ai_location import pending_location
 from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import SearchArguments, norm, relational_area
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_saved_schedule import schedule_date
-from we2day_api.ai_search_spec import referenced_anchor
+from we2day_api.ai_search_spec import place_name, referenced_anchor
 from we2day_api.ai_selection import REPAIRABLE, Selection, parse_selection, record_selection
 from we2day_api.ai_tools import EmptyArguments, WeatherArguments
 from we2day_api.prompt_bundle import PROMPT
@@ -73,15 +74,18 @@ MODELS = {
 def direct_request(body, context, proposal, today):
     """Reuse typed current-task answers and complete edits before free-form selection."""
     location = pending_location(context, body.version)
-    if (not proposal and not location) or body.brief:
+    social = social_turn(body.messages[-1].content)
+    if (not proposal and not location and not social) or body.brief:
         return None
     decision = prepare_control(body, context, proposal, today)
     directive = decision.directive
+    if social and directive.reply and not decision.interpret and not directive.allowed_tools:
+        return decision
     if location and decision.reason == "conditions" and not decision.interpret:
         return decision
     if (
         directive.intent == "edit"
-        and directive.plan
+        and (directive.plan or decision.reason == "conditions" and directive.reply)
         and not decision.interpret
         and not directive.allowed_tools
     ):
@@ -94,6 +98,23 @@ def selection_messages(body, context, proposal, today):
     # requests and the already-authorized current planning state enter this selector.
     requested = schedule_date(body.messages[-1].content, context, body.version, today)
     location = pending_location(context, body.version)
+    current = None
+    if proposal:
+        current = {
+            "title": proposal.title,
+            "activities": [
+                {
+                    "ref": f"activity_{i + 1}",
+                    "title": a.title,
+                    "time": a.time,
+                    "place": place_name(a),
+                }
+                for i, a in enumerate(proposal.activities)
+            ],
+        }
+        for field in ("date", "budget"):
+            if getattr(proposal, field) != context.get(field):
+                current[field] = getattr(proposal, field)
     value = {
         "today": today.isoformat(),
         "resolved_request_date": requested.date,
@@ -114,21 +135,11 @@ def selection_messages(body, context, proposal, today):
         "pending_place_targets": [t.query for t in location.search.targets]
         if location and location.search
         else [],
-        "current_proposal": {
-            "title": proposal.title,
-            "date": proposal.date,
-            "budget": proposal.budget,
-            "activities": [
-                {"ref": f"activity_{i + 1}", "title": a.title, "time": a.time, "place": a.place}
-                for i, a in enumerate(proposal.activities)
-            ],
-        }
-        if proposal
-        else None,
+        "current_proposal": current,
     }
     return [
         {"role": "system", "content": PROMPT.route},
-        {"role": "user", "content": json.dumps(value, ensure_ascii=False)},
+        {"role": "user", "content": json.dumps(value, ensure_ascii=False, separators=(",", ":"))},
     ]
 
 
@@ -167,7 +178,7 @@ async def _select_once(
     stats.counts["model_calls"] += 1
     stats.counts["request_bytes"] += len(encoded)
     try:
-        with stats.span("model"):
+        with stats.inference("selection_repair" if repair else "selection"):
             if repair:
                 stats.stage("selection_repair")
             status, raw = await bounded_response(
@@ -202,7 +213,7 @@ async def _select_once(
         payload = json.loads(raw)
         result = payload.get("result", payload)
         if isinstance(result, dict):
-            stats.usage(result)
+            stats.usage(result, role="selection_repair" if repair else "selection")
     except (ValueError, TypeError, AttributeError):
         pass
     return parse_selection(raw, MODELS, BY_NAME, selected=bool(body.selected_places))
