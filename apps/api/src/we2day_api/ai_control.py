@@ -14,6 +14,7 @@ from we2day_api.ai_dialogue import Directive, analyze, merge_context, new_task, 
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, change_window, start_brief
 from we2day_api.ai_location import project_location, resume_location
+from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_answers import address_area, private_anchor, recover_followup_area
 from we2day_api.ai_place_policy import (
     LABELS,
@@ -510,7 +511,7 @@ async def interpret(control, latest, settings, client, budget, stats):
     prior_view = saved_spec(control.context)
     legacy_view = saved_refinement(control.context, control.directive.scope)
     inputs = {
-        "model": "@cf/qwen/qwen3-30b-a3b-fp8",
+        **model_parameters(settings),
         "messages": [
             {"role": "system", "content": PROMPT.interpret},
             {

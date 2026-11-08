@@ -7,6 +7,7 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import kinds, norm, plain, source_kind
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.prompt_bundle import PROMPT
@@ -70,7 +71,7 @@ async def enrich_candidates(session, io):
     if io.budget.remaining() < 3:
         return
     body = {
-        "model": "@cf/qwen/qwen3-30b-a3b-fp8",
+        **model_parameters(io.settings),
         "messages": [
             {"role": "system", "content": PROMPT.relevance},
             {"role": "user", "content": json.dumps(inputs, ensure_ascii=False)},

@@ -19,6 +19,7 @@ from we2day_api.ai_capabilities import (
 from we2day_api.ai_control import Action, apply_action
 from we2day_api.ai_control import prepare as prepare_control
 from we2day_api.ai_location import pending_location
+from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import SearchArguments, norm
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_saved_schedule import schedule_date
@@ -118,7 +119,7 @@ def selection_messages(body, context, proposal, today):
 
 async def select(body, context, proposal, today, settings, client, budget, stats):
     inputs = {
-        "model": "@cf/qwen/qwen3-30b-a3b-fp8",
+        **model_parameters(settings),
         "messages": selection_messages(body, context, proposal, today),
         "tools": definitions(MODELS, selected=bool(body.selected_places)),
         "tool_choice": "required",

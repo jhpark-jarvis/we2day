@@ -38,6 +38,7 @@ def setup(monkeypatch):
         body = json.loads(request.content)
         assert body["max_tokens"] == 2048
         assert body["model"] == ai_planner.MODEL
+        assert body["reasoning_effort"] == "low"
         if "tools" in body and replies[0].status_code == 200:
             # The planning phase is separate from the provider's strict final schema.
             return httpx.Response(200, json={"choices": [{"message": {"content": "응답 준비"}}]})

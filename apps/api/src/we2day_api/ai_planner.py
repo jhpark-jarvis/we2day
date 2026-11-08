@@ -26,6 +26,7 @@ from we2day_api.ai_dialogue import activity_target, merge_context
 from we2day_api.ai_dialogue import explicit_date as explicit_date
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, window_checks
+from we2day_api.ai_model import MODEL_ID, model_parameters
 from we2day_api.ai_place_answers import (
     candidate_reply,
     claims_place_search,
@@ -67,7 +68,7 @@ router = APIRouter(tags=["ai-planner"])
 logger = logging.getLogger(__name__)
 PROMPT_VERSION = PROMPT.version
 PROMPT_SHA256 = PROMPT.sha256
-MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+MODEL = MODEL_ID
 SYSTEM = PROMPT.system
 
 
@@ -190,7 +191,7 @@ async def complete(
             budget.remaining()
             final = step == steps - 1 or session is None or format_completion or schema_completion
             inputs = {
-                "model": MODEL,
+                **model_parameters(settings),
                 "messages": messages,
                 "max_tokens": 2048,
                 "temperature": 0.4,
@@ -508,7 +509,13 @@ def status(request: Request, response: Response, store: Store):
     if not store.rpc("get_my_couple"):
         raise HTTPException(403, "couple_required")
     settings = request.app.state.settings
-    return {"available": bool(settings.cloudflare_account_id and settings.cloudflare_api_token)}
+    return {
+        "available": bool(
+            settings.ai_planner_enabled
+            and settings.cloudflare_account_id
+            and settings.cloudflare_api_token
+        )
+    }
 
 
 @router.get("/ai/planner/history")
@@ -536,6 +543,8 @@ def selected_options(
 async def chat(body: ChatInput, request: Request, response: Response, store: Store):
     response.headers["Cache-Control"] = "private, no-store"
     settings = request.app.state.settings
+    if not settings.ai_planner_enabled:
+        raise HTTPException(503, "ai_unavailable")
     if not settings.cloudflare_account_id or not settings.cloudflare_api_token:
         raise HTTPException(503, "ai_not_configured")
     if body.messages[-1].role != "user":

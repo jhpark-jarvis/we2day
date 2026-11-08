@@ -63,7 +63,9 @@ WE2DAY_AI_CAPABILITIES_ENABLED=true
 
 `WE2DAY_AI_CAPABILITIES_ENABLED`의 기본값은 `false`입니다. `true`는 공통 명세를 통한 기능 선택 경로, `false`는 기존 대화 제어 경로를 사용합니다. 기능 선택도 메시지당 전체 모델 호출 3회에 포함됩니다. 환경값 변경은 API 재시작이 필요하며, 되돌릴 때는 기존 이미지와 해당 환경값을 함께 복구합니다.
 
-Cloudflare Workers AI → Use REST API에서 현재 계정에만 Workers AI Read/Edit 권한을 가진 전용 토큰을 발급합니다. 고정 모델은 `@cf/qwen/qwen3-30b-a3b-fp8`입니다. 기존 FastAPI가 REST API로 호출하므로 별도 Worker·D1·R2나 서비스 이전은 필요 없습니다. 이 모델의 공식 문서에는 2026년 11월 15일 종료 예정이 표시되어 있습니다. 대체 모델은 함수 선택·최종 스키마·한국어 회귀와 계정 한도를 확인한 뒤 별도로 교체해야 합니다.
+Cloudflare Workers AI → Use REST API에서 현재 계정에만 Workers AI Read/Edit 권한을 가진 전용 토큰을 발급합니다. 고정 모델은 `@cf/openai/gpt-oss-120b`, 추론 강도는 `low`이며 서버 공통 설정에서 기능 선택·코스 작성·해석·관련도에 적용합니다. 기존 FastAPI가 Cloudflare의 Chat Completions REST API로 호출하므로 별도 OpenAI API 키·Worker·D1·R2나 서비스 이전은 필요 없습니다. 모델을 변경할 때에는 도구 선택·최종 스키마·한국어 후속 대화와 계정 한도를 다시 확인하세요.
+
+장애나 제공량 소진 시 API 환경의 `WE2DAY_AI_PLANNER_ENABLED=false`로 새 AI 요청을 중단할 수 있습니다. API를 다시 시작하면 적용되며 대화 이력 조회·수동 일정/코스와 외부 에이전트 연결은 유지됩니다. 재개할 때 `true`로 돌립니다. 유료 또는 다른 모델로 자동 전환하지 않습니다.
 
 Workers Free는 제공량 소진 시 중단합니다. Workers Paid 사용 시 제공량 초과분이 청구될 수 있으므로 계정의 플랜 상태를 직접 확인하세요. 앱 자체의 하루 50회 제한은 없습니다. Cloudflare Workers Free의 계정별 일일 제공량을 기준으로 중단하며, 대화 길이와 출력량에 따라 가능한 요청 횟수가 달라집니다. 무료 제공량은 UTC 0시(한국 오전 9시)에 초기화됩니다. 모델 호출 요청의 연속 실행을 막는 프로젝트 공통 5초 간격은 서버 재시작 후에도 유지됩니다. 입력은 시스템 지침 포함 24KB, 도구 결과를 포함한 모델 요청은 48KB, 호출당 출력은 최대 2,048토큰입니다. 한 메시지에 모델 최대 3회·장소 검색 최대 4회·날씨 조회 최대 2회, 전체 처리 예산은 85초입니다. 다른 앱의 Cloudflare 사용량까지 통제하지는 않습니다. 공급자 한도·통신 오류 때 자동 재시도나 다른 유료 모델로 전환하지 않습니다. 출력 형식이 맞지 않을 때는 같은 3회 예산 안에서 JSON 완성 단계를 한 번 거칩니다.
 
@@ -75,7 +77,7 @@ Workers Free는 제공량 소진 시 중단합니다. Workers Paid 사용 시 �
 
 외부 ChatGPT의 [일정·코스 관리 연결](agent-api.md)은 별도 기능입니다. 외부 연결 키나 OAuth 토큰을 내부 AI에 전달하지 않습니다.
 
-공식 참고: [REST 설정](https://developers.cloudflare.com/workers-ai/get-started/rest-api/), [모델](https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/), [무료 한도](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+공식 참고: [REST 설정](https://developers.cloudflare.com/workers-ai/get-started/rest-api/), [모델](https://developers.cloudflare.com/workers-ai/models/gpt-oss-120b/), [무료 한도](https://developers.cloudflare.com/workers-ai/platform/pricing/).
 
 일일 무료 제공량 소진 오류(3036)와 일시적인 처리 용량 부족(3040)을 구분해 안내합니다. 앱의 호출 횟수 카운터는 Cloudflare의 정확한 Neuron 사용량이나 남은 무료량을 뜻하지 않습니다.
 
