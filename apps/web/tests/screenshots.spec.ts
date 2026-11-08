@@ -141,7 +141,7 @@ test("generate public screenshots using disposable synthetic records only", asyn
     await expect(
       coursePage.getByRole("navigation", { name: "주요 메뉴", exact: true }),
     ).toBeVisible();
-    await expect(coursePage.locator(".day-course-stops li")).toHaveCount(3);
+    await expect(coursePage.locator(".activity-card")).toHaveCount(3);
     await capture(coursePage, "day-course-mobile.png", coursePage.locator(".app-shell"));
     await coursePage.close();
     console.log("Public capture: photo upload");

@@ -1,8 +1,8 @@
+import { redirect } from "next/navigation";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RecordExplorer } from "@/components/record-explorer";
 import { callApi } from "@/lib/api";
-import { getAuthConfig } from "@/lib/auth/config";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
 import { type ContextRead, section } from "@/lib/page-reads";
 
@@ -11,17 +11,16 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<{ type?: string; month?: string; date?: string }>;
 }) {
-  const [query, context] = await Promise.all([
-    searchParams,
-    callApi<ContextRead>("/bootstrap/context"),
-  ]);
+  const query = await searchParams;
+  if (query.type === "routes") {
+    const date = typeof query.date === "string" && isSupportedDate(query.date) ? query.date : "";
+    redirect(`/today${date ? `?date=${date}` : ""}`);
+  }
+  const context = await callApi<ContextRead>("/bootstrap/context");
   const couple = section(context.data?.couple, context.status);
   const profiles = context.data?.profiles.data;
   const today = seoulToday();
-  const type =
-    query.type === "records" || query.type === "routes" || query.type === "monthly"
-      ? query.type
-      : "photos";
+  const type = query.type === "records" || query.type === "monthly" ? query.type : "photos";
   const month =
     typeof query.month === "string" && /^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(query.month)
       ? query.month
@@ -38,8 +37,6 @@ export default async function SearchPage({
           today={today}
           initialType={type}
           initialMonth={month}
-          initialDate={query.date && isSupportedDate(query.date) ? query.date : today}
-          site={getAuthConfig()?.site || ""}
           names={{
             mine: profiles?.mine?.display_name || "",
             partner: profiles?.partner?.display_name || "",

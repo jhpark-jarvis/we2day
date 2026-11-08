@@ -102,21 +102,32 @@ test("record discovery respects sharing and next appointment preserves date-only
 
     // Switching search targets is client-side and preserves each visited form/result.
     let routeReads = 0,
-      monthlyReads = 0;
+      monthlyReads = 0,
+      monthlyCancelled = 0;
     b.on("request", (request) => {
       if (request.url().includes("/api/routes/history")) routeReads++;
       if (request.url().includes("/api/records/search?month=")) monthlyReads++;
+    });
+    b.on("requestfailed", (request) => {
+      if (
+        request.url().includes("/api/records/search?month=") &&
+        /abort|cancel/i.test(request.failure()?.errorText || "")
+      )
+        monthlyCancelled++;
     });
     const target = b.getByLabel("검색 대상", { exact: true });
     await target.selectOption("photos");
     await b.getByLabel("사진 한마디 검색어 (선택)", { exact: true }).fill("통합 검색 유지");
     await expect(b.getByRole("heading", { level: 1 })).toHaveCount(1);
-    await target.selectOption("routes");
+    await expect(target.locator('option[value="routes"]')).toHaveCount(0);
     expect(routeReads).toBe(0);
     expect(monthlyReads).toBe(0);
     await target.selectOption("monthly");
     await expect(b.getByLabel("선택한 달의 기록 합계")).toBeVisible();
-    expect(monthlyReads).toBe(1);
+    await b.waitForLoadState("networkidle");
+    // Dev Strict Mode may cancel the first mount request before repeating the effect.
+    expect(monthlyReads - monthlyCancelled).toBe(1);
+    const initialMonthlyReads = monthlyReads;
     await target.selectOption("records");
     await expect(b.getByLabel("기록 검색어")).toHaveValue("우리의 작은 산책");
     await expect(results).toContainText("우리의 작은 산책");
@@ -125,21 +136,21 @@ test("record discovery respects sharing and next appointment preserves date-only
       "통합 검색 유지",
     );
     await target.selectOption("monthly");
-    expect(monthlyReads).toBe(1);
+    expect(monthlyReads).toBe(initialMonthlyReads);
     await b.getByLabel("돌아볼 월").fill("2000-01");
     await expect(b.getByLabel("돌아볼 월")).toHaveValue("2000-01");
     await b.route("**/api/records/search?month=2000-01", (route) =>
       route.fulfill({ status: 503, json: { error: "합성 월간 조회 실패" } }),
     );
     await b.getByRole("button", { name: "이 달 보기", exact: true }).click();
-    await expect.poll(() => monthlyReads).toBe(2);
+    await expect.poll(() => monthlyReads).toBe(initialMonthlyReads + 1);
     await expect(b.getByRole("button", { name: "이 달 보기", exact: true })).toBeEnabled();
     await expect(b.getByRole("alert").filter({ hasText: "월간 추억" })).toContainText("이전 결과");
     await expect(b.getByLabel("선택한 달의 기록 합계")).toBeVisible();
     await b.unroute("**/api/records/search?month=2000-01");
     await b.route("**/api/records/search?month=2000-01", (route) => route.abort());
     await b.getByRole("button", { name: "이 달 보기", exact: true }).click();
-    await expect.poll(() => monthlyReads).toBe(3);
+    await expect.poll(() => monthlyReads).toBe(initialMonthlyReads + 2);
     await expect(b.getByLabel("선택한 달의 기록 합계")).toBeVisible();
     await expect(b.getByRole("button", { name: "이 달 보기", exact: true })).toBeEnabled();
     await b.unroute("**/api/records/search?month=2000-01");

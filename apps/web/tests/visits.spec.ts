@@ -117,7 +117,7 @@ test("activity cards show latest publication and handle shared state conflicts a
       "true",
     );
     await open(page, "/plans");
-    await page.getByRole("button", { name: /합성 방문 플랜/ }).click();
+    await page.locator("button.plan-card").filter({ hasText: "합성 방문 플랜" }).click();
     await page.getByLabel("활동 1 이름").fill("변경한 합성 활동");
     await page.getByRole("button", { name: "플랜 저장", exact: true }).click();
     await page.getByRole("button", { name: "변경 내용 확인·재확정", exact: true }).click();

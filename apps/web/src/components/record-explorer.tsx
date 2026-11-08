@@ -11,10 +11,6 @@ function PanelLoading() {
     </div>
   );
 }
-const DayCourseHistory = dynamic(
-  () => import("@/components/day-course-history").then((m) => m.DayCourseHistory),
-  { loading: PanelLoading },
-);
 const MonthlyMemories = dynamic(
   () => import("@/components/monthly-memories").then((m) => m.MonthlyMemories),
   { loading: PanelLoading },
@@ -27,21 +23,17 @@ const RecordSearch = dynamic(
   { loading: PanelLoading },
 );
 
-const kinds = { photos: "사진", records: "기록", routes: "동선", monthly: "월간 추억" } as const;
+const kinds = { photos: "사진", records: "기록", monthly: "월간 추억" } as const;
 type Kind = keyof typeof kinds;
 export function RecordExplorer({
   today,
   initialType,
   initialMonth,
-  initialDate,
-  site,
   names,
 }: {
   today: string;
   initialType: Kind;
   initialMonth: string;
-  initialDate: string;
-  site: string;
   names: { mine: string; partner: string };
 }) {
   const search = useSearchParams();
@@ -79,8 +71,6 @@ export function RecordExplorer({
             <PhotoSearch start={`${today.slice(0, 8)}01`} end={today} names={names} />
           ) : type === "records" ? (
             <RecordSearch today={today} />
-          ) : type === "routes" ? (
-            <DayCourseHistory initialDate={initialDate} site={site} />
           ) : (
             <MonthlyMemories initialMonth={initialMonth} />
           )}

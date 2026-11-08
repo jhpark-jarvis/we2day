@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { confirmPlanAndReopen } from "./plan-confirmation";
 
-test("two-point input is absent while all confirmed day-course stops remain available", async ({
+test("course entry replaces duplicate route views and preserves all stops and visits", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
@@ -21,21 +21,27 @@ test("two-point input is absent while all confirmed day-course stops remain avai
   await expect(page.getByLabel("이 날 만났어요", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "함께한 동선" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "동선 기록 열기" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "하루 동선", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "동선 보기", exact: true })).toHaveCount(0);
+  await expect(
+    page.locator(".agenda-header-actions").getByRole("link", { name: /데이트 코스/ }),
+  ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("calendar-without-routes.png"),
     fullPage: true,
   });
-  await page.goto("/memories/search?type=routes");
-  await expect(page.getByLabel("검색 대상")).toHaveValue("routes");
+  await page.goto("/memories/search");
   await expect(page.getByLabel("검색 대상").locator("option")).toHaveText([
     "사진",
     "기록",
-    "동선",
     "월간 추억",
   ]);
+  await page.goto("/memories/search?type=routes");
+  await expect(page).toHaveURL(/\/today$/);
   await page.goto("/memories/routes");
-  await expect(page).toHaveURL(/\/memories\/search\?type=routes$/);
-  await expect(page.getByLabel("검색 대상")).toHaveValue("routes");
+  await expect(page).toHaveURL(/\/today$/);
+  await page.goto("/memories/routes?date=2026-02-30");
+  await expect(page).toHaveURL(/\/today$/);
   await page.goto("/plans?date=2026-10-24&new=1");
   await page.getByLabel("플랜 이름", { exact: true }).fill("세 장소 코스");
   await page.getByLabel("플랜 날짜").fill("2026-10-24");
@@ -57,26 +63,67 @@ test("two-point input is absent while all confirmed day-course stops remain avai
   await expect(page.getByRole("heading", { name: "추가 산책 코스", exact: true })).toBeVisible();
   await confirmPlanAndReopen(page);
   await page.goto("/memories/routes?date=2026-10-24");
-  await expect(page).toHaveURL(/type=routes&date=2026-10-24/);
-  const day = page.getByRole("region", { name: "날짜별 하루 동선", exact: true });
-  await expect(day.getByRole("heading", { name: "세 장소 코스" })).toBeVisible();
-  await expect(day.getByRole("heading", { name: "추가 산책 코스" })).toBeVisible();
-  await expect(day.getByText("밤 산책길", { exact: true })).toBeVisible();
-  const stops = day.getByRole("list", { name: "세 장소 코스 장소 순서" });
-  await expect(stops.getByRole("listitem")).toHaveCount(3);
-  await expect(stops.getByRole("listitem").nth(0)).toContainText("산책 공원");
-  await expect(stops.getByRole("listitem").nth(1)).toContainText("점심 식당");
-  await expect(stops.getByRole("listitem").nth(2)).toContainText("저녁 카페");
-  await expect(stops.getByRole("link").nth(0)).toHaveAttribute(
-    "href",
-    "https://naver.me/Example12",
+  await expect(page).toHaveURL(/\/today\?date=2026-10-24$/);
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "세 장소 코스", exact: true }).click();
+  const stops = page.locator(".activity-card");
+  await expect(stops).toHaveCount(3);
+  for (const [index, place] of ["산책 공원", "점심 식당", "저녁 카페"].entries()) {
+    await expect(stops.nth(index)).toContainText(place);
+    await stops
+      .nth(index)
+      .getByRole("button", { name: new RegExp(`장소 ${index + 1}`) })
+      .click();
+    const map = page.getByRole("link", { name: "네이버 지도", exact: true });
+    if (index === 0) {
+      await expect(map).toHaveAttribute("href", "https://naver.me/Example12");
+    } else {
+      const url = new URL((await map.getAttribute("href")) || "");
+      expect(url.protocol).toBe("nmap:");
+      expect(url.hostname).toBe("search");
+      expect(url.searchParams.get("query")).toBe(place);
+    }
+  }
+  const visit = page.getByRole("group", { name: "장소 2 방문 상태", exact: true });
+  await visit.getByRole("button", { name: "방문 완료", exact: true }).click();
+  await expect(visit.getByRole("button", { name: "방문 완료", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
-  await expect(stops.getByRole("link")).toHaveCount(3);
-  await page.screenshot({ path: testInfo.outputPath("all-day-course-stops.png"), fullPage: true });
-  await page.getByLabel("동선 날짜").fill("2026-10-25");
-  await page.getByRole("button", { name: "동선 조회", exact: true }).click();
-  await expect(day.getByText("이 날짜에 확정한 코스가 없어요.")).toBeVisible();
-  await expect(day.getByRole("heading", { name: "세 장소 코스" })).toHaveCount(0);
+  await page.getByRole("button", { name: "추가 산책 코스", exact: true }).click();
+  await expect(stops).toHaveCount(1);
+  await expect(stops).toContainText("밤 산책길");
+  await page.goto("/memories/search?type=routes&date=2026-10-24");
+  await expect(page).toHaveURL(/\/today\?date=2026-10-24$/);
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "세 장소 코스", exact: true }).click();
+  await expect(visit.getByRole("button", { name: "방문 완료", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  for (const width of [1280, 393, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`unified-course-${width}.png`),
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 393, height: 1000 });
+  await page.screenshot({
+    path: testInfo.outputPath("unified-course-public.png"),
+    fullPage: true,
+    animations: "disabled",
+    // Documentation capture: put the sticky navigation at the document end and hide dev chrome.
+    style:
+      "nextjs-portal { display: none !important; } .app-navigation { position: static !important; }",
+  });
+  await page.getByLabel("살펴볼 날짜").fill("2026-10-25");
+  await page.getByRole("button", { name: "이 날짜 보기", exact: true }).click();
+  await expect(page.getByText("이 날짜에 확정한 플랜이 없어요.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "세 장소 코스" })).toHaveCount(0);
   expect((await page.request.get("/api/plans?date=2026-02-30")).status()).toBe(422);
   expect(routeRequests).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
