@@ -98,7 +98,12 @@ def edit_activities(text, proposal, previous, clock_value):
     previous = ActivityEdit.model_validate(previous) if previous else None
     if previous and cancel_request(text):
         return EditResult("변경을 취소했어요. 현재 코스는 그대로 둘게요.")
-    swap = bool(re.search(r"순서|순번", text) and re.search(r"바꿔|교환|교체", text))
+    keep_order = re.search(
+        r"(?:순서|순번)(?:은|는|을|를)?\s*(?:그대로|유지|바꾸지|변경하지)", text
+    )
+    swap = bool(
+        not keep_order and re.search(r"순서|순번", text) and re.search(r"바꿔|교환|교체", text)
+    )
     shift = bool(re.search(r"미뤄|늦춰|당겨|앞당겨", text))
     indices, invalid = targets(text, len(proposal.activities))
     multiple_time = "시간" in text and len(indices) > 1 and bool(re.search(r"바꿔|변경|설정", text))

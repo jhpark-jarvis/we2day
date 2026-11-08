@@ -84,6 +84,12 @@ def relational_area(text):
             r"|^(?:그|저|이|해당|아까)\s*(?:장소|곳)(?:\s|$)",
             text,
         )
+        or re.fullmatch(
+            r"(?:(?:첫|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟)\s*(?:번(?:째)?|째)?"
+            r"|\d+\s*번(?:째)?|마지막|이전|다음|현재|선택한|고른)"
+            r"\s*(?:활동|일정|코스|장소)(?:의)?",
+            text,
+        )
     )
 
 
@@ -126,7 +132,8 @@ def explicit_area(text):
         (
             a
             for a in areas
-            if not a.endswith(
+            if not relational_area(a)
+            and not a.endswith(
                 ("다시", "잠시", "혹시", "친구", "도구", "문구", "입구", "출구", "농구", "지구")
             )
         ),
