@@ -335,6 +335,7 @@ test("all page controls remain identifiable in both themes and narrow layouts", 
   await page.getByLabel("시간 (선택)").fill("14:30");
   await page.getByRole("button", { name: "약속 저장하기", exact: true }).click();
   await expect(page.getByRole("button", { name: "약속 추가하기", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "만남 기록", exact: true }).click();
   await page.getByLabel("이 날 만났어요", { exact: true }).check();
   await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
   await open(page, "/memories");

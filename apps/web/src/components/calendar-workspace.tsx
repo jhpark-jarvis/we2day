@@ -3,11 +3,14 @@
 import {
   CalendarDays,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Ellipsis,
   Images,
+  ListTodo,
   MapPin,
+  NotebookPen,
   Pencil,
   RefreshCw,
   Route,
@@ -15,7 +18,15 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { deletePersonalAppointment } from "@/app/actions/appointments";
 import { AppointmentForm } from "@/components/appointment-form";
 import { LoadingRegion } from "@/components/loading-region";
@@ -145,6 +156,15 @@ export function CalendarWorkspace({
   const calendarElement = useRef<HTMLDivElement>(null);
   const keyboardFocus = useRef(false);
   const keyboardHelpId = useId();
+  const scheduleTools = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (event.target instanceof Node && !scheduleTools.current?.contains(event.target))
+        scheduleTools.current?.removeAttribute("open");
+    };
+    window.addEventListener("pointerdown", dismiss);
+    return () => window.removeEventListener("pointerdown", dismiss);
+  }, []);
   useEffect(() => {
     const reset = () => {
       setDetail(null);
@@ -427,7 +447,7 @@ export function CalendarWorkspace({
         {preview && <span className="preview-badge">미리보기</span>}
       </PageHeading>
       {!preview && (
-        <div className="calendar-toolbar">
+        <div className="calendar-toolbar home-calendar-toolbar">
           {status === "ready" ? (
             <>
               <button
@@ -437,18 +457,11 @@ export function CalendarWorkspace({
               >
                 약속 추가하기
               </button>
-              <details className="schedule-tools">
-                <summary>
-                  일정 도구
-                  <ChevronDown className="schedule-tools-chevron" size={16} aria-hidden="true" />
-                </summary>
-                <nav aria-label="일정 도구">
-                  <Link href={`/plans?date=${selected}`}>플랜</Link>
-                  <Link href={`/today?date=${selected}`}>데이트 코스</Link>
-                  <Link href="/reminders">다가오는 일정</Link>
-                  <Link href="/calendar/export">캘린더 내보내기</Link>
-                </nav>
-              </details>
+              {memberCount === 1 && (
+                <Link className="text-button calendar-invite" href="/couple">
+                  초대
+                </Link>
+              )}
               <Link
                 href="/plans/ai"
                 className="icon-button home-ai-entry"
@@ -457,11 +470,51 @@ export function CalendarWorkspace({
               >
                 <We2AiIcon size={32} />
               </Link>
-              {memberCount === 1 && (
-                <Link className="text-button" href="/couple">
-                  초대
-                </Link>
-              )}
+              <details
+                className="schedule-tools"
+                ref={scheduleTools}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && event.currentTarget.open) {
+                    event.preventDefault();
+                    event.currentTarget.open = false;
+                    event.currentTarget.querySelector("summary")?.focus();
+                  }
+                }}
+              >
+                <summary className="icon-button" aria-label="일정 도구" title="일정 도구">
+                  <Ellipsis size={20} aria-hidden="true" />
+                </summary>
+                <nav aria-label="일정 도구">
+                  <Link
+                    href={`/plans?date=${selected}`}
+                    onClick={() => scheduleTools.current?.removeAttribute("open")}
+                  >
+                    <ListTodo size={18} aria-hidden="true" />
+                    플랜
+                  </Link>
+                  <Link
+                    href={`/today?date=${selected}`}
+                    onClick={() => scheduleTools.current?.removeAttribute("open")}
+                  >
+                    <Route size={18} aria-hidden="true" />
+                    코스
+                  </Link>
+                  <Link
+                    href="/reminders"
+                    onClick={() => scheduleTools.current?.removeAttribute("open")}
+                  >
+                    <CalendarDays size={18} aria-hidden="true" />
+                    다가오는 일정
+                  </Link>
+                  <Link
+                    href="/calendar/export"
+                    onClick={() => scheduleTools.current?.removeAttribute("open")}
+                  >
+                    <Download size={18} aria-hidden="true" />
+                    캘린더 내보내기
+                  </Link>
+                </nav>
+              </details>
             </>
           ) : (
             <Link className="text-button" href={status === "guest" ? "/login" : "/couple"}>
@@ -593,25 +646,51 @@ export function CalendarWorkspace({
           <div className="day-workspace">
             <section className="agenda" aria-label="선택한 날짜의 약속">
               <header className="agenda-heading">
-                <h2 aria-live="polite">
-                  {month + 1}월 {day}일 <small>{weekday}요일</small>
-                </h2>
-                <div className="agenda-header-actions">
+                <div className="agenda-date-heading">
+                  <h2 aria-live="polite">
+                    {month + 1}월 {day}일 <small>{weekday}요일</small>
+                  </h2>
                   {meetings.some((meeting) => meeting.date === selected && meeting.met) && (
                     <span className="agenda-meeting">
                       <Check size={14} aria-hidden="true" />
                       만난 날
                     </span>
                   )}
+                </div>
+                <div className="agenda-header-actions">
                   {!preview && status === "ready" && (
-                    <Link
-                      className="icon-button"
-                      href={`/today?date=${selected}`}
-                      aria-label={selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
-                      title={selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
-                    >
-                      <Route size={18} aria-hidden="true" />
-                    </Link>
+                    <>
+                      <Link
+                        className="icon-button"
+                        href={`/today?date=${selected}`}
+                        aria-label={selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
+                        title={selected === today ? "오늘의 데이트 코스" : "데이트 코스"}
+                      >
+                        <Route size={18} aria-hidden="true" />
+                      </Link>
+                      <Link
+                        className="icon-button"
+                        href={`/memories?date=${selected}`}
+                        aria-label="이 날짜의 사진"
+                        title={`${month + 1}월 ${day}일 사진`}
+                      >
+                        <Images size={18} aria-hidden="true" />
+                      </Link>
+                      <button
+                        type="button"
+                        className="icon-button agenda-record-trigger"
+                        aria-label="만남 기록"
+                        title={`${month + 1}월 ${day}일 만남 기록`}
+                        aria-haspopup="dialog"
+                        aria-expanded={view.detail === "meeting"}
+                        onClick={() => {
+                          setMeetingNotice("");
+                          pushView((v) => ({ ...v, detail: "meeting", edit: "", request: "" }));
+                        }}
+                      >
+                        <NotebookPen size={18} aria-hidden="true" />
+                      </button>
+                    </>
                   )}
                 </div>
               </header>
@@ -641,57 +720,107 @@ export function CalendarWorkspace({
                 </div>
               )}
             </section>
-            {!preview && status === "ready" && (
-              <>
-                {meetingError && (
-                  <p className="error-message" role="alert">
-                    만남 기록을 불러오지 못했어요. 일정 새로고침으로 다시 시도해 주세요.
-                  </p>
-                )}
-                <LoadingRegion
-                  busy={meetingLoading}
-                  disabled={Boolean(meetingError)}
-                  label="만남 기록을 불러오는 중"
-                >
-                  <MeetingDayEditor
-                    key={`${selected}:${meetings.find((item) => item.date === selected)?.version || 0}`}
-                    date={selected}
-                    today={today}
-                    record={meetings.find((item) => item.date === selected)}
-                    onSaved={onMeetingSaved}
-                    onReload={() => setRefresh((value) => value + 1)}
-                  />
-                </LoadingRegion>
-                {meetingNotice && (
-                  <p className="settings-hint" role="status">
-                    {meetingNotice}
-                  </p>
-                )}
-              </>
-            )}
-            {preview ? (
+            {preview && (
               <section className="memory-section" aria-label="지난 기록">
                 <h2>지난 기록</h2>
                 <PhotoStory onOpen={() => setDetail(examples[0])} />
                 <p className="preview-label">생성된 예시 사진 · 실제 사진이 아닙니다</p>
               </section>
-            ) : (
-              <section className="memory-section">
-                <header>
-                  <Images size={17} aria-hidden="true" />
-                  <h2>함께한 날의 사진</h2>
-                </header>
-                <p className="muted">이 날의 사진을 함께 모아보세요.</p>
-                <Link className="text-button" href={`/memories?date=${selected}`}>
-                  {month + 1}월 {day}일 사진 보기·남기기
-                </Link>
-              </section>
             )}
           </div>
         </div>
       </LoadingRegion>
+      {!preview && status === "ready" && view.detail === "meeting" && (
+        <MeetingRecordDialog
+          dateLabel={`${year}년 ${month + 1}월 ${day}일`}
+          onClose={() => backView((v) => ({ ...v, detail: "", edit: "", request: "" }))}
+        >
+          {meetingError && (
+            <p className="error-message" role="alert">
+              만남 기록을 불러오지 못했어요. 다시 불러온 뒤 수정해 주세요.
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setRefresh((v) => v + 1)}
+                disabled={meetingLoading}
+              >
+                다시 불러오기
+              </button>
+            </p>
+          )}
+          <LoadingRegion
+            busy={meetingLoading}
+            disabled={Boolean(meetingError)}
+            label="만남 기록을 불러오는 중"
+          >
+            <MeetingDayEditor
+              key={`${selected}:${meetings.find((item) => item.date === selected)?.version || 0}`}
+              date={selected}
+              today={today}
+              record={meetings.find((item) => item.date === selected)}
+              onSaved={onMeetingSaved}
+              onReload={() => setRefresh((value) => value + 1)}
+            />
+          </LoadingRegion>
+          {meetingNotice && (
+            <p className="settings-hint" role="status">
+              {meetingNotice}
+            </p>
+          )}
+        </MeetingRecordDialog>
+      )}
       {preview && <p className="preview-label">화면 미리보기 · 저장되지 않는 예시 일정</p>}
     </>
+  );
+}
+
+function MeetingRecordDialog({
+  dateLabel,
+  onClose,
+  children,
+}: {
+  dateLabel: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    const trigger = document.querySelector<HTMLButtonElement>(".agenda-record-trigger");
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      queueMicrotask(() => {
+        if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+      });
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="meeting-record-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <header className="section-heading">
+        <h2 id={titleId}>만남 기록</h2>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="만남 기록 닫기"
+          title="닫기"
+          onClick={onClose}
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
+      </header>
+      <p className="muted">{dateLabel}</p>
+      {children}
+    </dialog>
   );
 }
 

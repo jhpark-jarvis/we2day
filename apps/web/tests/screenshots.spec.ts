@@ -85,11 +85,14 @@ test("generate public screenshots using disposable synthetic records only", asyn
       await page.getByRole("button", { name: "약속 저장하기", exact: true }).click();
       await expect(page.getByRole("button", { name: new RegExp(title) })).toBeVisible();
     }
+    await page.getByRole("button", { name: "만남 기록", exact: true }).click();
     await page.getByLabel("이 날 만났어요", { exact: true }).check();
     await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
     await expect(
       page.getByRole("status").filter({ hasText: "만남 기록을 저장했어요" }),
     ).toBeVisible();
+    await page.getByRole("button", { name: "만남 기록 닫기", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "만남 기록", exact: true })).toHaveCount(0);
     await page.goto(`/?date=${date}`);
     await expect(page.getByRole("button", { name: /느긋한 오후 산책/ })).toBeVisible();
     await capture(page, "calendar-desktop.png");

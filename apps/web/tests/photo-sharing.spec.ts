@@ -407,6 +407,8 @@ test("compressed photo survives retry and is shared through API, SQL and private
     // One focused meeting flow reuses this pair and the same temporary SQL environment.
     await a.goto("/");
     await b.goto("/");
+    await a.getByRole("button", { name: "만남 기록", exact: true }).click();
+    await b.getByRole("button", { name: "만남 기록", exact: true }).click();
     await expect(a.getByLabel("함께한 날의 메모")).toBeVisible();
     await expect(b.getByLabel("함께한 날의 메모")).toBeVisible();
     await a.getByLabel("이 날 만났어요", { exact: true }).check();
@@ -426,6 +428,9 @@ test("compressed photo survives retry and is shared through API, SQL and private
     await b.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
     await expect(b.getByText("만남 기록을 저장했어요.", { exact: true })).toBeVisible();
     await a.reload();
+    await a.waitForLoadState("networkidle");
+    if (!(await a.getByRole("dialog", { name: "만남 기록", exact: true }).count()))
+      await a.getByRole("button", { name: "만남 기록", exact: true }).click();
     await expect(a.getByLabel("이 날 만났어요", { exact: true })).not.toBeChecked();
     await expect(a.getByLabel("함께한 날의 메모")).toHaveValue("산책하고 따뜻한 차 마시기");
   } finally {

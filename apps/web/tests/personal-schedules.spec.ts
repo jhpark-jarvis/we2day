@@ -56,11 +56,13 @@ test("personal schedules share read access, restrict edits and keep independent 
     ).toBe("none");
     await expect(day.locator(".day-personal-dot")).toBeVisible();
     await expect(day).not.toHaveClass(/has-event/);
+    await page.getByRole("button", { name: "만남 기록", exact: true }).click();
     await page.getByLabel("이 날 만났어요", { exact: true }).check();
     await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
     await expect(day.locator(".day-check")).toBeVisible();
     await expect(page.locator(".agenda-meeting")).toHaveText("만난 날");
     await expect(day).toHaveAttribute("aria-label", /만난 날.*개인 일정 있음/);
+    await page.getByRole("button", { name: "만남 기록 닫기", exact: true }).click();
     await page.getByRole("button", { name: "약속 추가하기", exact: true }).click();
     await page.getByLabel("약속 이름", { exact: true }).fill("공동 약속 합성 예시");
     await page.locator('input[type="time"]').fill("14:00");
@@ -127,6 +129,7 @@ test("personal schedules share read access, restrict edits and keep independent 
     await expect(day.locator(".day-check")).toBeVisible();
     await expect(day).toHaveClass(/has-event/);
     await expect(day.locator(".day-personal-dot")).toHaveCount(0);
+    await page.getByRole("button", { name: "만남 기록", exact: true }).click();
     await page.getByLabel("이 날 만났어요", { exact: true }).uncheck();
     await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
     await expect(day.locator(".day-check")).toHaveCount(0);

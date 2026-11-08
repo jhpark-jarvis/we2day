@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { saveMeeting } from "@/app/actions/meetings";
-import type { MeetingDay } from "@/lib/meetings";
+import type { MeetingDay, MeetingSaveState } from "@/lib/meetings";
 
 function SubmitMeeting() {
   const { pending } = useFormStatus();
@@ -40,13 +40,18 @@ export function MeetingDayEditor({
   const [met, setMet] = useState(record?.met || false);
   const [note, setNote] = useState(record?.note || "");
   const [requestId, setRequestId] = useState("");
-  const [state, action] = useActionState(saveMeeting, { error: "" });
+  const [state, action] = useActionState(
+    async (previous: MeetingSaveState, form: FormData) => {
+      const result = await saveMeeting(previous, form);
+      // The calendar must receive completed saves even if the editor was closed while pending.
+      if (result.meeting) onSaved(result.meeting);
+      return result;
+    },
+    { error: "" },
+  );
   useEffect(() => {
     setRequestId(crypto.randomUUID());
   }, []);
-  useEffect(() => {
-    if (state.meeting) onSaved(state.meeting);
-  }, [state.meeting, onSaved]);
   if (date > today)
     return <p className="settings-hint">만난 날은 오늘과 지난 날짜에 기록할 수 있어요.</p>;
   return (

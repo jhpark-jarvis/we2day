@@ -37,6 +37,7 @@ test("shared meeting record copies support explicit download and isolation", asy
     await b.getByRole("button", { name: "초대 수락하기" }).click();
     await expect(b.getByRole("status")).toContainText("두 사람이 연결되었어요");
     await a.goto("/?date=2026-10-01");
+    await a.getByRole("button", { name: "만남 기록", exact: true }).click();
     await a.getByLabel("이 날 만났어요", { exact: true }).check();
     await a.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
     await expect(a.getByRole("status").filter({ hasText: "만남 기록을 저장했어요" })).toBeVisible();

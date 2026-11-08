@@ -18,7 +18,7 @@ test("course entry replaces duplicate route views and preserves all stops and vi
     if (new URL(request.url()).pathname.startsWith("/api/routes")) routeRequests++;
   });
   await page.goto("/");
-  await expect(page.getByLabel("이 날 만났어요", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "만남 기록", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "함께한 동선" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "동선 기록 열기" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "하루 동선", exact: true })).toHaveCount(0);

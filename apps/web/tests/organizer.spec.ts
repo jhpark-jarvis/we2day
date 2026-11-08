@@ -22,6 +22,7 @@ test("upcoming dates, selected-day links, calendar download and monthly original
   const date = await page.getByLabel("날짜", { exact: true }).inputValue();
   await page.getByRole("button", { name: "약속 저장하기", exact: true }).click();
   await expect(page.getByRole("button", { name: /알림함 검증용 산책/ })).toBeVisible();
+  await page.getByRole("button", { name: "만남 기록", exact: true }).click();
   await page.getByLabel("이 날 만났어요", { exact: true }).check();
   await page.getByRole("button", { name: "만남 기록 저장", exact: true }).click();
   await expect(
@@ -77,6 +78,7 @@ test("upcoming dates, selected-day links, calendar download and monthly original
     true,
   );
   await page.getByRole("link", { name: "일정 보기", exact: true }).click();
+  await page.getByRole("button", { name: "만남 기록", exact: true }).click();
   await expect(page.getByLabel("이 날 만났어요", { exact: true })).toBeChecked();
   await page.goto("/memories/month?month=2000-01");
   await expect(page.getByText("이 달에는 아직 남긴 기록이 없어요.")).toBeVisible();
