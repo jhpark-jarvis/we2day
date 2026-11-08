@@ -97,8 +97,8 @@ def search_places(
     return fetch_places(request.app.state.settings, body.query)
 
 
-def fetch_places(config, query: str) -> SearchResults:
-    """Fixed provider request; callers enforce authentication and their own tool budget."""
+def place_request(config, query: str) -> dict:
+    """One wire contract for sync UI and async AI; never caller credentials."""
     query = SearchInput(query=query).query
     if not (
         config.naver_search_enabled
@@ -106,28 +106,45 @@ def fetch_places(config, query: str) -> SearchResults:
         and config.naver_search_client_secret
     ):
         raise HTTPException(503, "place_search_not_configured")
+    return {
+        "url": HUB_URL,
+        "params": {"query": query, "display": 5, "start": 1, "sort": "random"},
+        "headers": {
+            "X-NCP-APIGW-API-KEY-ID": config.naver_search_client_id,
+            "X-NCP-APIGW-API-KEY": config.naver_search_client_secret,
+        },
+    }
+
+
+def parse_place_response(status: int, raw: bytes) -> SearchResults:
+    if status == 429:
+        raise HTTPException(429, "place_search_limited")
+    if status != 200 or len(raw) > 65536:
+        raise HTTPException(503, "place_search_unavailable")
+    try:
+        return SearchResults.model_validate_json(raw)
+    except ValidationError as error:
+        raise HTTPException(503, "place_search_unavailable") from error
+
+
+def fetch_places(config, query: str) -> SearchResults:
+    """Fixed provider request; callers enforce authentication and their own tool budget."""
+    spec = place_request(config, query)
     try:
         # Fixed destination, no caller JWT, redirects, cookies, response cache or retries.
         with httpx.Client(timeout=4.0, follow_redirects=False, trust_env=False) as client:
             with client.stream(
                 "GET",
-                HUB_URL,
-                params={"query": query, "display": 5, "start": 1, "sort": "random"},
-                headers={
-                    "X-NCP-APIGW-API-KEY-ID": config.naver_search_client_id,
-                    "X-NCP-APIGW-API-KEY": config.naver_search_client_secret,
-                },
+                **spec,
             ) as result:
-                if result.status_code == 429:
-                    raise HTTPException(429, "place_search_limited")
-                if not result.is_success:
-                    raise HTTPException(503, "place_search_unavailable")
+                if result.status_code != 200:
+                    return parse_place_response(result.status_code, b"")
                 data = bytearray()
                 for chunk in result.iter_bytes():
                     data.extend(chunk)
                     if len(data) > 65_536:
                         raise HTTPException(503, "place_search_unavailable")
-                return SearchResults.model_validate_json(data)
-    except (httpx.HTTPError, ValidationError) as error:
+                return parse_place_response(result.status_code, data)
+    except httpx.HTTPError as error:
         # Never expose provider responses, secrets, search queries or exception URLs.
         raise HTTPException(503, "place_search_unavailable") from error

@@ -14,6 +14,11 @@ DATE_TOKEN = re.compile(
     r"(?:(20\d{2}|2100)년\s*)?(\d{1,2})월\s*(\d{1,2})일)"
 )
 LIMIT = 10
+PLAN_SELECT = (
+    "id,appointment_id,draft_title:content->>title,draft_date:content->>date,"
+    "draft_activities:content->activities,published_title:published_content->>title,"
+    "published_date:published_content->>date,activities:published_content->activities"
+)
 
 
 @dataclass(frozen=True)
@@ -109,7 +114,14 @@ def plain(value, limit=140):
     return re.sub(r"\s+", " ", value).strip()[:limit] if isinstance(value, str) else ""
 
 
-def render(target, appointments, plans):
+@dataclass(frozen=True)
+class ScheduleSummary:
+    reply: str
+    count: int
+    partial: bool
+
+
+def summarize_schedule(target, appointments, plans):
     """Published courses belong to their shared appointment; drafts stay separately labelled."""
     lines, shown = [f"{target} 공동 일정"], 0
     clipped = len(appointments) > LIMIT or len(plans) > LIMIT
@@ -181,7 +193,13 @@ def render(target, appointments, plans):
         lines.append("저장된 공동 약속과 코스가 없어요. 개인 일정은 이 조회에 포함되지 않아요.")
     if clipped:
         lines.append("일부 일정만 표시했어요. 나머지는 일정·플랜 목록에서 확인해 주세요.")
-    return "\n".join(lines), shown
+    return ScheduleSummary("\n".join(lines), shown, clipped)
+
+
+def render(target, appointments, plans):
+    """Keep the original formatter contract for stored/internal callers."""
+    result = summarize_schedule(target, appointments, plans)
+    return result.reply, result.count
 
 
 async def read_schedule(request, store, stats):
@@ -205,11 +223,7 @@ async def read_schedule(request, store, stats):
                 "GET",
                 "date_plans",
                 params={
-                    "select": "id,appointment_id,draft_title:content->>title,"
-                    "draft_date:content->>date,"
-                    "draft_activities:content->activities,"
-                    "published_title:published_content->>title,"
-                    "published_date:published_content->>date,activities:published_content->activities",
+                    "select": PLAN_SELECT,
                     "archived": "eq.false",
                     "or": f"(content->>date.eq.{target},published_content->>date.eq.{target})",
                     "order": "id.asc",
@@ -220,9 +234,13 @@ async def read_schedule(request, store, stats):
             raise ValueError("Invalid saved schedule response")
         if any(not isinstance(p, dict) for p in appointments + plans):
             raise ValueError("Invalid saved schedule row")
-        reply, count = render(target, appointments, plans)
-        return reply, [
-            {"name": "read_shared_schedule", "count": count, "status": "ok" if count else "empty"}
+        result = summarize_schedule(target, appointments, plans)
+        return result.reply, [
+            {
+                "name": "read_shared_schedule",
+                "count": result.count,
+                "status": "partial" if result.partial else "ok" if result.count else "empty",
+            }
         ]
     except (HTTPException, httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError):
         # Cancellation is intentionally not caught; lease/disconnect handling remains in _chat.

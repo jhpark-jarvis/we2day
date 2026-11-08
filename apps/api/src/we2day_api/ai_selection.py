@@ -34,6 +34,8 @@ FIELDS = frozenset(
         "targets",
         "operation",
         "city",
+        "tasks",
+        "arguments",
     }
 )
 
@@ -70,6 +72,24 @@ def parse_selection(raw, models, capabilities, *, selected):
             return failure("missing_calls")
         if len(calls) > 4:
             return failure("too_many_calls")
+        # Validate the envelope, then run the same per-capability argument/permission
+        # checks as legacy native calls. No model-selected executor or URL is accepted.
+        if len(calls) == 1 and calls[0].get("function", {}).get("name") == "select_capabilities":
+            arguments = calls[0]["function"].get("arguments", {})
+            try:
+                batch = json.loads(arguments) if isinstance(arguments, str) else arguments
+            except (ValueError, TypeError):
+                return failure("invalid_json")
+            if not isinstance(batch, dict) or set(batch) != {"tasks"}:
+                return failure("invalid_arguments", ["tasks"])
+            tasks = batch["tasks"]
+            if not isinstance(tasks, list) or not tasks:
+                return failure("invalid_arguments", ["tasks"])
+            if len(tasks) > 4:
+                return failure("too_many_calls")
+            if any(not isinstance(t, dict) or set(t) != {"name", "arguments"} for t in tasks):
+                return failure("invalid_arguments", ["tasks"])
+            calls = [{"function": task} for task in tasks]
         parsed, seen = Selection(), set()
         for call in calls:
             fn = call["function"]

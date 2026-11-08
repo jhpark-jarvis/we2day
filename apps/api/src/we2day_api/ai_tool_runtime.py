@@ -9,7 +9,7 @@ from we2day_api.ai_capabilities import BY_NAME, model_result
 from we2day_api.ai_place_policy import SearchArguments
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_tools import weather_requests
-from we2day_api.places import HUB_URL, SearchInput, SearchResults
+from we2day_api.places import parse_place_response, place_request
 
 
 class ToolIO:
@@ -51,32 +51,21 @@ class ToolIO:
             if kind == "data":
                 return await self.store.call("GET", action[1], params=action[2])
             if kind == "places":
-                query = SearchInput(query=action[1]).query
-                config = self.settings
-                if not (
-                    config.naver_search_enabled
-                    and config.naver_search_client_id
-                    and config.naver_search_client_secret
-                ):
-                    raise HTTPException(503, "place_search_not_configured")
-                status, raw = await bounded_response(
-                    self.client,
-                    "GET",
-                    HUB_URL,
-                    self.budget,
-                    limit=65536,
-                    seconds=4,
-                    params={"query": query, "display": 5, "start": 1, "sort": "random"},
-                    headers={
-                        "X-NCP-APIGW-API-KEY-ID": config.naver_search_client_id,
-                        "X-NCP-APIGW-API-KEY": config.naver_search_client_secret,
-                    },
-                )
-                if status == 429:
-                    raise HTTPException(429, "place_search_limited")
-                if status != 200:
-                    raise HTTPException(503, "place_search_unavailable")
-                return SearchResults.model_validate_json(raw)
+                spec = place_request(self.settings, action[1])
+                try:
+                    status, raw = await bounded_response(
+                        self.client,
+                        "GET",
+                        budget=self.budget,
+                        limit=65536,
+                        seconds=4,
+                        **spec,
+                    )
+                except HTTPException as error:
+                    if error.detail == "ai_invalid_response":
+                        raise HTTPException(503, "place_search_unavailable") from error
+                    raise
+                return parse_place_response(status, raw)
             if kind == "weather":
                 steps = weather_requests(action[1])
                 try:

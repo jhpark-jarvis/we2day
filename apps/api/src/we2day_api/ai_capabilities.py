@@ -149,14 +149,17 @@ CAPABILITIES = (
     Capability(
         "course.validate",
         "validate_course",
-        "서버의 최종 코스 장소/시간/비용 검사. 업무 저장 없음.",
+        "현재 코스 초안의 비용 합계/예산·미정 비용·같은/역순 시각·중복/누락 장소 점검. "
+        "인자는 빈 객체, 서버의 현재 초안만 검사. 실제 이동/영업 조회·수정/저장 없음.",
         "check",
         "current",
         "check",
-        exposed=False,
     ),
 )
 BY_NAME = {c.name: c for c in CAPABILITIES}
+SERVER_NAMES = frozenset(
+    c.name for c in CAPABILITIES if c.executor in {"schedule", "plan", "check"}
+)
 SESSION_NAMES = frozenset(c.name for c in CAPABILITIES if c.executor == "session")
 QUESTIONS = {
     "date": "어느 날짜의 공동 일정을 볼까요? 날짜 하나를 알려주세요.",
@@ -249,3 +252,41 @@ def definitions(models, names=None, *, selected=True):
         for c in CAPABILITIES
         if c.name in selected_names and c.exposed and (selected or not c.selected_required)
     ]
+
+
+def batch_definition(models, *, selected):
+    """One native call can cover independent tasks without provider parallel-call support."""
+    tasks = [
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "name": {"const": tool["function"]["name"], "type": "string"},
+                "arguments": tool["function"]["parameters"],
+            },
+            "required": ["name", "arguments"],
+            "description": tool["function"]["description"],
+        }
+        for tool in definitions(models, selected=selected)
+    ]
+    return {
+        "type": "function",
+        "function": {
+            "name": "select_capabilities",
+            "description": "List ALL independently requested tasks, one to four, in one call. "
+            "Each task names an allowed capability and supplies its typed arguments. No prose.",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "tasks": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "items": {"oneOf": tasks},
+                    }
+                },
+                "required": ["tasks"],
+            },
+        },
+    }

@@ -6,13 +6,14 @@ import httpx
 from fastapi import HTTPException
 
 from we2day_api.ai_capabilities import QUESTIONS
+from we2day_api.ai_course_check import inspect_current_course
 from we2day_api.ai_place_policy import norm
-from we2day_api.ai_saved_schedule import ScheduleRead, read_schedule, render, schedule_date
-
-PLAN_SELECT = (
-    "id,appointment_id,draft_title:content->>title,draft_date:content->>date,"
-    "draft_activities:content->activities,published_title:published_content->>title,"
-    "published_date:published_content->>date,activities:published_content->activities"
+from we2day_api.ai_saved_schedule import (
+    PLAN_SELECT,
+    ScheduleRead,
+    read_schedule,
+    schedule_date,
+    summarize_schedule,
 )
 
 
@@ -68,6 +69,10 @@ async def read_plan(args, latest, context, version, today, store, stats):
                         else "eq." + title
                     ),
                 }
+                if target:
+                    params["or"] = (
+                        f"(content->>date.eq.{target},published_content->>date.eq.{target})"
+                    )
                 values = await store.call("GET", "date_plans", params=params)
                 if not isinstance(values, list) or any(not isinstance(v, dict) for v in values):
                     raise ValueError("Invalid plan result")
@@ -105,15 +110,21 @@ async def read_plan(args, latest, context, version, today, store, stats):
             if target
             else sorted({d for d in [row.get("published_date"), row.get("draft_date")] if d})
         )
-        reply = "저장 플랜 조회\n" + "\n".join(render(d, [], [row])[0] for d in dates)
-        return reply[:3900], [{"name": "read_shared_plan", "status": "ok", "count": 1}]
+        summaries = [summarize_schedule(d, [], [row]) for d in dates]
+        reply = "저장 플랜 조회\n" + "\n".join(s.reply for s in summaries)
+        partial = any(s.partial for s in summaries) or len(reply) > 3900
+        if len(reply) > 3900:
+            reply = reply[:3800] + "\n일부 내용만 표시했어요. 플랜에서 나머지를 확인해 주세요."
+        return reply, [
+            {"name": "read_shared_plan", "status": "partial" if partial else "ok", "count": 1}
+        ]
     except (HTTPException, httpx.HTTPError, ValueError, TypeError, KeyError, TimeoutError):
         return "저장 플랜 조회\n플랜을 불러오지 못했어요. 잠시 후 다시 확인해 주세요.", [
             {"name": "read_shared_plan", "status": "failed", "count": 0}
         ]
 
 
-async def execute_reads(selection, latest, context, version, today, store, stats):
+async def execute_reads(selection, latest, context, version, today, store, stats, *, proposal=None):
     replies, reports, pending = [], [], None
     for name, args in selection.calls:
         if name == "read_shared_calendar":
@@ -122,6 +133,9 @@ async def execute_reads(selection, latest, context, version, today, store, stats
             pending = {"basis": version + 1, "date": request.date}
         elif name == "read_shared_plan":
             reply, tools = await read_plan(args, latest, context, version, today, store, stats)
+        elif name == "validate_course":
+            with stats.span("tools"):
+                reply, tools = inspect_current_course(proposal)
         else:
             continue
         replies.append(reply)

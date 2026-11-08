@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from we2day_api.ai_capabilities import QUESTIONS
+from we2day_api.ai_capabilities import QUESTIONS, SERVER_NAMES
 from we2day_api.ai_capability_reads import execute_reads
 from we2day_api.ai_capability_router import apply_selection, direct_request, valid_weather
 from we2day_api.ai_capability_router import select as select_capability
@@ -809,11 +809,18 @@ async def _chat(body, settings, store, client, budget, stats):
             if selection.invalid:
                 raise HTTPException(502, "ai_selection_failed")
             private_replies, private_reports, pending = await execute_reads(
-                selection, latest, before_context, body.version, today, store, stats
+                selection,
+                latest,
+                before_context,
+                body.version,
+                today,
+                store,
+                stats,
+                proposal=proposal,
             )
             if pending is not None:
                 context.schedule_read = pending
-            if all(n in {"read_shared_calendar", "read_shared_plan"} for n, _ in selection.calls):
+            if all(n in SERVER_NAMES for n, _ in selection.calls):
                 return await terminal("", private_reports)
             question = next((a["field"] for n, a in selection.calls if n == "ask_user"), None)
             if question == "region":
@@ -878,10 +885,7 @@ async def _chat(body, settings, store, client, budget, stats):
             if any(n in {"get_weather", "lookup_selected_places"} for n, _ in selection.calls):
                 decision.interpret = False
                 decision.directive.reply = ""
-            if all(
-                n in {"get_weather", "read_shared_calendar", "read_shared_plan"}
-                for n, _ in selection.calls
-            ):
+            if all(n in {"get_weather"} | SERVER_NAMES for n, _ in selection.calls):
                 decision.directive.intent = decision.directive.state.intent = "weather"
                 decision.directive.allowed_tools = {"get_weather"}
         await restore_saved_area(decision, body, store, stats)

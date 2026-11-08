@@ -59,6 +59,7 @@ COUNTERS |= {
         "propose_course",
         "continue_planning",
         "ask_user",
+        "validate_course",
     )
 }
 CATEGORIES = {

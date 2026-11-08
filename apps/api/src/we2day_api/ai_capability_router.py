@@ -15,7 +15,7 @@ from we2day_api.ai_capabilities import (
     ClarifyArguments,
     CourseProposalArguments,
     PlanReadArguments,
-    definitions,
+    batch_definition,
 )
 from we2day_api.ai_control import Action, apply_action
 from we2day_api.ai_control import prepare as prepare_control
@@ -68,6 +68,7 @@ MODELS = {
     "propose_course": CourseProposalArguments,
     "continue_planning": EmptyArguments,
     "ask_user": ClarifyArguments,
+    "validate_course": EmptyArguments,
 }
 
 
@@ -149,7 +150,7 @@ async def _select_once(
     inputs = {
         **model_parameters(settings),
         "messages": selection_messages(body, context, proposal, today),
-        "tools": definitions(MODELS, selected=bool(body.selected_places)),
+        "tools": [batch_definition(MODELS, selected=bool(body.selected_places))],
         "tool_choice": "required",
         "temperature": 0,
         "max_tokens": 768,
