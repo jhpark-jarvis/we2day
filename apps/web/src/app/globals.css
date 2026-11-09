@@ -154,6 +154,8 @@ button { appearance: none; color: var(--foreground); }
 .agenda-header-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
 .agenda-meeting { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-size: 12px; white-space: nowrap; }
 .appointment-row { display: grid; grid-template-columns: 38px minmax(43px, max-content) minmax(0, 1fr) 16px; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 8px 0; text-align: left; border: 0; border-radius: 6px; background: transparent; }
+.appointment-row.has-author { grid-template-columns: 38px minmax(43px, max-content) minmax(0, 1fr) minmax(0, max-content) 16px; }
+.appointment-author { display: block; min-width: 0; max-width: min(96px, 22vw); padding: 2px 6px; border-radius: 5px; background: var(--panel); color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; justify-self: end; }
 .appointment-kind { font-size: 12px; color: var(--accent); }
 .appointment-kind.personal { color: color-mix(in srgb, var(--foreground) 30%, #7691aa); }
 .appointment-row time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; word-break: keep-all; }

@@ -697,7 +697,7 @@ export function CalendarWorkspace({
               {dayEvents.length ? (
                 dayEvents.map((event) => (
                   <button
-                    className="appointment-row"
+                    className={`appointment-row${event.kind === "personal" ? " has-author" : ""}`}
                     type="button"
                     key={event.id}
                     onClick={() => setDetail(event)}
@@ -709,6 +709,15 @@ export function CalendarWorkspace({
                     </span>
                     <time>{event.time}</time>
                     <strong className="appointment-title">{event.title}</strong>
+                    {event.kind === "personal" && (
+                      <span
+                        className="appointment-author"
+                        title={names[event.created_by || ""] || "이름 미설정"}
+                      >
+                        <span className="sr-only">작성자: </span>
+                        {names[event.created_by || ""] || "이름 미설정"}
+                      </span>
+                    )}
                     <ChevronRight size={16} aria-hidden="true" />
                   </button>
                 ))

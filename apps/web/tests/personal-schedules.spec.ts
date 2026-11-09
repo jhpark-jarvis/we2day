@@ -15,6 +15,7 @@ test("personal schedules share read access, restrict edits and keep independent 
     await view.goto(path);
     await view.waitForLoadState("networkidle");
   };
+  const longAuthorName = "예시 작성자 이름이 길어도 전체 이름 보존";
   try {
     const partner = await context.newPage();
     for (const [view, id, name] of [
@@ -70,6 +71,18 @@ test("personal schedules share read access, restrict edits and keep independent 
     await expect(day).toHaveClass(/has-event/);
     await expect(day.locator(".day-check")).toBeVisible();
     await expect(day).toHaveClass(/has-personal/);
+    await open(partner, `/?date=${date}`);
+    await partner.getByRole("button", { name: "약속 추가하기", exact: true }).click();
+    await partner.getByRole("radio", { name: "개인 일정", exact: true }).check();
+    await partner.getByLabel("일정 이름", { exact: true }).fill("상대방 개인 일정");
+    await partner.locator('input[type="time"]').fill("12:00");
+    await partner.getByRole("button", { name: "일정 저장", exact: true }).click();
+    await expect(partner.getByRole("button", { name: /상대방 개인 일정/ })).toBeVisible();
+    await open(page, "/account");
+    await page.getByLabel("사용자 이름", { exact: true }).fill(longAuthorName);
+    await page.getByRole("button", { name: "이름 저장", exact: true }).click();
+    await expect(page.locator(".detail-list")).toContainText(longAuthorName);
+    await open(page, `/?date=${date}`);
     for (const width of [320, 393, 1280]) {
       await page.setViewportSize({ width, height: 852 });
       const number = day.locator(".day-number");
@@ -83,12 +96,50 @@ test("personal schedules share read access, restrict edits and keep independent 
       if (!circle || !dot) throw new Error("calendar markers missing");
       expect(dot.y).toBeGreaterThan(circle.y + circle.height);
       const agenda = page.getByRole("region", { name: "선택한 날짜의 약속", exact: true });
-      await expect(agenda.locator(".appointment-kind")).toHaveText(["개인", "데이트"]);
+      await expect(agenda.locator(".appointment-kind")).toHaveText(["개인", "개인", "데이트"]);
       await expect(agenda.locator(".appointment-title")).toHaveText([
         "개인 일정 합성 예시",
+        "상대방 개인 일정",
         "공동 약속 합성 예시",
       ]);
-      await expect(agenda.locator(".appointment-row time")).toHaveText(["10:00", "14:00"]);
+      await expect(agenda.locator(".appointment-row time")).toHaveText(["10:00", "12:00", "14:00"]);
+      await expect(agenda.locator(".appointment-author")).toHaveText([
+        `작성자: ${longAuthorName}`,
+        "작성자: 예시 상대방",
+      ]);
+      await expect(agenda.locator(".appointment-author").first()).toHaveAttribute(
+        "title",
+        longAuthorName,
+      );
+      await expect(
+        agenda.getByRole("button", { name: /공동 약속 합성 예시/ }).locator(".appointment-author"),
+      ).toHaveCount(0);
+      for (const theme of ["warm", "white", "pongni", "dumung", "sopoo", "kuku"]) {
+        await page.evaluate((value) => {
+          document.documentElement.dataset.theme = value;
+        }, theme);
+        const layout = await agenda.locator(".appointment-row").evaluateAll((rows) =>
+          rows.map((row) => {
+            const box = row.getBoundingClientRect();
+            const cells = [...row.children].map((child) => child.getBoundingClientRect());
+            return {
+              inside: cells.every((cell) => cell.left >= box.left && cell.right <= box.right + 1),
+              separated: cells.every(
+                (cell, index) => !index || cell.left >= cells[index - 1].right - 1,
+              ),
+              authorEnd: row.querySelector(".appointment-author")?.getBoundingClientRect().right,
+            };
+          }),
+        );
+        expect(layout.every((row) => row.inside && row.separated)).toBe(true);
+        expect(Math.abs((layout[0].authorEnd || 0) - (layout[1].authorEnd || 0))).toBeLessThan(1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+      }
+      await page.evaluate(() => {
+        document.documentElement.dataset.theme = "warm";
+      });
       await expect(agenda.getByRole("heading")).toHaveText(/\d+월 \d+일.*요일/);
       await expect(agenda.getByRole("link", { name: /데이트 코스/ })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -102,7 +153,7 @@ test("personal schedules share read access, restrict edits and keep independent 
     });
     await open(partner, `/?date=${date}`);
     await partner.getByRole("button", { name: /개인 일정 합성 예시/ }).click();
-    await expect(partner.locator(".detail-list")).toContainText("예시 작성자");
+    await expect(partner.locator(".detail-list")).toContainText(longAuthorName);
     await expect(partner.getByRole("button", { name: "개인 일정 수정", exact: true })).toHaveCount(
       0,
     );
@@ -110,6 +161,15 @@ test("personal schedules share read access, restrict edits and keep independent 
       0,
     );
     await expect(partner.getByText("장소", { exact: true })).toHaveCount(0);
+    await partner.goBack();
+    await expect(partner.getByRole("button", { name: /상대방 개인 일정/ })).toBeVisible();
+    await partner.getByRole("button", { name: /상대방 개인 일정/ }).click();
+    await partner.getByRole("button", { name: "개인 일정 삭제", exact: true }).click();
+    await partner
+      .getByRole("dialog", { name: "개인 일정 삭제 확인", exact: true })
+      .getByRole("button", { name: "삭제", exact: true })
+      .click();
+    await open(page, `/?date=${date}`);
     await page.getByRole("button", { name: /개인 일정 합성 예시/ }).click();
     await page.getByRole("button", { name: "개인 일정 수정", exact: true }).click();
     await page.getByLabel("일정 이름", { exact: true }).fill("수정한 개인 일정");
