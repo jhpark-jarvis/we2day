@@ -52,7 +52,17 @@ def setup(monkeypatch):
 
 
 def body(text="2030년 1월 1일 코스 제안"):
-    return {"consent": True, "messages": [{"role": "user", "content": text}]}
+    # Protocol/error tests must reach inference with an actionable current course;
+    # a date-only new plan now correctly asks for activities without calling it.
+    return {
+        "consent": True,
+        "messages": [{"role": "user", "content": text}],
+        "proposal": {
+            "title": "합성 기존 코스",
+            "date": "2030-01-01",
+            "activities": [{"title": "카페", "place": "합성 카페"}],
+        },
+    }
 
 
 def test_validated_plan_and_no_database_write(setup):

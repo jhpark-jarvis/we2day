@@ -541,6 +541,11 @@ class ToolSession:
                 visible.append(item)
         return self.ordered(visible)
 
+    def selected_candidates(self):
+        # Identity deduplication may reuse a current-course or freshly chosen
+        # candidate. Explicit selection is a request-local role, not its origin.
+        return [c for c in self.candidates.values() if c.ref in self.selected_usage]
+
     def guard_plan(self, model_plan, resolved):
         scope = self.policy.scope
         if self.operation in {"search", "reject", "clarify", "chat", "weather"}:

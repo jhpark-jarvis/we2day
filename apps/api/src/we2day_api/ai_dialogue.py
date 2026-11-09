@@ -296,6 +296,11 @@ def new_task(text):
             planning_request(text)
             or re.search(r"검색|찾아|추천|알아\s*봐|코스.*(?:만들|짜)|플랜.*(?:만들|짜)", text)
             or re.search(
+                r"보여\s*(?:줘|주세요|줄)|알려\s*(?:줘|주세요)|브리핑|"
+                r"점검(?:해|하)|계산(?:해|하)|확인(?:해|하)|저장(?:해|하)|날씨|예보",
+                text,
+            )
+            or re.search(
                 r"제목|날짜|예산|총액|지역|동네|이동\s*수단|추가\s*조건|시작\s*시간|종료\s*시간",
                 text,
             )
@@ -379,6 +384,32 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
                 "아직 변경하지 않았어요. 새 값을 알려주거나 진행 중인 변경을 취소할 수 있어요."
             )
         return directive
+    quoted_title = re.fullmatch(r"\s*[\"'‘“](.+)[\"'’”]\s*", text)
+    if (
+        old_pending
+        and old_pending.field == "title"
+        and old_pending.resume == "edit"
+        and proposal
+        and not cancel_request(text)
+        and (
+            quoted_title
+            or not any(field_values(text).values())
+            and not re.search(
+                r"찾아|검색(?:해|하)|추천(?:해|좀)|보여|알려|확인해|점검해|계산해|저장해|"
+                r"바꿔|바꾸|변경해|수정해|짜\s*줘|만들어|추가해|넣어|빼\s*줘|없애",
+                text,
+            )
+        )
+    ):
+        title = (quoted_title[1] if quoted_title else text).strip()
+        if 1 <= len(title) <= 100:
+            # Bind a literal answer to the text field before interpreting words
+            # inside that value as dates, budgets, venue kinds or a new task.
+            directive.plan = proposal.model_copy(deep=True)
+            directive.plan.title = title
+            directive.intent = directive.state.intent = "edit"
+            directive.reply = "제목을 바꿨어요."
+            return directive
     fresh = new_task(text)
     answer_fields = set(field_values(text))
     pending_labels = {

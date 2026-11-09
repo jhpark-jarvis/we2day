@@ -45,6 +45,7 @@ from we2day_api.ai_search_spec import (
     scope_for,
     semantic_request,
 )
+from we2day_api.ai_state import advance_context
 from we2day_api.prompt_bundle import PROMPT
 
 VERSION = 1
@@ -303,6 +304,21 @@ def prepare(body, context, proposal, today):
         if not known_date:
             directive.ask(
                 "date", "어느 날짜의 코스로 정할까요? 날짜를 알려주세요.", resume=directive.intent
+            )
+        elif (
+            directive.intent == "plan"
+            and not body.brief
+            and not proposal
+            and not body.selected_places
+            and not body.chosen_places
+            and not directive.scope.kinds
+            and not directive.scope.exact_name
+            and not directive.slots.get("activities", before.get("activities"))
+        ):
+            directive.ask(
+                "target",
+                "어떤 활동을 하고 싶나요? 원하는 활동이나 장소 종류를 알려주세요.",
+                resume="plan",
             )
     replacement_area = changed_area(latest) or explicit_area(latest)
     if (
@@ -730,6 +746,8 @@ def apply_action(control, latest, action):
             directive.scope.search_only = action.operation == "search"
             directive.slots["region"] = directive.scope.area
             directive.allowed_tools = {"search_places"}
+            if control.selected:
+                directive.allowed_tools.add("lookup_selected_places")
             if action.operation == "plan" and not directive.slots.get(
                 "date", control.context.get("date")
             ):
@@ -766,6 +784,13 @@ def apply_action(control, latest, action):
 
 def reduce_context(before, incoming, directive, body, session, reason):
     """Only this projection records action/conditions; no selected IDs or result lists."""
+    if directive.intent == "weather" and not directive.state.pending:
+        # A weather side question must not consume an unanswered planning/edit question.
+        prior = before.get("dialogue") or {}
+        if prior.get("turn_version", 0) == body.version and prior.get("pending"):
+            from we2day_api.ai_dialogue import PendingChange
+
+            directive.state.pending = PendingChange.model_validate(prior["pending"])
     result = merge_context(before, incoming, directive)
     old = state_at(before, body.version)
     previous = old.get("last_action")
@@ -779,7 +804,15 @@ def reduce_context(before, incoming, directive, body, session, reason):
         if directive.state.pending and directive.state.pending.resume in PLACE_INTENTS
         else directive.intent
     )
-    if not cancelled and (operation in PLACE_INTENTS or directive.place_followup):
+    if (
+        not cancelled
+        and (operation in PLACE_INTENTS or directive.place_followup)
+        and not (
+            reason == "retry"
+            and previous is None
+            and not any(report["name"] == "search_places" for report in session.reports)
+        )
+    ):
         previous = {
             "operation": operation if operation in PLACE_INTENTS else "search",
             "scope": directive.scope.model_dump(),
@@ -816,13 +849,10 @@ def reduce_context(before, incoming, directive, body, session, reason):
         result["intake"] = current
     if (
         not body.brief
-        and directive.intent == "chat"
+        and directive.intent in {"chat", "weather"}
         and not cancel_request(body.messages[-1].content)
     ):
         # A social turn preserves an active clarification across every controller;
         # otherwise its unchanged basis would look like an older API writer next turn.
-        for name in ("intake", "activity_edit", "pending_fields"):
-            value = result.get(name)
-            if isinstance(value, dict) and value.get("turn_version") == body.version:
-                result[name] = {**value, "turn_version": body.version + 1}
+        return advance_context(result, body.version)
     return result

@@ -140,7 +140,7 @@ def semantic_request(text, directive, proposal, before):
         return True
     # A safe fast path remains for an exact, plain category lookup. Rich requests
     # use semantic extraction even if an old parser happened to inherit a category.
-    if directive.intent == "search" and requested and not directive.scope.exact_name:
+    if directive.intent == "search" and requested:
         target_text = text.replace(explicit_area(text), "") if explicit_area(text) else text
         if len(kinds(text)) < 2 and re.search(r"랑|하고|그리고|(?:와|과|및)\s|[,，]", target_text):
             return True

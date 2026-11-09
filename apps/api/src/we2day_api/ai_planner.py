@@ -22,7 +22,13 @@ from we2day_api.ai_capability_router import apply_selection, direct_request, val
 from we2day_api.ai_capability_router import select as select_capability
 from we2day_api.ai_context import model_messages
 from we2day_api.ai_control import interpret, prepare, reduce_context, restore_saved_area
-from we2day_api.ai_dialogue import activity_target, merge_context
+from we2day_api.ai_dialogue import (
+    DialogueState,
+    Directive,
+    activity_target,
+    merge_context,
+    planning_request,
+)
 from we2day_api.ai_dialogue import explicit_date as explicit_date
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, window_checks
@@ -32,7 +38,9 @@ from we2day_api.ai_place_answers import (
     claims_place_search,
     read_candidate_request,
 )
-from we2day_api.ai_place_policy import LABELS, PlacePolicy, explicit_area, kinds, norm
+from we2day_api.ai_place_policy import LABELS, PlacePolicy, SearchScope, explicit_area, kinds, norm
+from we2day_api.ai_plan_metadata import generated_title
+from we2day_api.ai_read_answers import join_replies, selected_reply, weather_reply
 from we2day_api.ai_runtime import (
     AIStore,
     Budget,
@@ -44,6 +52,7 @@ from we2day_api.ai_runtime import (
 from we2day_api.ai_saved_schedule import read_schedule, request_read
 from we2day_api.ai_search_followups import pending_promise, saved_refinement
 from we2day_api.ai_search_spec import current_anchor, saved_spec, search_queries
+from we2day_api.ai_state import advance_context, current_context
 from we2day_api.ai_stream import events
 from we2day_api.ai_tool_runtime import ToolIO, execute_batch
 from we2day_api.ai_tools import (
@@ -396,6 +405,18 @@ async def complete(
             plan = session.resolve(model_answer.plan) if session and model_answer.plan else None
             guarded = []
             if session:
+                if plan:
+                    title = generated_title(
+                        plan.title,
+                        plan.date,
+                        session.policy.user_text,
+                        existing=session.previous_plan is not None,
+                    )
+                    if title != plan.title:
+                        plan.title = title
+                        stats.counts["optional_normalizations"] = (
+                            stats.counts.get("optional_normalizations", 0) + 1
+                        )
                 plan, guarded = session.guard_plan(model_answer.plan, plan)
                 if plan and session.append_only and session.previous_plan:
                     places = {(a.place, a.map_url) for a in session.previous_plan.activities}
@@ -761,18 +782,21 @@ async def _chat(body, settings, store, client, budget, stats):
             proposal = head.get("proposal") or proposal
             proposal = PlanContent.model_validate(proposal) if proposal else None
         today = datetime.now(ZoneInfo("Asia/Seoul")).date()
-        before_context = context.model_dump()
+        before_context = current_context(context.model_dump(), body.version)
+        context = StoredContext.model_validate(before_context)
         selection, private_replies, private_reports, pending = None, [], [], None
 
         async def terminal(reply, reports):
             nonlocal finished
             if private_replies:
-                reply = "\n\n".join([*private_replies, *([reply] if reply else [])])[:3900]
+                reply = join_replies([*private_replies, reply])
             stats.counts.update(server_responses=1, executed_tools=len(reports))
             answer = ChatResult(
                 reply=reply,
                 tools=reports,
-                context=context,
+                context=StoredContext.model_validate(
+                    advance_context(context.model_dump(), body.version)
+                ),
                 prompt_version=PROMPT_VERSION,
                 prompt_sha256=PROMPT_SHA256,
             )
@@ -837,7 +861,13 @@ async def _chat(body, settings, store, client, budget, stats):
                     for t in targets
                 ]
             elif question:
-                return await terminal(QUESTIONS[question], [])
+                question_control = prepare(body, before_context, proposal, today)
+                if question in {"date", "target"} and question_control.directive.state.pending:
+                    # Use the same typed question/continuation contract as normal
+                    # turns instead of emitting an untracked clarification string.
+                    local_request, selection = question_control, None
+                else:
+                    return await terminal(QUESTIONS[question], [])
         saved_request = (
             None
             if body.brief or getattr(settings, "ai_capabilities_enabled", False)
@@ -847,32 +877,9 @@ async def _chat(body, settings, store, client, budget, stats):
             reply, reports = await read_schedule(saved_request, store, stats)
             # Keep the user's editing proposal/conditions separate from a viewed schedule date.
             context.schedule_read = {"basis": body.version + 1, "date": saved_request.date}
-            stats.counts.update(server_responses=1, planned_tools=1, executed_tools=len(reports))
-            answer = ChatResult(
-                reply=reply,
-                tools=reports,
-                context=context,
-                prompt_version=PROMPT_VERSION,
-                prompt_sha256=PROMPT_SHA256,
-            )
-            stats.stage("validate")
-            result = await _finish_result(body, latest, answer, [], store, stats, lease)
-            finished = True
-            return result
+            stats.counts["planned_tools"] = 1
+            return await terminal(reply, reports)
         before_context.pop("schedule_read", None)
-        if (
-            context.intake
-            and context.intake.pending
-            and context.intake.turn_version != body.version
-        ):
-            before_context["intake"]["pending"] = None
-        if context.activity_edit and context.activity_edit.turn_version != body.version:
-            before_context["activity_edit"] = None
-        if context.pending_fields and context.pending_fields.turn_version != body.version:
-            before_context["pending_fields"] = None
-        if context.dialogue.turn_version != body.version:
-            # Opaque state can survive an older API writer; never resume a stale pending edit.
-            before_context["dialogue"]["pending"] = None
         if proposal and not before_context.get("date") and not context.dialogue.cleared_date:
             before_context["date"] = proposal.date
         decision = local_request or prepare(body, before_context, proposal, today)
@@ -885,9 +892,28 @@ async def _chat(body, settings, store, client, budget, stats):
             if any(n in {"get_weather", "lookup_selected_places"} for n, _ in selection.calls):
                 decision.interpret = False
                 decision.directive.reply = ""
-            if all(n in {"get_weather"} | SERVER_NAMES for n, _ in selection.calls):
-                decision.directive.intent = decision.directive.state.intent = "weather"
-                decision.directive.allowed_tools = {"get_weather"}
+            names = {n for n, _ in selection.calls}
+            if "get_weather" in names:
+                # A forecast's explicit date is not an edit to the planning date,
+                # including when another independent read/search shares the turn.
+                decision.directive.slots.pop("date", None)
+                decision.directive.state.cleared_date = before_context.get("dialogue", {}).get(
+                    "cleared_date", False
+                )
+            if names <= {"get_weather", "lookup_selected_places"} | SERVER_NAMES and (
+                "lookup_selected_places" not in names or not planning_request(latest)
+            ):
+                # A forecast's date/city belong to the read, not to the course's
+                # conditions or unanswered planning question.
+                state = DialogueState.model_validate(before_context.get("dialogue") or {})
+                operation = "weather" if "get_weather" in names else "chat"
+                state.intent = operation
+                decision.directive = Directive(
+                    state,
+                    SearchScope.model_validate(before_context.get("search_scope") or {}),
+                    intent=operation,
+                    allowed_tools=names & {"get_weather", "lookup_selected_places"},
+                )
         await restore_saved_area(decision, body, store, stats)
         before_context, directive = decision.context, decision.directive
         if decision.interpret:
@@ -1011,6 +1037,24 @@ async def _chat(body, settings, store, client, budget, stats):
                 with stats.span("tools"):
                     await execute_batch(session, calls, io)
         await read_candidate_request(directive, session, io)
+        if selection and directive.intent not in {"plan", "select", "edit"}:
+            names = {n for n, _ in selection.calls}
+            read_parts = []
+            if "lookup_selected_places" in names:
+                read_parts.append(selected_reply(session))
+            if "get_weather" in names:
+                read_parts.append(
+                    weather_reply(
+                        session.weather,
+                        [
+                            result["error"]
+                            for result in session.weather_queries.values()
+                            if result.get("error")
+                        ],
+                    )
+                )
+            if read_parts:
+                directive.reply = join_replies([directive.reply, *read_parts])
         if selection and not any(n == "continue_planning" for n, _ in selection.calls):
             session.direct_final = True
         if (
@@ -1090,6 +1134,7 @@ async def _chat(body, settings, store, client, budget, stats):
                 plan=directive.plan,
                 checks=check_course(directive.plan) if directive.plan else [],
                 tools=session.reports,
+                weather=session.weather,
                 prompt_version=PROMPT_VERSION,
                 prompt_sha256=PROMPT_SHA256,
             )
@@ -1108,7 +1153,7 @@ async def _chat(body, settings, store, client, budget, stats):
         if directive.notices:
             answer.reply = "\n".join([*directive.notices, answer.reply])[:4000]
         if private_replies:
-            answer.reply = "\n\n".join([*private_replies, answer.reply])[:3900]
+            answer.reply = join_replies([*private_replies, answer.reply])
             answer.tools = (private_reports + answer.tools)[:9]
         answer.context = StoredContext.model_validate(
             reduce_context(

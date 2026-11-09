@@ -1,6 +1,7 @@
 """One bounded native tool-selection call, before any shared-business read."""
 
 import json
+import re
 import time
 from datetime import date
 from typing import Annotated
@@ -19,7 +20,7 @@ from we2day_api.ai_capabilities import (
 )
 from we2day_api.ai_control import Action, apply_action
 from we2day_api.ai_control import prepare as prepare_control
-from we2day_api.ai_dialogue import new_task, social_turn
+from we2day_api.ai_dialogue import date_value, new_task, social_turn
 from we2day_api.ai_location import pending_location
 from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import SearchArguments, norm, relational_area
@@ -75,8 +76,11 @@ MODELS = {
 def direct_request(body, context, proposal, today):
     """Reuse typed current-task answers and complete edits before free-form selection."""
     location = pending_location(context, body.version)
-    social = social_turn(body.messages[-1].content)
-    if (not proposal and not location and not social) or body.brief:
+    latest = body.messages[-1].content
+    social = social_turn(latest)
+    dialogue = context.get("dialogue") or {}
+    pending = dialogue.get("pending") if dialogue.get("turn_version", 0) == body.version else None
+    if (not proposal and not location and not social and not pending) or body.brief:
         return None
     decision = prepare_control(body, context, proposal, today)
     directive = decision.directive
@@ -84,6 +88,18 @@ def direct_request(body, context, proposal, today):
         return decision
     if location and decision.reason == "conditions" and not decision.interpret:
         return decision
+    if (
+        pending
+        and not new_task(latest)
+        and not re.search(r"보여|알려|확인|점검|계산|저장|브리핑|날씨|예보|[?？]", latest)
+        and not decision.interpret
+    ):
+        field = pending["field"]
+        answered = (
+            field == "date" and "date" in directive.slots and date_value(latest, today)[0]
+        ) or (field == "target" and bool(directive.slots.get("activities")))
+        if answered and directive.intent != "chat":
+            return decision
     if (
         directive.intent == "edit"
         and (directive.plan or decision.reason == "conditions" and directive.reply)
@@ -133,6 +149,10 @@ def selection_messages(body, context, proposal, today):
         if (context.get("schedule_read") or {}).get("basis") == body.version
         else None,
         "selected_count": len(body.selected_places),
+        "selected_roles": {
+            role: sum(p.usage == role for p in body.selected_places)
+            for role in ("anchor", "include")
+        },
         "pending_place_targets": [t.query for t in location.search.targets]
         if location and location.search
         else [],

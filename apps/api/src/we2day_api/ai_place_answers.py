@@ -160,15 +160,11 @@ async def read_candidate_request(directive, session, io):
         await execute_batch(
             session, [{"function": {"name": "lookup_selected_places", "arguments": "{}"}}], io
         )
-        selected = [p for p in session.candidates.values() if p.source == "selected"]
+        selected = session.selected_candidates()
         if not selected:
             if any(r["status"] == "failed" for r in session.reports):
                 session.resolution = "failed"
-                directive.ask(
-                    "target",
-                    "선택한 장소를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
-                    resume="search",
-                )
+                directive.reply = "선택한 장소를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
                 return
             session.resolution = "selection_required" if not session.reports else "unresolved"
             directive.ask(
@@ -268,11 +264,7 @@ async def read_candidate_request(directive, session, io):
                 resume="plan" if directive.intent == "plan" else "search",
             )
             return
-        anchors = [
-            p
-            for p in session.candidates.values()
-            if p.source == "selected" and norm(p.title) == norm(area)
-        ]
+        anchors = [p for p in session.selected_candidates() if norm(p.title) == norm(area)]
         areas = {address_area(p.address) for p in anchors} - {""}
         if len(areas) != 1:
             session.resolution = "unresolved"

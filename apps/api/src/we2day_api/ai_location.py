@@ -143,7 +143,11 @@ def project_location(result, before, directive, body, cancelled):
             scope=directive.scope,
             search=search,
         ).model_dump()
-    elif not cancelled and directive.intent == "chat" and pending_location(before, body.version):
+    elif (
+        not cancelled
+        and directive.intent in {"chat", "weather"}
+        and pending_location(before, body.version)
+    ):
         value = pending_location(before, body.version)
         value.basis = body.version + 1
         result["location_request"] = value.model_dump()

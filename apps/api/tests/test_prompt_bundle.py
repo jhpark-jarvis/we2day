@@ -21,8 +21,8 @@ def resource_copy(tmp_path):
 
 
 def test_immutable_release_and_cross_platform_digest(resource_copy):
-    assert PROMPT.version == "we2-ai-2026-11-09-v23"
-    assert PROMPT.sha256 == "47eeb1902bc5d743c170a80a371d7bd1a7f3bb58216531dd181e57ff51a0a059"
+    assert PROMPT.version == "we2-ai-2026-11-09-v24"
+    assert PROMPT.sha256 == "464dc10fc5a5e77cf23f97288b0a00ac420e8aadbabb74ba91bfb6419d964a3c"
     assert PROMPT.interpret
     for path in (resource_copy / PROMPT.version).iterdir():
         path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))

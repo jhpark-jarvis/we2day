@@ -64,7 +64,10 @@ def model_messages(system, body, context, scope, directive, session, proposal, t
         for message in body.messages
         if not (
             message.role == "assistant"
-            and re.search(r"(?m)^(?:\d{4}-\d{2}-\d{2} 공동 일정|저장 플랜 조회)\n", message.content)
+            and re.search(
+                r"(?m)^(?:\d{4}-\d{2}-\d{2} 공동 일정|저장 플랜 조회|선택한 장소 조회)\n",
+                message.content,
+            )
         )
     ]
     if body.brief:
