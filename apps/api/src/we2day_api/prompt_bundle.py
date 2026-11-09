@@ -18,6 +18,7 @@ class PromptBundle:
     interpret: str = ""
     relevance: str = ""
     route: str = ""
+    retrieval: str = ""
 
 
 def read_bundle(root: Traversable) -> PromptBundle:
@@ -41,6 +42,8 @@ def read_bundle(root: Traversable) -> PromptBundle:
         names.append("relevance")
     if int(version.rsplit("v", 1)[1]) >= 16:
         names.append("route")
+    if int(version.rsplit("v", 1)[1]) >= 26:
+        names.append("retrieval")
     for name in names:
         content = root.joinpath(version, f"{name}.txt").read_bytes()
         if not content or len(content) > 16384:

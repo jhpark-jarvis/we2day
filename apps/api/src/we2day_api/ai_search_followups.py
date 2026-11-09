@@ -90,7 +90,11 @@ def pending_promise(reply):
     )
 
 
-def grounded_query(query, latest):
+def grounded_query(query, latest, *, category=False):
     return bool(
-        query and re.fullmatch(r"[가-힣A-Za-z0-9 ]{2,50}", query) and norm(query) in norm(latest)
+        query
+        and re.fullmatch(
+            r"[가-힣A-Za-z0-9 ]{1,50}" if category else r"[가-힣A-Za-z0-9 ]{2,50}", query
+        )
+        and norm(query) in norm(latest)
     )

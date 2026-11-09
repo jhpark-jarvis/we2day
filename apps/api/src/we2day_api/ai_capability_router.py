@@ -26,7 +26,7 @@ from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import SearchArguments, norm, relational_area
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_saved_schedule import schedule_date
-from we2day_api.ai_search_spec import place_name, referenced_anchor
+from we2day_api.ai_search_spec import CategoryHint, broad_goal, place_name, referenced_anchor
 from we2day_api.ai_selection import REPAIRABLE, Selection, parse_selection, record_selection
 from we2day_api.ai_tools import EmptyArguments, WeatherArguments
 from we2day_api.prompt_bundle import PROMPT
@@ -42,7 +42,8 @@ class PlaceSelectionArguments(SearchArguments):
         min_length=1,
         max_length=50,
         description=(
-            "검색할 장소·음식·시설 이름의 짧은 명사구. 먹을/마실/갈 만한 곳·요청 동사·지역 제외."
+            "첫 targets 원문을 복사. 장소·음식·시설 이름이나 일반 활동 목표를 유지. "
+            "지역·요청 동사 제외."
         ),
     )
     anchor_ref: str = Field(
@@ -56,6 +57,14 @@ class PlaceSelectionArguments(SearchArguments):
         description=(
             "현재 요청의 장소·음식·시설 명사구 전부. "
             "여러 목표는 각각 원소로, query는 첫 원소. 정확명은 이름 하나만."
+        ),
+    )
+    category_hints: list[CategoryHint] = Field(
+        default_factory=list,
+        max_length=4,
+        description=(
+            "장소명/메뉴/정확 키워드가 없는 일반 활동 의도만 기존 종류로 검색. "
+            "query는 targets의 원문 그대로. 분류 미정은 빈 배열이나 kind any."
         ),
     )
 
@@ -285,8 +294,11 @@ def apply_selection(selection, decision, latest):
         if action.operation != "plan":
             raise ValueError("Only a current proposal may be requested")
     else:
-        targets, area, anchor = [], "", ""
+        targets, area, anchor, hints = [], "", "", []
         for args in searches:
+            hints.extend(args.get("category_hints", []))
+            if args["mode"] == "exact_name" and args.get("category_hints"):
+                raise ValueError("Exact names cannot use category retrieval")
             ref = args.get("anchor_ref", "")
             if ref:
                 index, required = referenced_anchor(latest, decision.proposal)
@@ -306,6 +318,15 @@ def apply_selection(selection, decision, latest):
                 if norm(args["area"]) not in norm(outside_name):
                     args = {**args, "area": ""}
             requested = args.get("targets") or [query]
+            if (
+                args["mode"] != "exact_name"
+                and args.get("kind", "any") != "any"
+                and len(requested) == 1
+                and (broad_goal(requested[0]) or len(norm(requested[0])) == 1)
+                and not any(h["kind"] != "any" for h in args.get("category_hints", []))
+            ):
+                hints = [h for h in hints if h["query"] != requested[0]]
+                hints.append({"query": requested[0], "kind": args["kind"]})
             if args["mode"] == "exact_name":
                 if len(requested) != 1:
                     raise ValueError("Exact name requires one target")
@@ -335,6 +356,7 @@ def apply_selection(selection, decision, latest):
             area=area,
             targets=targets,
             anchor_ref=anchor,
+            category_hints=hints,
         )
     apply_action(decision, latest, action)
     if (

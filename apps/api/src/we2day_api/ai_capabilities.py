@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from we2day_api.ai_search_spec import CategoryHint
 from we2day_api.ai_wire import compact_schema
 
 
@@ -53,6 +54,7 @@ class CourseProposalArguments(BaseModel):
     targets: list[str] = Field(
         default_factory=list, max_length=4, description="활동 명사구만. 날짜·조사·요청 동사 제외."
     )
+    category_hints: list[CategoryHint] = Field(default_factory=list, max_length=4)
 
 
 @dataclass(frozen=True)

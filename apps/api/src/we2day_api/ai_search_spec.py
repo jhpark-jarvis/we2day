@@ -3,10 +3,17 @@
 import hashlib
 import re
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    model_serializer,
+    model_validator,
+)
 
 from we2day_api.ai_conversation_hints import guidance
-from we2day_api.ai_place_policy import Kind, SearchScope, explicit_area, kinds, norm
+from we2day_api.ai_place_policy import LABELS, Kind, SearchScope, explicit_area, kinds, norm
 from we2day_api.ai_search_followups import continuation, search_phrase
 
 
@@ -14,6 +21,38 @@ class SearchTarget(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     kind: Kind = "any"
     query: str = Field(min_length=1, max_length=50, pattern=r"^[가-힣A-Za-z0-9 ]+$")
+    category_retrieval: bool = False
+
+    @model_validator(mode="after")
+    def bounded_category(self):
+        if self.category_retrieval and self.kind not in LABELS:
+            raise ValueError("Category retrieval requires an existing concrete kind")
+        return self
+
+    @model_serializer(mode="wrap")
+    def omit_legacy_default(self, handler):
+        value = handler(self)
+        if not self.category_retrieval:
+            value.pop("category_retrieval", None)
+        return value
+
+
+class CategoryHint(BaseModel):
+    """Optional interpretation; `any` abstains and never authorizes a query."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    query: str = Field(min_length=1, max_length=50, pattern=r"^[가-힣A-Za-z0-9 ]+$")
+    kind: Kind
+
+
+def broad_goal(value):
+    """Recognize a verbal activity phrase, independently of venue vocabulary."""
+    value = re.sub(r"\s*만한\s*", "", value.strip())
+    match = re.search(r"([가-힣])\s*(?:곳|공간|장소|데|것|거|체험|활동|운동)$", value)
+    if not match:
+        return False
+    syllable = match[1]
+    return (ord(syllable) - ord("가")) % 28 == 8 or syllable in {"는", "은", "기"}
 
 
 class SearchSpec(BaseModel):
@@ -72,7 +111,10 @@ def current_anchor(spec, proposal):
 def search_queries(spec, proposal):
     anchor = current_anchor(spec, proposal)
     prefix = place_name(anchor) if anchor else ""
-    return [(t.kind, f"{prefix} {t.query}".strip(), t.query) for t in spec.targets]
+    return [
+        (t.kind, f"{prefix} {LABELS[t.kind] if t.category_retrieval else t.query}".strip(), t.query)
+        for t in spec.targets
+    ]
 
 
 def address_fallback(activity):

@@ -41,6 +41,7 @@ from we2day_api.ai_place_answers import (
 from we2day_api.ai_place_policy import LABELS, PlacePolicy, SearchScope, explicit_area, kinds, norm
 from we2day_api.ai_plan_metadata import generated_title
 from we2day_api.ai_read_answers import join_replies, selected_reply, weather_reply
+from we2day_api.ai_retrieval import plan_retrieval, retrieval_targets
 from we2day_api.ai_runtime import (
     AIStore,
     Budget,
@@ -923,6 +924,15 @@ async def _chat(body, settings, store, client, budget, stats):
             await interpret(decision, latest, settings, client, budget, stats)
             if body.selected_places and directive.intent in {"search", "plan", "select"}:
                 directive.allowed_tools.add("lookup_selected_places")
+        if (
+            retrieval_targets(decision)[1]
+            and stats.counts.get("model_calls", 0) < 2
+            and budget.remaining() >= 12
+        ):
+            if not decision.model_reserved and not await store.rpc("reserve_ai_planner_request"):
+                raise HTTPException(429, "ai_rate_limited")
+            decision.model_reserved = True
+            await plan_retrieval(decision, settings, client, budget, stats)
         directive.state.turn_version = body.version + 1
         if directive.slots.get("activity_edit"):
             directive.slots["activity_edit"]["turn_version"] = body.version + 1
@@ -956,6 +966,9 @@ async def _chat(body, settings, store, client, budget, stats):
             excluded=directive.state.excluded_kinds,
             keyword=lexical["query"] if lexical else "",
             queries=search_queries(spec, proposal) if spec else (),
+            category_targets={(t.kind, t.query) for t in spec.targets if t.category_retrieval}
+            if spec
+            else (),
         )
         session = ToolSession(
             settings,
@@ -992,6 +1005,9 @@ async def _chat(body, settings, store, client, budget, stats):
             session.activity_limit = len(context.activities)
             session.requested_activities = context.activities
         session.plan_updates = {"budget": context.budget, "transport": context.transport}
+        if directive.intent == "plan" and spec and any(t.category_retrieval for t in spec.targets):
+            session.requested_activities = [t.query for t in spec.targets]
+            session.activity_limit = len(spec.targets)
         if known_date:
             session.plan_updates["date"] = known_date
         session.allowed_tools = set(directive.allowed_tools)

@@ -13,7 +13,7 @@ def resource_copy(tmp_path):
     (tmp_path / "manifest.json").write_bytes(root.joinpath("manifest.json").read_bytes())
     directory = tmp_path / PROMPT.version
     directory.mkdir()
-    for name in ("system", "finish", "repair", "interpret", "relevance", "route"):
+    for name in ("system", "finish", "repair", "interpret", "relevance", "route", "retrieval"):
         (directory / f"{name}.txt").write_bytes(
             root.joinpath(PROMPT.version, f"{name}.txt").read_bytes()
         )
@@ -21,8 +21,8 @@ def resource_copy(tmp_path):
 
 
 def test_immutable_release_and_cross_platform_digest(resource_copy):
-    assert PROMPT.version == "we2-ai-2026-11-09-v24"
-    assert PROMPT.sha256 == "464dc10fc5a5e77cf23f97288b0a00ac420e8aadbabb74ba91bfb6419d964a3c"
+    assert PROMPT.version == "we2-ai-2026-11-09-v27"
+    assert PROMPT.sha256 == "1046805f03b127a1734068bd9c8835aca8c0d753814963e90f8718c3af6a80c8"
     assert PROMPT.interpret
     for path in (resource_copy / PROMPT.version).iterdir():
         path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))

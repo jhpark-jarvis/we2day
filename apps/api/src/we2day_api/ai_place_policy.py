@@ -245,7 +245,15 @@ def requested_scope(text, previous=None, chosen=()):
 
 class PlacePolicy:
     def __init__(
-        self, scope=None, user_text="", *, rejected=(), excluded=(), keyword="", queries=()
+        self,
+        scope=None,
+        user_text="",
+        *,
+        rejected=(),
+        excluded=(),
+        keyword="",
+        queries=(),
+        category_targets=(),
     ):
         self.scope = scope or SearchScope()
         self.user_text = user_text
@@ -254,6 +262,7 @@ class PlacePolicy:
         self.excluded = set(excluded)
         self.keyword = keyword
         self.queries = list(queries)
+        self.category_targets = set(category_targets)
 
     def forbidden(self, title, kind="any"):
         return norm(title) in self.rejected or kind in self.excluded
@@ -348,6 +357,9 @@ class PlacePolicy:
             if matched is None:
                 return False
             target = matched[1]
+            if matched in self.category_targets:
+                # Retrieval is not evidence that the original goal is satisfied.
+                return False
             terms = [
                 norm(t)
                 for t in target.split()

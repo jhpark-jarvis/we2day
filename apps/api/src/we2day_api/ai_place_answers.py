@@ -326,7 +326,15 @@ async def read_candidate_request(directive, session, io):
         and not verified_candidates(session)
         and all(r["status"] == "ok" for r in session.reports)
     ):
-        extra = [(k, f"{fallback} {target}", target) for k, _, target in session.policy.queries]
+        extra = [
+            (
+                k,
+                f"{fallback} "
+                + (LABELS[k] if (k, target) in session.policy.category_targets else target),
+                target,
+            )
+            for k, _, target in session.policy.queries
+        ]
         session.policy.queries.extend(extra)
         for kind, query, _ in extra:
             if len(session.searches) >= 4:

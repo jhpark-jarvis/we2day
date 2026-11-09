@@ -34,6 +34,7 @@ from we2day_api.ai_search_followups import (
     saved_refinement,
 )
 from we2day_api.ai_search_spec import (
+    CategoryHint,
     SearchSpec,
     SearchTarget,
     anchor_key,
@@ -60,6 +61,7 @@ class Action(BaseModel):
     question: str = Field(default="", max_length=180)
     query: str = Field(default="", max_length=50)
     targets: list[str] = Field(default_factory=list, max_length=4)
+    category_hints: list[CategoryHint] = Field(default_factory=list, max_length=4)
     anchor_ref: str = Field(default="", max_length=32)
     anchor_index: int | None = Field(default=None, ge=0, le=7)
     anchor_needed: bool = False
@@ -625,6 +627,12 @@ def apply_action(control, latest, action):
         ):
             raise ValueError("Ungrounded area")
         prior = saved_spec(control.context)
+        hints = {norm(h.query): h.kind for h in action.category_hints}
+        if len(hints) != len(action.category_hints) or any(
+            key not in {norm(t) for t in action.targets} for key in hints
+        ):
+            raise ValueError("Category hint must belong to a current target")
+        hints = {key: kind for key, kind in hints.items() if kind != "any"}
         targets = []
         for query in action.targets:
             query = " ".join(query.split())
@@ -635,7 +643,18 @@ def apply_action(control, latest, action):
             kind = (
                 specific[0] if len(specific) == 1 else detected[0] if len(detected) == 1 else "any"
             )
-            targets.append(SearchTarget(kind=kind, query=query))
+            hint = hints.get(norm(query))
+            if hint and detected and hint not in detected:
+                raise ValueError("Category hint contradicts the explicit activity")
+            quoted = re.findall(r"[\"'‘“]([^\"'’”]+)[\"'’”]", latest)
+            if hint and (
+                norm(scope.exact_name) == norm(query)
+                or any(norm(query) == norm(value) for value in quoted)
+            ):
+                raise ValueError("Exact names and quoted keywords use literal retrieval")
+            targets.append(
+                SearchTarget(kind=hint or kind, query=query, category_retrieval=bool(hint))
+            )
         if action.anchor_ref:
             match = re.fullmatch(r"activity_([1-8])", action.anchor_ref)
             if not match:
@@ -661,13 +680,17 @@ def apply_action(control, latest, action):
         relation = re.search(r"주변|근처|인근|주위", latest)
         target_evidence = latest[relation.end() :] if relation else evidence
         for target in targets:
-            if not grounded_query(target.query, evidence):
+            if not grounded_query(target.query, evidence, category=target.category_retrieval):
                 raise ValueError("Ungrounded query")
         replacement = re.split(r"말고|대신", target_evidence)
         if len(replacement) > 1 and re.search(r"찾|검색|추천|알려", replacement[-1]):
             target_evidence = replacement[-1]
         if relation or len(replacement) > 1:
-            targets = [t for t in targets if grounded_query(t.query, target_evidence)]
+            targets = [
+                t
+                for t in targets
+                if grounded_query(t.query, target_evidence, category=t.category_retrieval)
+            ]
         spec = SearchSpec(targets=targets) if targets else None
         anchor_text = (
             control.previous_request
@@ -696,11 +719,23 @@ def apply_action(control, latest, action):
                 spec.anchor_key = anchor_key(activity)
         directive = control.directive
         if spec:
+            exact = (
+                scope.exact_name
+                if (
+                    scope.exact_name
+                    and norm(scope.exact_name) in norm(latest)
+                    and any(norm(t.query) == norm(scope.exact_name) for t in targets)
+                )
+                else ""
+            )
+            name_kind = scope.name_kind
             if spec.anchor_key and (not scope.area or relational_area(scope.area)):
                 activity = control.proposal.activities[spec.anchor_index]
                 address = re.search(r"\(([^()]*)\)", activity.place)
                 scope.area = address_area(address[1]) if address else ""
             directive.scope = scope_for(targets, action.area or scope.area)
+            if exact:
+                directive.scope.exact_name, directive.scope.name_kind = exact, name_kind
             spec.area = directive.scope.area
             directive.slots["place_search"] = spec.model_dump()
         if action.anchor_needed and not control.proposal and control.selected and spec:
