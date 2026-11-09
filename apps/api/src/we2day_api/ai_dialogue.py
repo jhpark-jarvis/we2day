@@ -273,11 +273,28 @@ def social_turn(text):
     )
 
 
+def planning_request(text):
+    return any(
+        (
+            re.search(r"(?:코스|플랜).*(?:짜|만들|반영|제안|추천)", clause)
+            or re.search(
+                r"(?:데이트(?:\s*일정)?|일정|약속).{0,70}(?:잡아|잡을|짜줘|만들어|계획해)", clause
+            )
+        )
+        and not re.search(
+            r"(?:코스|플랜|데이트|일정|약속).{0,15}(?:만들지|짜지|반영하지|잡지|아직|말고|나중)",
+            clause,
+        )
+        for clause in re.split(r"[.!?\n]", text)
+    )
+
+
 def new_task(text):
     """Explicit operations supersede a question; bare short answers do not."""
     return bool(
         (
-            re.search(r"검색|찾아|추천|알아\s*봐|코스.*(?:만들|짜)|플랜.*(?:만들|짜)", text)
+            planning_request(text)
+            or re.search(r"검색|찾아|추천|알아\s*봐|코스.*(?:만들|짜)|플랜.*(?:만들|짜)", text)
             or re.search(
                 r"제목|날짜|예산|총액|지역|동네|이동\s*수단|추가\s*조건|시작\s*시간|종료\s*시간",
                 text,
@@ -483,11 +500,7 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
         and previous_scope.kinds
         and not re.search(r"빼\s*줘|제외해|삭제해|없애", text)
     )
-    plan_request = any(
-        re.search(r"(?:코스|플랜).*(?:짜|만들|반영|제안|추천)", clause)
-        and not re.search(r"(?:코스|플랜).{0,10}(?:만들지|짜지|반영하지|아직|말고|나중)", clause)
-        for clause in re.split(r"[.!?\n]", positive)
-    )
+    plan_request = planning_request(positive)
     labeled_title = re.fullmatch(
         r"\s*(?:제목|(?:코스|플랜)\s*(?:이름|명칭))\s*[:：]\s*([^\n]{1,100}?)\s*", text
     )
@@ -566,7 +579,16 @@ def analyze(text, context, proposal, chosen, today, *, selected=False):
     ):
         directive.ask("target", "어느 장소나 활동을 말하나요? 이름을 알려주세요.", resume="search")
     state.intent = directive.intent
-    if plan_request and not proposal and active:
+    if (
+        (
+            plan_request
+            or old_pending
+            and old_pending.field == "target"
+            and old_pending.resume == "plan"
+        )
+        and not proposal
+        and active
+    ):
         directive.slots["activities"] = sorted(
             [min((w for w in WORDS[k] if w in positive), key=positive.index) for k in active],
             key=positive.index,

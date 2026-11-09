@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from we2day_api.ai_conversation_hints import guidance
-from we2day_api.ai_dialogue import social_turn
+from we2day_api.ai_dialogue import planning_request, social_turn
 from we2day_api.ai_place_answers import private_anchor
 from we2day_api.ai_place_policy import SearchScope, explicit_area, kinds, relational_area
 from we2day_api.ai_search_spec import SearchSpec, area_only_request
@@ -61,6 +61,24 @@ def resume_location(directive, body, before):
     selected_answer = bool(body.selected_places) and bool(
         re.fullmatch(r"(?:선택한 장소|이곳)\s*주변에서\s*찾아줘[.!?\s]*", text)
     )
+    if (
+        selected_answer
+        and pending.operation == "search"
+        and not pending.search
+        and not pending.scope.kinds
+    ):
+        previous = next(
+            (
+                m.content
+                for m in reversed(body.messages[:-1])
+                if m.role == "user"
+                and not social_turn(m.content)
+                and not m.content.startswith("선택한 장소")
+            ),
+            "",
+        )
+        if planning_request(previous):
+            pending.operation = "plan"
     if not selected_answer and (
         directive.intent in {"edit", "weather", "reject"}
         or re.search(r"날짜|예산|시간|제목|교통|이동수단", text)

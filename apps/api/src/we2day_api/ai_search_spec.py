@@ -81,7 +81,14 @@ def address_fallback(activity):
     match = re.search(r"\(([^()]*)\)", activity.place)
     if not match:
         return ""
-    tokens = match[1].split()
+    return address_hint(match[1])
+
+
+def address_hint(address):
+    """Public road/locality name only; never a building number or a URL."""
+    if re.search(r"https?://|naver\.me/", address, re.I):
+        return ""
+    tokens = address.split()
     roads = [t for t in tokens if re.fullmatch(r"[가-힣A-Za-z0-9]+(?:대로|로|길)", t)]
     local = [t for t in tokens if re.fullmatch(r"[가-힣]+(?:동|읍|면)(?:\d+가)?", t)]
     return next(iter(roads or local[-1:]), "")

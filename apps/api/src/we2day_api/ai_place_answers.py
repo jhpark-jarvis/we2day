@@ -14,7 +14,7 @@ from we2day_api.ai_place_policy import (
     relational_area,
 )
 from we2day_api.ai_relevance import enrich_candidates
-from we2day_api.ai_search_spec import address_fallback
+from we2day_api.ai_search_spec import address_fallback, address_hint
 from we2day_api.ai_tool_runtime import execute_batch
 
 
@@ -23,14 +23,19 @@ def private_anchor(area):
     return not kinds(area) and bool(re.fullmatch(r"[가-힣A-Za-z0-9]{0,12}(?:집|회사|직장)", value))
 
 
-def address_area(address):
+def address_area(address, *, allow_road=False):
     if re.search(r"https?://|naver\.me/", address, re.I):
         return ""
     tokens = re.findall(
         r"(?<![가-힣])([가-힣]{2,12}(?:시|군|구|읍|면|동)(?:\d+가)?)(?=\s|$)",
         plain(address),
     )
-    return " ".join(tokens[-2:])
+    local = tokens[-2:]
+    if allow_road and len(local) == 1 and local[0].endswith(("시", "군")):
+        road = address_hint(address)
+        if road:
+            local.append(road)
+    return " ".join(local)
 
 
 def recover_followup_area(directive, history):
@@ -176,6 +181,29 @@ async def read_candidate_request(directive, session, io):
             session.direct_final = True
             session.resolution = "ready"
             return
+        if (
+            not session.policy.scope.kinds
+            and not session.policy.scope.exact_name
+            and not session.policy.queries
+            and session.initial_activities is None
+            and not directive.place_followup
+        ):
+            # A location answer is not an activity choice. Keep the verified coarse
+            # location and ask for the missing target before trying another search.
+            if (
+                len(selected) == 1
+                and session.selected_usage.get(selected[0].ref) == "anchor"
+                and (local := address_area(selected[0].address, allow_road=True))
+            ):
+                session.policy.scope.area = local
+                directive.slots["region"] = local
+            session.resolution = "unresolved"
+            directive.ask(
+                "target",
+                "선택한 장소를 기준으로 어떤 활동을 하고 싶나요? 원하는 활동을 알려주세요.",
+                resume="plan" if directive.intent == "plan" else "search",
+            )
+            return
         if getattr(session, "anchor_search", False):
             explicit = [p for p in selected if session.selected_usage.get(p.ref) == "anchor"]
             named = [p for p in selected if norm(p.title) == norm(area)]
@@ -204,7 +232,12 @@ async def read_candidate_request(directive, session, io):
                     ),
                     "",
                 )
-                if not fallback:
+                road_area = (
+                    address_area(anchors[0].address, allow_road=True)
+                    if session.selected_usage.get(anchors[0].ref) == "anchor"
+                    else area
+                )
+                if not fallback and road_area == area:
                     session.resolution = "unresolved"
                     directive.ask(
                         "region",
@@ -212,9 +245,11 @@ async def read_candidate_request(directive, session, io):
                         resume="search",
                     )
                     return
-                area = fallback
+                area = fallback or road_area
                 directive.notices.append(
                     "주소에서 동네를 확인하지 못해, 이미 정한 지역에서 후보를 찾았어요."
+                    if fallback
+                    else "선택한 주소의 도로명을 기준으로 후보를 찾아요. 실제 반경 검색은 아니에요."
                 )
             session.policy.scope.area = area
             directive.slots["region"] = area

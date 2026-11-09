@@ -747,6 +747,13 @@ def apply_action(control, latest, action):
         elif action.operation == "chat":
             directive.intent = directive.state.intent = "chat"
             directive.allowed_tools.clear()
+        elif action.operation in {"search", "plan"}:
+            directive.ask(
+                "target",
+                "어떤 활동을 하고 싶나요? 원하는 활동이나 장소 종류를 알려주세요.",
+                resume=action.operation,
+            )
+            control.reason = "clarify"
         else:
             directive.ask("region", "어느 지역에서 어떤 장소를 찾아볼까요?", resume="search")
             control.reason = "clarify"

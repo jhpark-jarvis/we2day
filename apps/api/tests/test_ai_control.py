@@ -403,7 +403,7 @@ def test_social_turn_preserves_pending_and_staged_fields(text):
 
 
 @pytest.mark.parametrize("fallback", [[], ["양주 덕계"]])
-def test_city_only_address_is_not_silently_used_as_nearby(fallback):
+def test_city_road_anchor_prefers_known_area_and_discloses_road_fallback(fallback):
     from we2day_api.ai_place_answers import read_candidate_request
     from we2day_api.ai_tools import SelectedPlace
     from we2day_api.places import SearchResults
@@ -442,7 +442,7 @@ def test_city_only_address_is_not_silently_used_as_nearby(fallback):
                             "destination": "경기도 양주시 평화로 1",
                         }
                     ]
-                assert fallback and action[1] == "양주 덕계 카페"
+                assert action[1] == ("양주 덕계 카페" if fallback else "양주시 평화로 카페")
                 return SearchResults(items=[])
 
         await read_candidate_request(directive, session, IO())
@@ -450,8 +450,8 @@ def test_city_only_address_is_not_silently_used_as_nearby(fallback):
             assert directive.scope.area == "양주 덕계" and directive.notices
             assert events == ["data", "places"]
         else:
-            assert directive.intent == "clarify" and session.resolution == "unresolved"
-            assert events == ["data"]
+            assert directive.scope.area == "양주시 평화로" and directive.notices
+            assert events == ["data", "places"] and "반경" in directive.notices[0]
 
     asyncio.run(run())
 

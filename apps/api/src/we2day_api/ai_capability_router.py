@@ -19,7 +19,7 @@ from we2day_api.ai_capabilities import (
 )
 from we2day_api.ai_control import Action, apply_action
 from we2day_api.ai_control import prepare as prepare_control
-from we2day_api.ai_dialogue import social_turn
+from we2day_api.ai_dialogue import new_task, social_turn
 from we2day_api.ai_location import pending_location
 from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import SearchArguments, norm, relational_area
@@ -300,8 +300,32 @@ def apply_selection(selection, decision, latest):
                     raise ValueError("Invalid target")
                 if target not in targets:
                     targets.append(target)
-        action = Action(operation="search", area=area, targets=targets, anchor_ref=anchor)
+        pending = (decision.context.get("dialogue") or {}).get("pending") or {}
+        resume_plan = (
+            len(selection.calls) == 1
+            and pending.get("field") == "target"
+            and pending.get("resume") == "plan"
+            and decision.directive.intent == "plan"
+            and not new_task(latest)
+        )
+        # Tool selection identifies the target; a short answer must not replace
+        # the server-owned purpose of the current, version-validated question.
+        action = Action(
+            operation="plan" if resume_plan else "search",
+            area=area,
+            targets=targets,
+            anchor_ref=anchor,
+        )
     apply_action(decision, latest, action)
+    if (
+        searches
+        and action.operation == "plan"
+        and decision.directive.intent == "plan"
+        and decision.directive.slots.get("place_search")
+    ):
+        decision.directive.slots["activities"] = [
+            t["query"] for t in decision.directive.slots["place_search"]["targets"]
+        ]
     decision.interpret = False
 
 
