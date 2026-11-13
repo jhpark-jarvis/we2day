@@ -181,6 +181,27 @@ button { appearance: none; color: var(--foreground); }
 .appointment-information { min-width: 0; margin-block: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .appointment-information h2 { margin: 0; font-size: 17px; font-weight: 500; }
 .appointment-information .detail-list { margin-block: 8px; }
+.appointment-date { margin: 0 0 5px; font-size: 12px; color: var(--muted); }
+.appointment-course-container { min-width: 0; }
+.course-loading-placeholder { min-height: 340px; }
+.expanded-course .section-heading h2, .empty-course h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; margin: 0; }
+.expanded-course .section-heading h2 svg, .empty-course h2 svg { color: var(--accent); flex-shrink: 0; }
+.course-timeline { margin: 14px 0; padding: 0; list-style: none; }
+.course-stop { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 10px; padding-bottom: 12px; min-width: 0; }
+.course-stop:last-child { padding-bottom: 0; }
+.course-track { position: relative; display: flex; flex-direction: column; align-items: center; gap: 9px; padding-top: 8px; color: var(--muted); font-size: 12px; }
+.course-track time { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: center; }
+.course-number { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 24px; background: var(--background); border: 1px solid var(--line); border-radius: 50%; color: var(--accent); z-index: 1; }
+.course-track::after { content: ""; position: absolute; width: 1px; background: var(--line); top: 55px; bottom: -20px; }
+.course-stop:last-child .course-track::after { display: none; }
+.course-stop-card { min-width: 0; padding: 8px 10px 4px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.course-stop-heading { display: flex; align-items: flex-start; gap: 4px; }
+.course-stop-heading h3 { min-width: 0; flex: 1; padding-top: 9px; margin: 0; font-size: 15px; font-weight: 500; word-break: keep-all; overflow-wrap: anywhere; }
+.course-stop-place, .course-stop-note { font-size: 12px; color: var(--muted); margin: 3px 0 8px; overflow-wrap: anywhere; }
+.course-map-link { flex-shrink: 0; color: var(--accent); }
+.course-stop-card .activity-progress { margin-top: 3px; padding: 0; }
+.empty-course { padding-block: 12px; }
+@media (max-width: 380px) { .course-stop { grid-template-columns: 39px minmax(0, 1fr); gap: 7px; } .course-stop-card { padding-inline: 10px; } }
 .appointment-place { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .appointment-place svg { flex-shrink: 0; }
 .appointment-place span { min-width: 0; overflow-wrap: anywhere; }

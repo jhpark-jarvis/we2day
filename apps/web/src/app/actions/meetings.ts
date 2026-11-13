@@ -34,5 +34,6 @@ export async function saveMeeting(
       conflict: result.status === 409,
     };
   revalidatePath("/");
+  revalidatePath("/today");
   return { error: "", meeting: result.data || undefined };
 }

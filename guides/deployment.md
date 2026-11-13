@@ -143,7 +143,7 @@ docker compose up --detach --no-build --no-deps --pull never --wait api
 
 iPhone에서는 [WebKit 안내](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)에 따라 지원되는 iOS에서 HTTPS 사이트를 Safari로 열어 **홈 화면에 추가 → 홈 화면 앱 실행 → 알림 켜기 → 직접 권한 허용** 순서로 진행합니다. 휴대폰의 `127.0.0.1`은 개발 PC가 아니므로 PC의 로컬 주소만으로 기기 테스트가 되지 않습니다. 도메인과 인증서 또는 검토된 HTTPS 접근 경로가 필요합니다. 도메인 구매·외부 공개 설정은 이 저장소가 자동 실행하지 않습니다.
 
-기기 등록 정보는 본인 계정에서만 볼 수 있습니다. 최대 5개 기기를 등록할 수 있으며 등록하거나 갱신한 날부터 30일간 유효합니다. 만료 후 자동 발송하지 않으며 재등록이 필요합니다. 테스트는 등록된 해당 endpoint 하나에만 기기당 60초 간격으로 요청합니다. 잠금화면에는 개인정보가 없는 고정 문구만 표시하고, 알림을 누르면 같은 사이트 `/reminders`를 엽니다. 개인 일정 제목·메모·좌표·상대 정보는 Push payload에 넣지 않습니다. 지원 endpoint는 Apple·FCM·Mozilla의 고정 HTTPS 주소로 제한하고 리디렉션·환경 프록시는 사용하지 않습니다.
+기기 등록 정보는 본인 계정에서만 볼 수 있습니다. 최대 5개 기기를 등록할 수 있으며 등록하거나 갱신한 날부터 30일간 유효합니다. 만료 후 자동 발송하지 않으며 재등록이 필요합니다. 테스트는 등록된 해당 endpoint 하나에만 기기당 60초 간격으로 요청합니다. 잠금화면에는 개인정보가 없는 고정 문구만 표시하고, 기념일·테스트 알림은 `/reminders`, 일정 등록 알림은 해당 날짜 달력을 엽니다. 개인 일정 제목·메모·좌표·상대 정보는 Push payload에 넣지 않습니다. 지원 endpoint는 Apple·FCM·Mozilla의 고정 HTTPS 주소로 제한하고 리디렉션·환경 프록시는 사용하지 않습니다.
 
 **로그아웃하면 본인 계정의 모든 기기 구독을 해지**합니다. 다른 기기에서도 다시 켜야 합니다. 해지 서버에 연결하지 못하면 로그아웃을 완료하지 않고 오류와 재시도 안내를 표시합니다. 이미 Push 서비스에 전달한 요청은 취소를 보장하지 않으며 기기에서 알림 표시/집중 모드 등을 확인해야 합니다. 서비스의 요청 수락은 실제 도착·읽음 확인이 아닙니다. 만료된 구독은 다시 등록할 때 정리하고 공급자가404/410을 반환한 기기 등록도 제거합니다.
 
@@ -167,9 +167,11 @@ sequenceDiagram
   W->>A: 해당 기기 또는 본인 전체 구독 해지
 ```
 
-### 기념일 자동 알림 설정
+### 일정 등록·기념일 자동 알림 설정
 
-자동 알림은 SQL024와 `reminder-worker` profile을 따로 설정해야 동작합니다. FastAPI는 계속 로그인한 사용자의 권한으로 데이터를 처리하며 worker 전용 DB 접속 정보를 사용하지 않습니다. worker는 일반 테이블을 직접 조회·변경하지 않고 비공개 claim·발송 허가·완료 함수 세 개만 실행합니다. 관리자 키나 사용자의 세션 갱신 토큰은 사용하지 않습니다.
+자동 알림은 SQL024와 `reminder-worker` profile을 따로 설정해야 동작합니다. 일정 등록 알림에는 SQL042까지 순서대로 적용하고 최신 worker·서비스 워커와 매분 실행하는 timer를 함께 배포합니다. 새 공동/개인 일정이 등록되면 두 사람의 알림을 켠 유효 기기에 보통 1분 안에 발송합니다. 기존 일정은 소급 발송하지 않으며 수정·재확정·저장 재시도는 등록 알림을 중복 생성하지 않습니다. 기념일은 기존 한국 시간 오전9시 예약을 유지합니다.
+
+FastAPI는 계속 로그인한 사용자의 권한으로 데이터를 처리하며 worker 전용 DB 접속 정보를 사용하지 않습니다. worker는 일반 테이블을 직접 조회·변경하지 않고 비공개 claim·발송 허가·완료 함수 세 개만 실행합니다. 관리자 키나 사용자의 세션 갱신 토큰은 사용하지 않습니다. 등록 알림은 고정 안내 문구와 유효 날짜/불투명 이벤트 식별자만 전달하고 클릭하면 해당 날짜 달력을 엽니다. 제목·장소·메모는 푸시로 보내지 않습니다. 전송 결과가 불명확하면 자동 재발송하지 않으므로 실제 수신 여부는 기기의 알림 권한·연결 상태에서 확인해야 합니다.
 
 1. SQL024를 한 번 적용하고 Supabase **Connect → Direct → Session pooler**에서 실제 IPv4 호환 host를 확인합니다. **Database → Settings → SSL configuration → Download certificate**에서 공식 CA 인증서를 내려받아 비공개 VM 배포 디렉터리의 `supabase-ca.crt`에 저장합니다. 이는 공개 CA 인증서이며 개인키가 아닙니다. Compose는 이 파일을 worker에 읽기 전용으로 연결하며 파일이 없으면 실행을 중단합니다. 기존 DB 관리자 계정의 비밀번호를 바꾸지 않습니다.
 2. 비공개 VM 배포 디렉터리에서 다음 도구로 새 설정을 준비합니다. 이미지 태그·프로젝트 식별자·host를 본인 환경에 맞춥니다. 기존 `api.env`의 VAPID 키·subject만 재사용하며 새 디렉터리/파일은 각각 700과 600으로 만들고 기존 파일은 덮어쓰지 않습니다. Windows에서는 별도로 ACL을 제한해야 합니다.
@@ -191,7 +193,7 @@ docker compose --profile reminders run --rm --no-deps -T reminder-worker \
 ```
 
 5. 검사 통과 후 `worker.env`의 `WE2DAY_REMINDER_WORKER_ENABLED=true`, `api.env`의 `WE2DAY_PUSH_AUTOMATIC_ENABLED=true`를 설정하고 API를 재생성합니다. [service](../apps/api/deployment/we2day-reminders.service)의 User·WorkingDirectory를 실제 배포 경로로 맞추고 [timer](../apps/api/deployment/we2day-reminders.timer)와 함께 systemd에 설치합니다. `sudo systemctl daemon-reload` 후 `sudo systemctl enable --now we2day-reminders.timer`로 예약합니다. `sudo systemctl disable --now we2day-reminders.timer`와 `sudo systemctl stop we2day-reminders.service`로 이 예약만 중지할 수 있습니다.
-6. 각 기기의 **설정 → 이 기기의 알림 → 자동 기념일 알림**을 직접 켭니다. 등록 갱신은 같은 기기 키의 기존 선택을 유지하며, 키가 바뀌거나 만료 후 새 등록이면 자동 알림은 다시 꺼짐부터 시작합니다. 자동 알림만 끄면 수동 테스트 구독은 유지합니다.
+6. 각 기기의 **설정 → 이 기기의 알림 → 일정·기념일 알림**을 직접 켭니다. 등록 갱신은 같은 기기 키의 기존 선택을 유지하며, 키가 바뀌거나 만료 후 새 등록이면 자동 알림은 다시 꺼짐부터 시작합니다. 자동 알림만 끄면 수동 테스트 구독은 유지합니다.
 
 배포 설정을 변경할 때는 같은 디렉터리에서 아래 사전 검사를 실행합니다. 네트워크 요청 없이 API/웹의 예약 자격 혼입, 전용 역할·프로젝트·CA 경로, 서버 Push 키/subject와 활성화 설정의 일치를 확인합니다. 검사 결과에 실제 설정 값이나 접속 URL은 출력하지 않습니다. 자동 알림이 켜졌는데 worker 파일을 함께 검토하지 않으면 실패합니다. CA 파일의 내용·실제 TLS 접속·DB 권한은 위 `reminder_worker --check`로 별도 확인해야 합니다.
 

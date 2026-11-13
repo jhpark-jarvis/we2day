@@ -1,5 +1,5 @@
 "use client";
-import { Settings2 } from "lucide-react";
+import { MapPin, Settings2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { naverAppLinks, naverShareLink, type RouteMode } from "@/lib/naver-app";
 
@@ -9,9 +9,11 @@ export function NaverAppHandoff({
   compact = false,
   extraAction,
   mapUrl = "",
+  iconOnly = false,
 }: {
   place: string;
   mapUrl?: string;
+  iconOnly?: boolean;
   site: string;
   compact?: boolean;
   extraAction?: ReactNode;
@@ -28,6 +30,19 @@ export function NaverAppHandoff({
   const shared = naverShareLink(mapUrl);
   const search = naverAppLinks(site, place);
   const route = naverAppLinks(site, place, { lat, lng, mode });
+  if (iconOnly)
+    return shared || search ? (
+      <a
+        className="icon-button course-map-link"
+        href={shared || search?.[platform]}
+        aria-label={`${place || "이 장소"} 네이버 지도`}
+        title="네이버 지도"
+        rel="noreferrer"
+        referrerPolicy="no-referrer"
+      >
+        <MapPin size={20} aria-hidden="true" />
+      </a>
+    ) : null;
   if (compact)
     return shared || search ? (
       <a

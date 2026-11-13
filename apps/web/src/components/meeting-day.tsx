@@ -91,7 +91,10 @@ export function MeetingDayEditor({
           </div>
           <SubmitMeeting />
         </MeetingFields>
-        <p className="settings-hint">저장을 눌러야 반영돼요. 만남 표시를 해제해도 메모는 남아요.</p>
+        <p className="settings-hint">
+          저장을 눌러야 반영돼요. 만난 날로 새로 표시하면 이 날짜의 코스 활동도 모두 완료돼요.
+          표시를 해제해도 메모와 방문 상태는 유지돼요.
+        </p>
         {state.error && (
           <p className="error-message" role="alert">
             {state.error}

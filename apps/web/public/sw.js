@@ -32,20 +32,52 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Payloads never choose visible text, navigation targets, or external resources.
+// Only known event kinds select fixed text and a validated local date target.
+function notificationDetails(data) {
+  try {
+    const value = data?.json();
+    if (
+      value?.type === "we2day-appointment-created-v1" &&
+      typeof value.date === "string" &&
+      /^(20\d{2}|2100)-\d{2}-\d{2}$/.test(value.date) &&
+      new Date(`${value.date}T00:00:00Z`).toISOString().slice(0, 10) === value.date &&
+      typeof value.event === "string" &&
+      /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value.event)
+    )
+      return {
+        body: "새 일정이 추가됐어요. 앱에서 확인해 주세요.",
+        tag: `we2day-appointment-${value.event}`,
+        path: `/?date=${value.date}`,
+      };
+  } catch {
+    /* Unknown or malformed payloads use the fixed generic notice. */
+  }
+  return {
+    body: "알림이 도착했어요. 앱에서 확인해 주세요.",
+    tag: "we2day-notice",
+    path: "/reminders",
+  };
+}
 self.addEventListener("push", (event) => {
+  const notice = notificationDetails(event.data);
   event.waitUntil(
     self.registration.showNotification("WE2DAY", {
-      body: "알림이 도착했어요. 앱에서 확인해 주세요.",
+      body: notice.body,
       icon: "/pwa-icon/192?v=brand2",
-      tag: "we2day-notice",
-      data: { path: "/reminders" },
+      tag: notice.tag,
+      data: { path: notice.path },
     }),
   );
 });
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL("/reminders", self.location.origin).href;
+  const path = event.notification.data?.path;
+  const target = new URL(
+    typeof path === "string" && /^\/\?date=(20\d{2}|2100)-\d{2}-\d{2}$/.test(path)
+      ? path
+      : "/reminders",
+    self.location.origin,
+  ).href;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

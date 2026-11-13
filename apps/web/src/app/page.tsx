@@ -4,6 +4,7 @@ import { CalendarWorkspace } from "@/components/calendar-workspace";
 import { NextAppointment } from "@/components/next-appointment";
 import type { AnniversaryList } from "@/lib/anniversaries";
 import { callApi } from "@/lib/api";
+import { getAuthConfig } from "@/lib/auth/config";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
 import { type HomeRead, section } from "@/lib/page-reads";
 import { profileNames } from "@/lib/profiles";
@@ -59,6 +60,7 @@ export default async function HomePage({
         />
       )}
       <CalendarWorkspace
+        site={getAuthConfig()?.site || ""}
         key={selectedDate}
         today={today}
         userId={core.data?.user_id || null}

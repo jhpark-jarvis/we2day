@@ -81,6 +81,31 @@ SELECT = (
 )
 
 
+@router.get("/appointments/{appointment_id}/course", response_model=Plan | None)
+def appointment_course(appointment_id: UUID, store: Store):
+    appointments = store.call(
+        "GET",
+        "appointments",
+        params={"select": "id,kind", "id": f"eq.{appointment_id}", "limit": "1"},
+    )
+    if not appointments:
+        raise HTTPException(404, "appointment_not_found")
+    if appointments[0]["kind"] == "personal":
+        return None
+    rows = store.call(
+        "GET",
+        "date_plans",
+        params={
+            "select": SELECT,
+            "appointment_id": f"eq.{appointment_id}",
+            "published_content": "not.is.null",
+            "archived": "eq.false",
+            "limit": "1",
+        },
+    )
+    return rows[0] if rows else None
+
+
 class PlanSummary(BaseModel):
     id: UUID
     title: str

@@ -166,8 +166,8 @@ export function PushSettings() {
         setAutomatic(result.automatic_enabled === true);
         setNotice(
           action === "automatic_on"
-            ? "자동 기념일 알림을 켰어요. 켠 이후의 예약 시점부터 받아요."
-            : "자동 기념일 알림을 껐어요. 수동 테스트는 계속 사용할 수 있어요.",
+            ? "일정·기념일 알림을 켰어요. 지금부터 새로 등록하는 일정과 기념일 알림을 받아요."
+            : "일정·기념일 알림을 껐어요. 수동 테스트는 계속 사용할 수 있어요.",
         );
       } else {
         setNotice(
@@ -225,21 +225,21 @@ export function PushSettings() {
           </button>
         </div>
         <div className="account-settings">
-          <h3>기념일 알림</h3>
+          <h3>일정·기념일 알림</h3>
           <p className="settings-hint">
-            한국 시간 오전 9시, 기념일 7일 전·1일 전·당일에 받아요. 이 기기에서 별도로 켠 경우에만
-            자동으로 보내요.
+            둘 중 한 사람이 일정을 등록하면 두 사람의 알림을 켠 기기에 보내요. 보통 1분 안에
+            발송하고, 기념일은 한국 시간 오전 9시에 7일 전·1일 전·당일 알림을 보내요.
           </p>
           <button
             type="button"
             className="text-button notification-switch"
             role="switch"
             aria-checked={automatic}
-            aria-label="자동 기념일 알림"
+            aria-label="일정·기념일 알림"
             disabled={pending || !supported || !enabled || !config?.automatic_available}
             onClick={() => act(automatic ? "automatic_off" : "automatic_on")}
           >
-            <span>자동 기념일 알림</span>
+            <span>일정·기념일 알림</span>
             <span className="notification-switch-track" aria-hidden="true" />
             <span>{automatic ? "켜짐" : "꺼짐"}</span>
           </button>

@@ -1,5 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
+import { resetCourseFixture } from "./course-fixture";
 import { confirmPlanAndReopen } from "./plan-confirmation";
+
+test.beforeEach(async ({ request }) => resetCourseFixture(request));
 
 test.use({ serviceWorkers: "block" });
 

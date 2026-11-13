@@ -28,6 +28,7 @@ import {
   useState,
 } from "react";
 import { deletePersonalAppointment } from "@/app/actions/appointments";
+import { AppointmentCourse } from "@/components/appointment-course";
 import { AppointmentForm } from "@/components/appointment-form";
 import { LoadingRegion } from "@/components/loading-region";
 import { LocalAppointmentTime } from "@/components/local-appointment-time";
@@ -96,6 +97,7 @@ export function CalendarWorkspace({
   participantNames = [],
   userId = null,
   names = {},
+  site = "",
 }: {
   today: string;
   preview?: boolean;
@@ -108,6 +110,7 @@ export function CalendarWorkspace({
   participantNames?: string[];
   userId?: string | null;
   names?: Record<string, string>;
+  site?: string;
 }) {
   const [view, pushView, replaceView, backView] = usePageHistory(
     "calendar",
@@ -327,10 +330,12 @@ export function CalendarWorkspace({
       <section className="appointment-detail">
         <PageHeading>
           <p className="eyebrow">{detail.photo ? "OUR LITTLE MEMORY" : "OUR NEXT PLAN"}</p>
-          <h1>{detail.title}</h1>
-          <p className="muted">
-            {detail.date.replaceAll("-", ".")} · {detail.time}
-          </p>
+          <h1>{detail.kind === "personal" || preview ? detail.title : "약속"}</h1>
+          {(detail.kind === "personal" || preview) && (
+            <p className="muted">
+              {detail.date.replaceAll("-", ".")} · {detail.time}
+            </p>
+          )}
         </PageHeading>
         {!preview && <LocalAppointmentTime date={detail.date} time={detail.time} zones={zones} />}
         {detail.photo && (
@@ -344,7 +349,16 @@ export function CalendarWorkspace({
         )}
         <section className="appointment-information" aria-label="약속 정보">
           <header className="section-heading">
-            <h2>{detail.kind === "personal" ? "개인 일정" : "약속 정보"}</h2>
+            {detail.kind === "personal" || preview ? (
+              <h2>{detail.kind === "personal" ? "개인 일정" : "약속 정보"}</h2>
+            ) : (
+              <div>
+                <p className="appointment-date">
+                  {detail.date.replaceAll("-", ".")} · {detail.time}
+                </p>
+                <h2>{detail.title}</h2>
+              </div>
+            )}
             {!preview && (detail.kind !== "personal" || detail.created_by === userId) && (
               <div className="section-actions">
                 <button
@@ -413,6 +427,16 @@ export function CalendarWorkspace({
           </dl>
           {detail.note && <p className="note-panel">{detail.note}</p>}
         </section>
+        {!preview && detail.kind !== "personal" && (
+          <AppointmentCourse
+            key={detail.id}
+            id={detail.id}
+            date={detail.date}
+            today={today}
+            site={site}
+            zones={zones}
+          />
+        )}
         {detail.photo && (
           <details className="photo-metadata">
             <summary>사진 정보</summary>

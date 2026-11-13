@@ -1,8 +1,8 @@
 [Unit]
-Description=WE2DAY anniversary reminders during Seoul morning window
+Description=WE2DAY appointment events and anniversary reminders
 
 [Timer]
-OnCalendar=*-*-* 09:00..59:00 Asia/Seoul
+OnCalendar=*-*-* *:*:00 Asia/Seoul
 AccuracySec=10s
 Persistent=false
 Unit=we2day-reminders.service

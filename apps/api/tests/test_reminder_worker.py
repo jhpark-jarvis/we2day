@@ -1,9 +1,43 @@
+import json
+from uuid import uuid4
+
 import requests
 from pywebpush import WebPushException
 from test_push import ENDPOINT, b64, keys
 
 from we2day_api import reminder_worker as worker
 from we2day_api.push import push_configuration
+
+
+def test_creation_payload_is_allowlisted_and_never_contains_business_text(monkeypatch):
+    raw, public = keys()
+    config = push_configuration(
+        worker.WorkerSettings(
+            push_enabled=True, push_private_key=raw, push_subject="https://example.com"
+        )
+    )
+    subscription = {"endpoint": ENDPOINT, "keys": {"p256dh": public, "auth": b64(b"a" * 16)}}
+    event = {"type": "we2day-appointment-created-v1", "date": "2026-11-13", "event": str(uuid4())}
+    sent = []
+
+    def send(**kwargs):
+        sent.append(kwargs)
+        response = requests.Response()
+        response.status_code = 201
+        return response
+
+    monkeypatch.setattr(worker, "webpush", send)
+    assert worker.deliver(subscription | {"notification": event}, config) == "accepted"
+    assert json.loads(sent[0]["data"]) == event
+    assert set(sent[0]["subscription_info"]) == {"endpoint", "keys"}
+    for invalid in [
+        event | {"date": "2026-02-30"},
+        event | {"type": "other"},
+        event | {"title": "private"},
+        event | {"event": "invalid"},
+    ]:
+        assert worker.deliver(subscription | {"notification": invalid}, config) == "rejected"
+    assert len(sent) == 1
 
 
 def test_worker_payload_fixed_and_definite_vs_ambiguous_outcomes(monkeypatch):

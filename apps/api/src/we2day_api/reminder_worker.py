@@ -4,6 +4,8 @@ import argparse
 import json
 import re
 from collections import Counter
+from datetime import date
+from uuid import UUID
 
 import psycopg
 import requests
@@ -99,14 +101,29 @@ def deliver(subscription: dict, config) -> str:
         return "retry" if status in {429, 500, 502, 503, 504} else "rejected"
 
     try:
+        notification = subscription.get("notification")
+        payload = {"type": "we2day-anniversary-v1"}
+        if notification is not None:
+            if not isinstance(notification, dict) or set(notification) != {"type", "date", "event"}:
+                raise ValueError("invalid_notification")
+            if notification["type"] != "we2day-appointment-created-v1":
+                raise ValueError("invalid_notification")
+            day = date.fromisoformat(notification["date"])
+            if not 2000 <= day.year <= 2100 or day.isoformat() != notification["date"]:
+                raise ValueError("invalid_notification")
+            payload = {
+                "type": notification["type"],
+                "date": day.isoformat(),
+                "event": str(UUID(notification["event"])),
+            }
         validate_endpoint(subscription["endpoint"])
         ec.EllipticCurvePublicKey.from_encoded_point(
             ec.SECP256R1(), decode_key(subscription["keys"]["p256dh"], 65)
         )
         decode_key(subscription["keys"]["auth"], 16)
         response = webpush(
-            subscription_info=subscription,
-            data=json.dumps({"type": "we2day-anniversary-v1"}),
+            subscription_info={"endpoint": subscription["endpoint"], "keys": subscription["keys"]},
+            data=json.dumps(payload),
             vapid_private_key=Vapid02(private_key=key),
             vapid_claims={"sub": subject},
             ttl=60,
@@ -150,7 +167,9 @@ def run_once(connection, config, *, check_only=False, sender=deliver):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run one bounded anniversary Push batch")
+    parser = argparse.ArgumentParser(
+        description="Run one bounded scheduled and creation Push batch"
+    )
     parser.add_argument(
         "--check", action="store_true", help="Check ACL only; no queue writes or sends"
     )

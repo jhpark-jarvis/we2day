@@ -1,4 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
+import { resetCourseFixture } from "./course-fixture";
+
+test.beforeEach(async ({ request }) => resetCourseFixture(request));
 
 test("personal schedules share read access, restrict edits and keep independent day markers", async ({
   page,

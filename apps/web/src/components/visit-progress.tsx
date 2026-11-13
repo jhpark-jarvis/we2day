@@ -1,25 +1,38 @@
 "use client";
-import { Check, ListRestart, SkipForward } from "lucide-react";
+import { Check, ListRestart, Route, SkipForward } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState, useTransition } from "react";
 import { LoadingRegion } from "@/components/loading-region";
+import { LocalAppointmentTime } from "@/components/local-appointment-time";
+import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { RefreshButton } from "@/components/workspace-controls";
 import type { DatePlan } from "@/lib/plans";
+import type { TimezoneView } from "@/lib/timezones";
 import { changeVisit, readVisits } from "@/lib/visit-requests";
 import { type VisitChange, type VisitProgress, type VisitState, visitLabels } from "@/lib/visits";
 
 export function VisitProgressPanel({
   plan,
   today,
-  selectedActivity,
+  selectedActivity = 0,
   onSelectActivity,
   selectedContent,
+  expanded = false,
+  site = "",
+  zones = null,
+  onRefreshPlan,
+  extraActions,
 }: {
   plan: DatePlan;
   today: string;
-  selectedActivity: number;
-  onSelectActivity: (index: number) => void;
+  selectedActivity?: number;
+  onSelectActivity?: (index: number) => void;
   selectedContent?: ReactNode;
+  expanded?: boolean;
+  site?: string;
+  zones?: TimezoneView | null;
+  onRefreshPlan?: () => void;
+  extraActions?: ReactNode;
 }) {
   const router = useRouter();
   const [current, setCurrent] = useState<VisitProgress | null>(null);
@@ -105,10 +118,23 @@ export function VisitProgressPanel({
   }
   return (
     <LoadingRegion busy={pending || (!loaded && !error)} label="방문 상태를 불러오는 중">
-      <section className="visit-progress" aria-label="데이트 활동" aria-busy={pending}>
+      <section
+        className={expanded ? "visit-progress expanded-course" : "visit-progress"}
+        aria-label={expanded ? "코스" : "데이트 활동"}
+        aria-busy={pending}
+      >
         <div className="section-heading">
-          <h2>데이트 활동</h2>
+          <h2>
+            {expanded ? (
+              <>
+                <Route size={18} aria-hidden="true" /> 코스
+              </>
+            ) : (
+              "데이트 활동"
+            )}
+          </h2>
           <div className="section-actions">
+            {extraActions}
             <button
               className="icon-button"
               aria-label="최신 방문 진행 불러오기"
@@ -122,7 +148,9 @@ export function VisitProgressPanel({
             <RefreshButton
               label="확정 플랜 새로고침"
               pending={pending}
-              onClick={() => refreshPlan(() => router.refresh())}
+              onClick={() =>
+                refreshPlan(() => (onRefreshPlan ? onRefreshPlan() : router.refresh()))
+              }
             />
           </div>
         </div>
@@ -149,48 +177,92 @@ export function VisitProgressPanel({
             같은 변경 다시 시도
           </button>
         )}
-        <ol className="day-timeline">
+        <ol className={expanded ? "course-timeline" : "day-timeline"}>
           {content?.activities.map((activity, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: Publication identity freezes activity order.
-            <li className="activity-card" key={index} data-selected={selectedActivity === index}>
-              <button
-                className="timeline-item"
-                type="button"
-                aria-pressed={selectedActivity === index}
-                onClick={() => onSelectActivity(index)}
-              >
-                <span>{activity.time || "시간 미정"}</span>
-                <strong>{activity.title}</strong>
-                <small>
-                  {activity.place || "장소 없는 활동"}
-                  {!!activity.cost && ` · ${activity.cost.toLocaleString()}원`}
-                </small>
-              </button>
-              {selectedActivity === index && selectedContent}
-              <div className="activity-progress">
-                <span className="visit-state">
-                  {loaded ? visitLabels[states[index]] : error ? "확인 필요" : "확인 중"}
-                </span>
-                <fieldset className="visit-actions" aria-label={`${activity.title} 방문 상태`}>
-                  {(["visited", "skipped"] as const).map((state) => {
-                    const active = loaded && states[index] === state;
-                    const Icon = state === "visited" ? Check : SkipForward;
-                    return (
-                      <button
-                        type="button"
-                        className="icon-button visit-action"
-                        key={state}
-                        aria-label={visitLabels[state]}
-                        title={`${visitLabels[state]}${active ? " 취소" : ""}`}
-                        aria-pressed={active}
-                        disabled={pending || !writable || !!attempt}
-                        onClick={() => choose(index, active ? "planned" : state)}
-                      >
-                        <Icon size={20} aria-hidden="true" />
-                      </button>
-                    );
-                  })}
-                </fieldset>
+            <li
+              className={expanded ? "course-stop" : "activity-card"}
+              // biome-ignore lint/suspicious/noArrayIndexKey: A publication freezes activity order.
+              key={`${plan.published_revision}:${index}`}
+              data-selected={!expanded && selectedActivity === index}
+            >
+              {expanded && (
+                <div className="course-track">
+                  <time>{activity.time || "시간 미정"}</time>
+                  <span className="course-number">
+                    {loaded && states[index] === "visited" ? (
+                      <Check size={14} aria-hidden="true" />
+                    ) : (
+                      index + 1
+                    )}
+                  </span>
+                </div>
+              )}
+              <div className={expanded ? "course-stop-card" : "activity-card-content"}>
+                {expanded ? (
+                  <>
+                    <header className="course-stop-heading">
+                      <h3>{activity.title}</h3>
+                      <NaverAppHandoff
+                        iconOnly
+                        site={site}
+                        place={activity.place}
+                        mapUrl={activity.map_url}
+                      />
+                    </header>
+                    <p className="course-stop-place">
+                      {activity.place || "장소 없는 활동"}
+                      {!!activity.cost && ` · ${activity.cost.toLocaleString()}원`}
+                    </p>
+                    <LocalAppointmentTime
+                      date={content?.date || ""}
+                      time={activity.time}
+                      zones={zones}
+                    />
+                    {activity.note && (
+                      <p className="course-stop-note preserve-lines">{activity.note}</p>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    className="timeline-item"
+                    type="button"
+                    aria-pressed={selectedActivity === index}
+                    onClick={() => onSelectActivity?.(index)}
+                  >
+                    <span>{activity.time || "시간 미정"}</span>
+                    <strong>{activity.title}</strong>
+                    <small>
+                      {activity.place || "장소 없는 활동"}
+                      {!!activity.cost && ` · ${activity.cost.toLocaleString()}원`}
+                    </small>
+                  </button>
+                )}
+                {!expanded && selectedActivity === index && selectedContent}
+                <div className="activity-progress">
+                  <span className="visit-state">
+                    {loaded ? visitLabels[states[index]] : error ? "확인 필요" : "확인 중"}
+                  </span>
+                  <fieldset className="visit-actions" aria-label={`${activity.title} 방문 상태`}>
+                    {(["visited", "skipped"] as const).map((state) => {
+                      const active = loaded && states[index] === state;
+                      const Icon = state === "visited" ? Check : SkipForward;
+                      return (
+                        <button
+                          type="button"
+                          className="icon-button visit-action"
+                          key={state}
+                          aria-label={visitLabels[state]}
+                          title={`${visitLabels[state]}${active ? " 취소" : ""}`}
+                          aria-pressed={active}
+                          disabled={pending || !writable || !!attempt}
+                          onClick={() => choose(index, active ? "planned" : state)}
+                        >
+                          <Icon size={20} aria-hidden="true" />
+                        </button>
+                      );
+                    })}
+                  </fieldset>
+                </div>
               </div>
             </li>
           ))}

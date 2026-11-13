@@ -19,6 +19,7 @@ from database_fixture import temporary_database  # noqa: E402
 def main():
     screenshots = "--screenshots" in sys.argv
     ai = "--ai" in sys.argv
+    appointment_course = "--appointment-course" in sys.argv
     photos = "--photos" in sys.argv or screenshots or "--organizer" in sys.argv
     places = "--places" in sys.argv
     plans = "--plans" in sys.argv
@@ -27,6 +28,15 @@ def main():
     jwt_secret = "local-calendar-fixture-secret-32-chars-minimum"
     with temporary_database(rest_port=54330) as (dsn, database_name):
         with psycopg.connect(dsn) as connection:
+            if appointment_course:
+                connection.execute("""
+                  create function public.fixture_reset_course_tests() returns void
+                  language sql security definer set search_path='' as $$
+                    truncate public.couples cascade;
+                  $$;
+                  revoke all on function public.fixture_reset_course_tests() from public;
+                  grant execute on function public.fixture_reset_course_tests() to anon;
+                """)
             if photos:
                 connection.execute("""
                   -- Test-only bridge for the in-memory Storage HTTP fixture.
@@ -104,6 +114,7 @@ def main():
                 "WE2DAY_TEST_JWT_SECRET": jwt_secret,
                 "WE2DAY_TEST_REST_URL": "http://127.0.0.1:54330",
                 "WE2DAY_TEST_AUTH_PROVIDERS": "password",
+                "WE2DAY_TEST_COURSE_RESET": "1" if appointment_course else "",
                 "WE2DAY_TEST_PHOTO_STORAGE": "1" if photos else "",
             }
             result = subprocess.run(
@@ -116,7 +127,9 @@ def main():
                     "playwright",
                     "test",
                     "--config",
-                    "playwright.ai.config.ts"
+                    "playwright.appointment-course.config.ts"
+                    if appointment_course
+                    else "playwright.ai.config.ts"
                     if ai
                     else "playwright.screenshots.config.ts"
                     if screenshots
@@ -143,6 +156,7 @@ def main():
                             "--organizer",
                             "--screenshots",
                             "--ai",
+                            "--appointment-course",
                         }
                     ],
                 ],

@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import { expect, test } from "@playwright/test";
+import { resetCourseFixture } from "./course-fixture";
+
+test.beforeEach(async ({ request }) => resetCourseFixture(request));
 
 test("device push explicit permission, retry, revoke and logout", async ({
   page,
@@ -106,14 +109,14 @@ test("device push explicit permission, retry, revoke and logout", async ({
         (window as unknown as Window & { fixturePermissionCount: number }).fixturePermissionCount,
     ),
   ).toBe(1);
-  const toggle = panel.getByRole("switch", { name: "자동 기념일 알림" });
+  const toggle = panel.getByRole("switch", { name: "일정·기념일 알림" });
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   await toggle.click();
   await expect(panel.getByRole("status")).toContainText("설정 연결 실패");
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-checked", "true");
-  await expect(panel.getByRole("status")).toContainText("켠 이후의 예약 시점");
+  await expect(panel.getByRole("status")).toContainText("지금부터 새로 등록하는 일정");
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   await expect(panel.getByRole("button", { name: "테스트 알림 보내기" })).toBeEnabled();

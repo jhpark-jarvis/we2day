@@ -1,5 +1,5 @@
 [Unit]
-Description=WE2DAY bounded anniversary reminder batch
+Description=WE2DAY bounded appointment and anniversary notification batch
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
