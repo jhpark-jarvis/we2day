@@ -27,10 +27,7 @@ test("wish locations and current-day calendar colors survive saving and plan han
     }, theme);
     const colors = await page.evaluate(() => {
       const root = getComputedStyle(document.documentElement);
-      return {
-        today: root.getPropertyValue("--foreground").trim(),
-        selected: root.getPropertyValue("--accent").trim(),
-      };
+      return { selected: root.getPropertyValue("--accent").trim() };
     });
     const rgb = (value: string) =>
       value.replace(
@@ -38,7 +35,8 @@ test("wish locations and current-day calendar colors survive saving and plan han
         (_, r, g, b) =>
           `rgb(${Number.parseInt(r, 16)}, ${Number.parseInt(g, 16)}, ${Number.parseInt(b, 16)})`,
       );
-    await expect(today.locator(".day-number")).toHaveCSS("background-color", rgb(colors.today));
+    await expect(today.locator(".day-number")).toHaveCSS("border-color", "rgb(34, 34, 34)");
+    await expect(today.locator(".day-number")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(other.locator(".day-number")).toHaveCSS("background-color", rgb(colors.selected));
   }
   await page.locator("html").evaluate((node) => {
@@ -46,6 +44,7 @@ test("wish locations and current-day calendar colors survive saving and plan han
   });
   await today.click();
   await expect(today).toHaveAttribute("aria-pressed", "true");
+  await expect(today.locator(".day-number")).toHaveCSS("background-color", "rgb(162, 84, 62)");
   await page.screenshot({ path: info.outputPath("calendar.png") });
   await page.goto("/wishlist");
   await page.getByRole("button", { name: "위시 추가", exact: true }).click();
