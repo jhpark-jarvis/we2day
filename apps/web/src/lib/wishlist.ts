@@ -2,6 +2,8 @@ export type WishContent = {
   title: string;
   kind: "place" | "activity";
   note: string;
+  place?: string;
+  map_url?: string;
   done: boolean;
   archived: boolean;
 };

@@ -2,6 +2,7 @@ import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { WishWorkspace } from "@/components/wish-workspace";
 import { callApi } from "@/lib/api";
+import { getAuthConfig } from "@/lib/auth/config";
 import type { Couple } from "@/lib/shared-calendar";
 import type { Wish } from "@/lib/wishlist";
 export default async function WishlistPage({
@@ -33,6 +34,7 @@ export default async function WishlistPage({
       : null;
   return (
     <WishWorkspace
+      site={getAuthConfig()?.site || ""}
       initialItems={wishes.data || []}
       initialSelected={selected?.data}
       initialError={

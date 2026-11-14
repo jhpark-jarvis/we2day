@@ -3,7 +3,9 @@ import { Pencil } from "lucide-react";
 
 import { useRef, useState, useTransition } from "react";
 import { saveWish } from "@/app/actions/wishlist";
+import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { PageHeading } from "@/components/page-heading";
+import { PlaceSearch } from "@/components/place-search";
 import Link from "@/components/progress-link";
 import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
 import { useItemHistory } from "@/lib/page-history";
@@ -12,10 +14,12 @@ export function WishWorkspace({
   initialItems,
   initialError,
   initialSelected = null,
+  site,
 }: {
   initialItems: Wish[];
   initialError: string;
   initialSelected?: Wish | null;
+  site: string;
 }) {
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState(initialError);
@@ -113,6 +117,17 @@ export function WishWorkspace({
             </small>
             <h2>{wish.title}</h2>
             <p className="preserve-lines">{wish.note}</p>
+            {wish.kind === "place" && (
+              <div className="calendar-toolbar">
+                {wish.place && <span className="preserve-lines">{wish.place}</span>}
+                <NaverAppHandoff
+                  place={wish.place || wish.title}
+                  mapUrl={wish.map_url}
+                  site={site}
+                  iconOnly
+                />
+              </div>
+            )}
             <button
               type="button"
               className="icon-button card-edit"
@@ -167,10 +182,20 @@ function WishEditor({
           title: wish.title,
           kind: wish.kind,
           note: wish.note,
+          place: wish.place || "",
+          map_url: wish.map_url || "",
           done: wish.done,
           archived: wish.archived,
         }
-      : { title: "", kind: "place", note: "", done: false, archived: false },
+      : {
+          title: "",
+          kind: "place",
+          note: "",
+          place: "",
+          map_url: "",
+          done: false,
+          archived: false,
+        },
   );
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState(false);
@@ -225,13 +250,61 @@ function WishEditor({
               id="wish-kind"
               value={content.kind}
               onChange={(e) =>
-                setContent({ ...content, kind: e.target.value as WishContent["kind"] })
+                setContent({
+                  ...content,
+                  kind: e.target.value as WishContent["kind"],
+                  place: "",
+                  map_url: "",
+                })
               }
             >
               <option value="place">가고 싶은 곳</option>
               <option value="activity">해보고 싶은 일</option>
             </select>
           </div>
+          {content.kind === "place" && (
+            <>
+              <PlaceSearch
+                compact
+                initialQuery={content.place || content.title}
+                onSelect={(place) =>
+                  setContent((current) => ({
+                    ...current,
+                    title: current.title || place.split(" (")[0].slice(0, 100),
+                    place,
+                    map_url: current.place === place ? current.map_url : "",
+                  }))
+                }
+              >
+                <div className="auth-field">
+                  <label htmlFor="wish-place">장소</label>
+                  <input
+                    id="wish-place"
+                    maxLength={200}
+                    value={content.place || ""}
+                    onChange={(event) => setContent({ ...content, place: event.target.value })}
+                  />
+                </div>
+              </PlaceSearch>
+              <div className="auth-field">
+                <label htmlFor="wish-map-url">네이버 지도 공유 링크</label>
+                <input
+                  id="wish-map-url"
+                  type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  maxLength={200}
+                  value={content.map_url || ""}
+                  pattern={"https://naver[.]me/[A-Za-z0-9_\\-]{1,80}"}
+                  placeholder="https://naver.me/…"
+                  onChange={(event) =>
+                    setContent({ ...content, map_url: event.target.value.trim() })
+                  }
+                />
+              </div>
+            </>
+          )}
           <div className="auth-field">
             <label htmlFor="wish-note">위시 메모</label>
             <textarea

@@ -51,7 +51,8 @@ export default async function PlansPage({
           {
             title: item.title,
             time: null,
-            place: item.kind === "place" ? item.title : "",
+            place: item.kind === "place" ? item.place || item.title : "",
+            map_url: item.kind === "place" ? item.map_url || "" : "",
             cost: null,
             note: item.note,
           },

@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -15,8 +16,17 @@ class WishContent(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     kind: Literal["place", "activity"]
     note: str = Field(default="", max_length=1000)
+    place: str = Field(default="", max_length=200)
+    map_url: str = Field(default="", max_length=200)
     done: bool = False
     archived: bool = False
+
+    @field_validator("map_url")
+    @classmethod
+    def map_link(cls, value):
+        if value and not re.fullmatch(r"https://naver\.me/[A-Za-z0-9_-]{1,80}", value):
+            raise ValueError("A NAVER map share link is required")
+        return value
 
     @field_validator("title")
     @classmethod
@@ -39,7 +49,7 @@ class Wish(WishContent):
     updated_at: datetime
 
 
-SELECT = "id,title,kind,note,done,archived,version,updated_by,updated_at"
+SELECT = "id,title,kind,note,place,map_url,done,archived,version,updated_by,updated_at"
 
 
 @router.get("/wishlist", response_model=list[Wish])
@@ -67,10 +77,15 @@ def read_wish(id: UUID, store: Store):
 
 @router.post("/wishlist/{id}", response_model=Wish)
 def save_wish(id: UUID, body: WishChange, store: Store):
+    located = bool({"place", "map_url"} & body.model_fields_set)
+    content = body.model_dump(mode="json")
+    if not located:
+        content.pop("place")
+        content.pop("map_url")
     return store.rpc(
-        "save_wish",
+        "save_wish_location" if located else "save_wish",
         {
             "p_id": str(id),
-            **{f"p_{key}": value for key, value in body.model_dump(mode="json").items()},
+            **{f"p_{key}": value for key, value in content.items()},
         },
     )[0]

@@ -1,4 +1,101 @@
 import { expect, type Route, test } from "@playwright/test";
+import { resetCourseFixture } from "./course-fixture";
+
+test.use({ serviceWorkers: "block" });
+
+test("wish locations and current-day calendar colors survive saving and plan handoff", async ({
+  page,
+  request,
+}, info) => {
+  test.setTimeout(120_000);
+  await resetCourseFixture(request);
+  await page.goto("/login");
+  await page.getByLabel("아이디", { exact: true }).fill("member");
+  await page.getByLabel("비밀번호", { exact: true }).fill("fixture-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await page.goto("/couple");
+  await page.getByRole("button", { name: "새 공간 만들기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "초대 코드 만들기", exact: true })).toBeVisible();
+  await page.goto("/");
+  const today = page.locator('.calendar-day[aria-current="date"]');
+  const other = page.locator('.calendar-day:not([aria-current="date"])').first();
+  await other.click();
+  for (const theme of ["warm", "white", "pongni", "dumung", "sopoo", "kuku"]) {
+    await page.locator("html").evaluate((node, value) => {
+      node.dataset.theme = value;
+    }, theme);
+    const colors = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      return {
+        today: root.getPropertyValue("--foreground").trim(),
+        selected: root.getPropertyValue("--accent").trim(),
+      };
+    });
+    const rgb = (value: string) =>
+      value.replace(
+        /^#(..)(..)(..)$/,
+        (_, r, g, b) =>
+          `rgb(${Number.parseInt(r, 16)}, ${Number.parseInt(g, 16)}, ${Number.parseInt(b, 16)})`,
+      );
+    await expect(today.locator(".day-number")).toHaveCSS("background-color", rgb(colors.today));
+    await expect(other.locator(".day-number")).toHaveCSS("background-color", rgb(colors.selected));
+  }
+  await page.locator("html").evaluate((node) => {
+    node.dataset.theme = "warm";
+  });
+  await today.click();
+  await expect(today).toHaveAttribute("aria-pressed", "true");
+  await page.screenshot({ path: info.outputPath("calendar.png") });
+  await page.goto("/wishlist");
+  await page.getByRole("button", { name: "위시 추가", exact: true }).click();
+  await page.route("**/api/places/search", async (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            title: "합성 카페",
+            link: "",
+            category: "카페",
+            description: "",
+            address: "서울특별시 성동구 합성로 10",
+            roadAddress: "서울특별시 성동구 합성로 10",
+          },
+        ],
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "장소 검색", exact: true }).click();
+  await page.getByLabel("장소 검색어", { exact: true }).fill("합성 카페");
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await page.getByRole("button", { name: "합성 카페 선택", exact: true }).click();
+  await expect(page.getByLabel("장소", { exact: true })).toHaveValue(/합성 카페/);
+  await page
+    .getByLabel("네이버 지도 공유 링크", { exact: true })
+    .fill("https://naver.me/fixture123");
+  await page.getByLabel("위시 메모", { exact: true }).fill("합성 메모 유지");
+  await page.screenshot({ path: info.outputPath("wish-editor.png") });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.getByRole("button", { name: "위시 저장", exact: true }).click();
+  await expect(page.getByRole("link", { name: /합성 카페.*네이버 지도/ })).toHaveAttribute(
+    "href",
+    "https://naver.me/fixture123",
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "위시 수정 · 합성 카페", exact: true }).click();
+  await expect(page.getByLabel("네이버 지도 공유 링크", { exact: true })).toHaveValue(
+    "https://naver.me/fixture123",
+  );
+  await expect(page.getByLabel("위시 메모", { exact: true })).toHaveValue("합성 메모 유지");
+  await page.getByRole("button", { name: "작성 취소", exact: true }).click();
+  await page.getByRole("link", { name: "이 위시로 플랜 초안 만들기", exact: true }).click();
+  await expect(page.getByLabel("활동 1 장소", { exact: true })).toHaveValue(/합성 카페/);
+  await expect(page.getByLabel("네이버 지도 공유 링크", { exact: true })).toHaveValue(
+    "https://naver.me/fixture123",
+  );
+});
 
 test("calendar controls keep tinted day labels centered and refresh in its section", async ({
   page,

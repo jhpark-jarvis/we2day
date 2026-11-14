@@ -74,3 +74,4 @@
 !/apps/web/src/app/api/ai/
 !/apps/web/src/app/api/ai/planner/
 !/apps/web/src/app/api/ai/planner/route.ts
+!supabase/migrations/202611140043_wish_locations.sql
