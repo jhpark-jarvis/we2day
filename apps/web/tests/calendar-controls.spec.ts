@@ -35,7 +35,7 @@ test("wish locations and current-day calendar colors survive saving and plan han
         (_, r, g, b) =>
           `rgb(${Number.parseInt(r, 16)}, ${Number.parseInt(g, 16)}, ${Number.parseInt(b, 16)})`,
       );
-    await expect(today.locator(".day-number")).toHaveCSS("border-color", "rgb(34, 34, 34)");
+    await expect(today.locator(".day-number")).toHaveCSS("border-color", rgb(colors.selected));
     await expect(today.locator(".day-number")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(other.locator(".day-number")).toHaveCSS("background-color", rgb(colors.selected));
   }
