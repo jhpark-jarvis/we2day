@@ -4,7 +4,7 @@ import { WishWorkspace } from "@/components/wish-workspace";
 import { callApi } from "@/lib/api";
 import { getAuthConfig } from "@/lib/auth/config";
 import type { Couple } from "@/lib/shared-calendar";
-import type { Wish } from "@/lib/wishlist";
+import type { Wish, WishOverview } from "@/lib/wishlist";
 export default async function WishlistPage({
   searchParams,
 }: {
@@ -12,7 +12,7 @@ export default async function WishlistPage({
 }) {
   const [couple, wishes] = await Promise.all([
     callApi<Couple | null>("/couple"),
-    callApi<Wish[]>("/wishlist"),
+    callApi<WishOverview>("/wishlist/overview"),
   ]);
   if (!couple.data)
     return (
@@ -35,7 +35,7 @@ export default async function WishlistPage({
   return (
     <WishWorkspace
       site={getAuthConfig()?.site || ""}
-      initialItems={wishes.data || []}
+      initialPage={wishes.data}
       initialSelected={selected?.data}
       initialError={
         wishes.error || selected?.error || (item && !selected ? "위시 주소를 확인해 주세요." : "")

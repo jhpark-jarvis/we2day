@@ -13,3 +13,10 @@ export type Wish = WishContent & {
   updated_by: string;
   updated_at: string;
 };
+
+export type WishView = "planned" | "done" | "archived";
+export type WishOverview = {
+  items: Wish[];
+  counts: Record<WishView, number>;
+  has_more: boolean;
+};

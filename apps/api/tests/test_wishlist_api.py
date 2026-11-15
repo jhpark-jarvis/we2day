@@ -25,3 +25,16 @@ def test_wishlist_api_validation_and_projection(upstream):  # noqa: F811
     assert calls[-1].url.params["archived"] == "eq.true"
     assert client.post(f"/wishlist/{id}", json={**body, "note": "x" * 1001}).status_code == 422
     assert client.get("/wishlist?offset=100001").status_code == 422
+
+
+def test_wish_overview_is_scoped_read_rpc_with_validated_view_and_offset(upstream):  # noqa: F811
+    client, calls, replies = upstream
+    replies.append(
+        (200, {"items": [], "counts": {"planned": 72, "done": 4, "archived": 3}, "has_more": True})
+    )
+    response = client.get("/wishlist/overview?view=done&offset=50")
+    assert response.status_code == 200 and response.json()["counts"]["planned"] == 72
+    assert calls[-1].url.path == "/rest/v1/rpc/wishlist_overview"
+    assert json.loads(calls[-1].content) == {"p_view": "done", "p_offset": 50}
+    for query in ["view=other", "offset=-1", "offset=100001"]:
+        assert client.get("/wishlist/overview?" + query).status_code == 422

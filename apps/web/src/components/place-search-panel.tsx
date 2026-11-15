@@ -1,14 +1,22 @@
 "use client";
+import { CirclePlus, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { LoadingRegion } from "@/components/loading-region";
+import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { type PlaceResults, placeText, safePlaceLink, selectedPlaceText } from "@/lib/places";
 
 export function PlaceSearchPanel({
   initialQuery,
   onSelect,
+  compact = false,
+  site = "",
+  onQueryChange,
 }: {
   initialQuery: string;
   onSelect?: (place: string) => void;
+  compact?: boolean;
+  site?: string;
+  onQueryChange?: (query: string) => void;
 }) {
   const id = useId();
   const [query, setQuery] = useState(initialQuery.slice(0, 100));
@@ -73,13 +81,20 @@ export function PlaceSearchPanel({
 
   return (
     <LoadingRegion busy={loading} label="장소를 찾는 중">
-      <search className="place-search-panel" aria-label="장소 검색 입력">
-        <p className="settings-hint">
-          지역과 장소 이름으로 검색해 보세요. 검색어는 네이버로 전송돼요.
-        </p>
+      <search
+        className={`place-search-panel${compact ? " place-search-panel-compact" : ""}`}
+        aria-label="장소 검색 입력"
+      >
+        {!compact && (
+          <p className="settings-hint">
+            지역과 장소 이름으로 검색해 보세요. 검색어는 네이버로 전송돼요.
+          </p>
+        )}
         <div className="place-search-form">
           <div className="auth-field">
-            <label htmlFor={id}>장소 검색어</label>
+            <label htmlFor={id} className={compact ? "sr-only" : undefined}>
+              장소 검색어
+            </label>
             <input
               id={id}
               type="search"
@@ -95,6 +110,7 @@ export function PlaceSearchPanel({
                 setSearched("");
                 setError("");
                 setQuery(event.target.value);
+                onQueryChange?.(event.target.value);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.nativeEvent.isComposing) {
@@ -108,11 +124,13 @@ export function PlaceSearchPanel({
           </div>
           <button
             type="button"
-            className="primary-button"
+            className={compact ? "icon-button" : "primary-button"}
+            aria-label="검색"
+            title="검색"
             disabled={loading || !query.trim()}
             onClick={() => void search()}
           >
-            검색
+            {compact ? <Search size={19} aria-hidden="true" /> : "검색"}
           </button>
         </div>
         {error && (
@@ -139,6 +157,39 @@ export function PlaceSearchPanel({
                 {results.items.map((place, index) => {
                   const link = safePlaceLink(place.link);
                   const destination = selectedPlaceText(place);
+                  if (compact)
+                    return (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: immutable provider order has no stable IDs
+                      <li className="compact-place-result" key={`${index}:${place.title}`}>
+                        <div className="compact-place-copy">
+                          <h3>
+                            <SearchText value={place.title} />
+                          </h3>
+                          <p>
+                            <SearchText value={place.roadAddress || place.address} />
+                          </p>
+                        </div>
+                        <div className="compact-place-actions">
+                          <NaverAppHandoff place={destination} site={site} iconOnly />
+                          {onSelect && (
+                            <button
+                              type="button"
+                              className="icon-button"
+                              aria-label={`${placeText(place.title.replace(/<\/?b>/gi, ""))} 선택`}
+                              title={
+                                destination.length > 200
+                                  ? "장소명이 길어요. 필요한 이름이나 주소를 직접 입력해 주세요."
+                                  : "선택"
+                              }
+                              disabled={!destination || destination.length > 200}
+                              onClick={() => onSelect(destination)}
+                            >
+                              <CirclePlus size={19} aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
                   return (
                     // Provider order is preserved; no stable place IDs are supplied.
                     // biome-ignore lint/suspicious/noArrayIndexKey: transient immutable result rows

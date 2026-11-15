@@ -1,351 +1,787 @@
 "use client";
-import { Pencil } from "lucide-react";
 
-import { useRef, useState, useTransition } from "react";
+import {
+  Archive,
+  ArchiveRestore,
+  Check,
+  ChevronRight,
+  Circle,
+  Ellipsis,
+  Link2,
+  MapPin,
+  Pencil,
+  Plus,
+  Route,
+  Search,
+  Star,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { saveWish } from "@/app/actions/wishlist";
+import { FavoritePlaces } from "@/components/favorite-places";
+import { LoadingRegion } from "@/components/loading-region";
 import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { PageHeading } from "@/components/page-heading";
-import { PlaceSearch } from "@/components/place-search";
+import { PlaceSearchPanel } from "@/components/place-search-panel";
 import Link from "@/components/progress-link";
-import { ArchiveToggle, RefreshButton } from "@/components/workspace-controls";
+import { RefreshButton } from "@/components/workspace-controls";
+import { naverShareLink } from "@/lib/naver-app";
 import { useItemHistory } from "@/lib/page-history";
-import type { Wish, WishContent } from "@/lib/wishlist";
+import type { Wish, WishContent, WishOverview, WishView } from "@/lib/wishlist";
+
+const views = [
+  ["planned", "예정"],
+  ["done", "완료"],
+  ["archived", "보관"],
+] as const;
+const emptyPage: WishOverview = {
+  items: [],
+  counts: { planned: 0, done: 0, archived: 0 },
+  has_more: false,
+};
+type Draft = {
+  content: WishContent;
+  version: number;
+  source: "search" | "link" | "favorites";
+  query: string;
+  searching: boolean;
+  error: string;
+  conflict: boolean;
+  request: { signature: string; id: string } | null;
+};
+function contentOf(wish?: Wish | null): WishContent {
+  return {
+    title: wish?.title || "",
+    kind: wish?.kind || "place",
+    note: wish?.note || "",
+    place: wish?.place || "",
+    map_url: wish?.map_url || "",
+    done: wish?.done || false,
+    archived: wish?.archived || false,
+  };
+}
+function statusOf(wish: WishContent): WishView {
+  return wish.archived ? "archived" : wish.done ? "done" : "planned";
+}
+
 export function WishWorkspace({
-  initialItems,
+  initialPage,
   initialError,
   initialSelected = null,
   site,
 }: {
-  initialItems: Wish[];
+  initialPage: WishOverview | null;
   initialError: string;
   initialSelected?: Wish | null;
   site: string;
 }) {
-  const [items, setItems] = useState(initialItems);
+  const router = useRouter();
+  const [page, setPage] = useState(initialPage || emptyPage);
+  const [counted, setCounted] = useState(Boolean(initialPage));
+  const [view, setView] = useState<WishView>("planned");
   const [error, setError] = useState(initialError);
-  const [archived, setArchived] = useState(false);
-  const [more, setMore] = useState(initialItems.length === 50);
-  const {
-    id,
-    selected,
-    open,
-    close,
-    finish,
-    error: navigationError,
-  } = useItemHistory(
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [mutating, startMutation] = useTransition();
+  const currentView = useRef(view);
+  currentView.current = view;
+  const workspace = useRef<HTMLElement>(null);
+  const active = useRef<AbortController | null>(null);
+  const known = useRef(
+    new Map(
+      [...(initialPage?.items || []), ...(initialSelected ? [initialSelected] : [])].map((item) => [
+        item.id,
+        item,
+      ]),
+    ),
+  );
+  const drafts = useRef(new Map<string, Draft>());
+  const newId = useRef("");
+  const trigger = useRef<{ id: string; action: string } | null>(null);
+  const hadEditor = useRef(false);
+  const retries = useRef(new Map<string, { signature: string; id: string }>());
+  const history = useItemHistory(
     "wishlist",
-    [...items, ...(initialSelected ? [initialSelected] : [])],
+    [...known.current.values()],
     "/api/wishlist",
     initialSelected?.id || "",
   );
-  const [pending, startTransition] = useTransition();
-  function load(next: boolean, offset = 0) {
-    startTransition(async () => {
-      try {
-        const response = await fetch(`/api/wishlist?archived=${next}&offset=${offset}`, {
-          cache: "no-store",
+  const currentEditor = useRef(history.id);
+  currentEditor.current = history.id;
+  const busy = loading || mutating;
+
+  useEffect(() => () => active.current?.abort(), []);
+  useEffect(() => {
+    if (history.id) {
+      hadEditor.current = true;
+      return;
+    }
+    if (!hadEditor.current || busy) return;
+    hadEditor.current = false;
+    const frame = requestAnimationFrame(() => {
+      const target = [
+        ...(workspace.current?.querySelectorAll<HTMLElement>("[data-wish-action]") || []),
+      ].find(
+        (node) =>
+          node.dataset.wishId === trigger.current?.id &&
+          node.dataset.wishAction === trigger.current?.action,
+      );
+      (
+        target || workspace.current?.querySelector<HTMLElement>('[data-wish-action="add"]')
+      )?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [history.id, busy]);
+  useEffect(() => {
+    const closeMenus = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest(".wish-menu")) return;
+      workspace.current
+        ?.querySelectorAll<HTMLDetailsElement>(".wish-menu[open]")
+        .forEach((menu) => {
+          menu.open = false;
         });
-        const data = await response.json();
-        if (!response.ok) throw Error();
-        setItems((current) =>
-          offset
-            ? [...current, ...data].filter(
-                (item, index, array) => array.findIndex((v) => v.id === item.id) === index,
-              )
-            : data,
-        );
-        setArchived(next);
-        setMore(data.length === 50);
-        setError("");
-      } catch {
+    };
+    document.addEventListener("pointerdown", closeMenus);
+    return () => document.removeEventListener("pointerdown", closeMenus);
+  }, []);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  async function load(next: WishView, offset = 0) {
+    active.current?.abort();
+    const controller = new AbortController();
+    active.current = controller;
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/wishlist?view=${next}&offset=${offset}`, {
+        cache: "no-store",
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+      });
+      const data = await response.json();
+      if (
+        !response.ok ||
+        !Array.isArray(data?.items) ||
+        typeof data.has_more !== "boolean" ||
+        !views.every(([key]) => Number.isSafeInteger(data.counts?.[key]) && data.counts[key] >= 0)
+      )
+        throw Error();
+      if (controller.signal.aborted) return;
+      for (const item of data.items as Wish[]) known.current.set(item.id, item);
+      setPage((current) => ({
+        ...data,
+        items: offset
+          ? [...current.items, ...data.items].filter(
+              (item, index, all) => all.findIndex((other) => other.id === item.id) === index,
+            )
+          : data.items,
+      }));
+      currentView.current = next;
+      setView(next);
+      setCounted(true);
+      setError("");
+    } catch {
+      if (!controller.signal.aborted)
         setError("위시 목록을 불러오지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }
+  function open(wish?: Wish) {
+    trigger.current = { id: wish?.id || "", action: wish ? "edit" : "add" };
+    if (!wish) newId.current ||= crypto.randomUUID();
+    history.open(wish?.id || newId.current, !wish);
+  }
+  function getDraft(id: string, wish: Wish | null) {
+    let draft = drafts.current.get(id);
+    if (!draft) {
+      draft = {
+        content: contentOf(wish),
+        version: wish?.version || 0,
+        source: wish?.map_url && !wish.place ? "link" : "search",
+        query: "",
+        searching: !wish?.place,
+        error: "",
+        conflict: false,
+        request: null,
+      };
+      drafts.current.set(id, draft);
+    }
+    return draft;
+  }
+  function saved(wish: Wish) {
+    const selectedView = currentView.current;
+    const previous = known.current.get(wish.id);
+    known.current.set(wish.id, wish);
+    setPage((current) => {
+      const counts = { ...current.counts };
+      if (counted) {
+        if (previous) counts[statusOf(previous)] = Math.max(0, counts[statusOf(previous)] - 1);
+        counts[statusOf(wish)]++;
+      }
+      const remaining = current.items.filter((item) => item.id !== wish.id);
+      return {
+        ...current,
+        counts,
+        items: statusOf(wish) === selectedView ? [wish, ...remaining] : remaining,
+      };
+    });
+    setError("");
+    void load(selectedView);
+  }
+  function closeEditor(finish = false) {
+    if (finish) history.finish();
+    else history.close();
+    if (initialSelected && new URL(window.location.href).searchParams.has("item"))
+      router.replace("/wishlist", { scroll: false });
+  }
+  function changeStatus(wish: Wish, field: "done" | "archived") {
+    if (busy) return;
+    workspace.current?.querySelectorAll<HTMLDetailsElement>(".wish-menu[open]").forEach((menu) => {
+      menu.open = false;
+    });
+    const content = { ...contentOf(wish), [field]: !wish[field] };
+    const signature = JSON.stringify([content, wish.version]);
+    let retry = retries.current.get(wish.id);
+    if (!retry || retry.signature !== signature) {
+      retry = { signature, id: crypto.randomUUID() };
+      retries.current.set(wish.id, retry);
+    }
+    const requestId = retry.id;
+    startMutation(async () => {
+      try {
+        const result = await saveWish(wish.id, content, wish.version, requestId);
+        if (result.data) {
+          retries.current.delete(wish.id);
+          saved(result.data);
+          setNotice(
+            field === "done"
+              ? content.done
+                ? "완료로 이동했어요."
+                : "예정으로 이동했어요."
+              : content.archived
+                ? "보관했어요."
+                : "복원했어요.",
+          );
+        } else if (result.status === 409) {
+          await load(view);
+          setError("상대가 위시를 수정했어요. 최신 내용을 확인해 주세요.");
+        } else setError(result.error);
+      } catch {
+        setError("연결을 확인하고 다시 시도해 주세요. 위시는 그대로 두었어요.");
       }
     });
   }
-  if (id)
-    return (
-      <WishEditor
-        key={`${id}:${selected?.version || 0}`}
-        id={id}
-        wish={selected}
-        onClose={close}
-        onSaved={(wish) => {
-          setItems((current) =>
-            [wish, ...current.filter((v) => v.id !== wish.id)].filter(
-              (v) => v.archived === archived,
-            ),
-          );
-          finish();
-        }}
-      />
-    );
+
   return (
-    <section>
+    <section className="wish-workspace" ref={workspace}>
       <PageHeading>
         <div>
           <p className="eyebrow">OUR WISHLIST</p>
-          <h1>위시리스트</h1>
-          <p className="muted">함께 가고 싶은 곳, 해보고 싶은 일을 모아요.</p>
+          <h1>위시</h1>
         </div>
       </PageHeading>
-      <div className="calendar-toolbar">
-        <button
-          className="primary-button"
-          type="button"
-          onClick={() => open(crypto.randomUUID(), true)}
-        >
-          위시 추가
-        </button>
-        <ArchiveToggle label="위시 구분" archived={archived} pending={pending} onChange={load} />
-        <RefreshButton label="위시 새로고침" pending={pending} onClick={() => load(archived)} />
-      </div>
-      <p className="settings-hint">
-        직접 작성한 내용만 저장해요. 완료 표시는 만난 날이나 실제 방문 기록을 만들지 않아요.
-      </p>
-      {(error || navigationError) && (
-        <p role="alert" className="error-message">
-          {error || navigationError}
-        </p>
-      )}
-      <div className="plan-list">
-        {items.map((wish) => (
-          <article className="plan-card" key={wish.id}>
-            <small>
-              {wish.kind === "place" ? "가고 싶은 곳" : "해보고 싶은 일"} ·{" "}
-              {wish.done ? "완료" : "하고 싶어요"}
-              {wish.archived ? " · 보관됨" : ""}
-            </small>
-            <h2>{wish.title}</h2>
-            <p className="preserve-lines">{wish.note}</p>
-            {wish.kind === "place" && (
-              <div className="calendar-toolbar">
-                {wish.place && <span className="preserve-lines">{wish.place}</span>}
-                <NaverAppHandoff
-                  place={wish.place || wish.title}
-                  mapUrl={wish.map_url}
-                  site={site}
-                  iconOnly
-                />
-              </div>
-            )}
+      <div className="wish-toolbar">
+        <fieldset className="wish-filters" aria-label="위시 상태">
+          {views.map(([key, label]) => (
             <button
               type="button"
-              className="icon-button card-edit"
-              aria-label={`위시 수정 · ${wish.title}`}
-              title="위시 수정"
-              onClick={() => {
-                open(wish.id);
-              }}
+              key={key}
+              aria-pressed={view === key}
+              disabled={busy}
+              onClick={() => void load(key)}
             >
-              <Pencil size={18} aria-hidden="true" />
+              {label}
+              <span>{counted ? page.counts[key] : "—"}</span>
             </button>
-            {!wish.archived && (
-              <Link className="text-button" href={`/plans?wish=${wish.id}`}>
-                이 위시로 플랜 초안 만들기
-              </Link>
-            )}
-          </article>
-        ))}
+          ))}
+        </fieldset>
+        <div className="wish-tools">
+          <RefreshButton label="위시 새로고침" pending={busy} onClick={() => void load(view)} />
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="위시 추가"
+            title="위시 추가"
+            data-wish-action="add"
+            data-wish-id=""
+            disabled={busy}
+            onClick={() => open()}
+          >
+            <Plus size={20} aria-hidden="true" />
+          </button>
+        </div>
       </div>
-      {!items.length && !error && (
-        <p className="empty-state">
-          {archived ? "보관된 위시가 없어요." : "아직 모아둔 위시가 없어요."}
-        </p>
+      <LoadingRegion busy={busy} label="위시를 불러오는 중">
+        <div className="wish-list">
+          {page.items.map((wish, index) => (
+            <article className="wish-row" key={wish.id}>
+              <button
+                className="wish-open"
+                type="button"
+                onClick={() => open(wish)}
+                aria-label={`위시 수정 · ${wish.title}`}
+                data-wish-action="edit"
+                data-wish-id={wish.id}
+              >
+                <span>
+                  <small>{wish.kind === "place" ? "장소" : "활동"}</small>
+                  <h2>{wish.title}</h2>
+                </span>
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+              {wish.kind === "place" && wish.place && <p className="wish-address">{wish.place}</p>}
+              <div className="wish-row-actions">
+                {wish.kind === "place" && (
+                  <NaverAppHandoff
+                    place={wish.place || wish.title}
+                    mapUrl={wish.map_url}
+                    site={site}
+                    iconOnly
+                  />
+                )}
+                {!wish.archived && (
+                  <Link
+                    className="wish-course"
+                    href={`/plans?wish=${wish.id}`}
+                    aria-label={`${wish.title} 코스 초안`}
+                  >
+                    <Route size={18} aria-hidden="true" />
+                    <span>코스</span>
+                  </Link>
+                )}
+                <details
+                  className="wish-menu"
+                  name="wish-actions"
+                  data-align={index && index === page.items.length - 1 ? "above" : "below"}
+                >
+                  <summary
+                    className="icon-button"
+                    aria-label={`${wish.title} 더보기`}
+                    title="더보기"
+                  >
+                    <Ellipsis size={20} aria-hidden="true" />
+                  </summary>
+                  <div className="wish-menu-items">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        workspace.current
+                          ?.querySelectorAll<HTMLDetailsElement>(".wish-menu[open]")
+                          .forEach((menu) => {
+                            menu.open = false;
+                          });
+                        open(wish);
+                      }}
+                    >
+                      <Pencil size={17} aria-hidden="true" />
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => changeStatus(wish, "done")}
+                    >
+                      {wish.done ? (
+                        <Circle size={17} aria-hidden="true" />
+                      ) : (
+                        <Check size={17} aria-hidden="true" />
+                      )}
+                      {wish.done ? "예정으로" : "완료"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => changeStatus(wish, "archived")}
+                    >
+                      {wish.archived ? (
+                        <ArchiveRestore size={17} aria-hidden="true" />
+                      ) : (
+                        <Archive size={17} aria-hidden="true" />
+                      )}
+                      {wish.archived ? "복원" : "보관"}
+                    </button>
+                  </div>
+                </details>
+              </div>
+            </article>
+          ))}
+        </div>
+        {!page.items.length && !error && (
+          <div className="wish-empty">
+            <Star size={25} aria-hidden="true" />
+            <p>
+              {view === "archived"
+                ? "보관한 위시가 없어요."
+                : view === "done"
+                  ? "완료한 위시가 없어요."
+                  : "함께 하고 싶은 일을 담아보세요."}
+            </p>
+          </div>
+        )}
+        {!page.items.length && error && (
+          <button type="button" className="text-button" onClick={() => void load(view)}>
+            다시 불러오기
+          </button>
+        )}
+        {page.has_more && (
+          <button
+            type="button"
+            className="text-button wish-more"
+            disabled={busy}
+            aria-label="위시 더 보기"
+            onClick={() => void load(view, page.items.length)}
+          >
+            더 보기
+          </button>
+        )}
+      </LoadingRegion>
+      {(error || history.error || notice) && (
+        <div className="wish-feedback" role={error || history.error ? "alert" : "status"}>
+          <span>{error || history.error || notice}</span>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="안내 닫기"
+            onClick={() => {
+              setError("");
+              setNotice("");
+            }}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
       )}
-      {more && (
-        <button
-          type="button"
-          className="text-button"
-          disabled={pending}
-          onClick={() => load(archived, items.length)}
-        >
-          위시 더 보기
-        </button>
+      {history.id && (
+        <WishEditor
+          key={history.id}
+          id={history.id}
+          record={getDraft(history.id, history.selected)}
+          site={site}
+          onClose={() => closeEditor()}
+          onSaved={(wish) => {
+            drafts.current.delete(wish.id);
+            if (newId.current === wish.id) newId.current = "";
+            saved(wish);
+            if (currentEditor.current === wish.id) closeEditor(true);
+            setNotice("저장했어요.");
+          }}
+          onDiscard={() => {
+            drafts.current.delete(history.id);
+            if (newId.current === history.id) newId.current = "";
+            closeEditor(true);
+            void load(view);
+          }}
+        />
       )}
     </section>
   );
 }
+
 function WishEditor({
   id,
-  wish,
+  record,
+  site,
   onClose,
   onSaved,
+  onDiscard,
 }: {
   id: string;
-  wish: Wish | null;
+  record: Draft;
+  site: string;
   onClose: () => void;
   onSaved: (wish: Wish) => void;
+  onDiscard: () => void;
 }) {
-  const [content, setContent] = useState<WishContent>(
-    wish
-      ? {
-          title: wish.title,
-          kind: wish.kind,
-          note: wish.note,
-          place: wish.place || "",
-          map_url: wish.map_url || "",
-          done: wish.done,
-          archived: wish.archived,
-        }
-      : {
-          title: "",
-          kind: "place",
-          note: "",
-          place: "",
-          map_url: "",
-          done: false,
-          archived: false,
-        },
-  );
-  const [error, setError] = useState("");
-  const [conflict, setConflict] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const identity = useId();
+  const [content, setContent] = useState(record.content);
+  const [source, setSource] = useState(record.source);
+  const [searching, setSearching] = useState(record.searching);
+  const [error, setError] = useState(record.error);
+  const [conflict, setConflict] = useState(record.conflict);
   const [pending, startTransition] = useTransition();
-  const request = useRef<{ signature: string; id: string } | null>(null);
+  const [portal, setPortal] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortal(document.body);
+  }, []);
+  useEffect(() => {
+    if (!portal) return;
+    const node = dialog.current;
+    node?.showModal();
+    return () => {
+      if (node?.open) node.close();
+    };
+  }, [portal]);
+  function change(update: Partial<WishContent>) {
+    const next = { ...content, ...update };
+    record.content = next;
+    setContent(next);
+    record.error = "";
+    setError("");
+  }
+  function select(place: string) {
+    change({
+      place,
+      title: content.title || place.split(" (")[0].slice(0, 100),
+      map_url: content.place === place ? content.map_url : "",
+    });
+    record.searching = false;
+    setSearching(false);
+  }
+  function chooseSource(next: Draft["source"]) {
+    record.source = next;
+    setSource(next);
+    if (next === "search") {
+      record.searching = true;
+      setSearching(true);
+    }
+  }
+  function fail(message: string, stale = false) {
+    record.error = message;
+    setError(message);
+    record.conflict = stale;
+    setConflict(stale);
+  }
   function save() {
-    const signature = JSON.stringify([content, wish?.version || 0]);
-    if (request.current?.signature !== signature)
-      request.current = { signature, id: crypto.randomUUID() };
-    const requestId = request.current.id;
+    if (pending || conflict) return;
+    const body = {
+      ...content,
+      title: content.title.trim(),
+      place: content.kind === "activity" ? "" : content.place || "",
+      map_url: content.kind === "activity" ? "" : content.map_url || "",
+    };
+    if (!body.title) {
+      fail("이름을 입력해 주세요.");
+      return;
+    }
+    if (body.map_url && !naverShareLink(body.map_url)) {
+      fail("네이버 지도 공유 링크를 확인해 주세요.");
+      return;
+    }
+    const signature = JSON.stringify([body, record.version]);
+    if (record.request?.signature !== signature)
+      record.request = { signature, id: crypto.randomUUID() };
+    const requestId = record.request.id;
     startTransition(async () => {
-      const result = await saveWish(id, content, wish?.version || 0, requestId);
-      if (result.data) onSaved(result.data);
-      else {
-        setError(
-          result.status === 409
-            ? "상대가 위시를 수정했어요. 작성 내용을 확인하고 최신 목록을 불러와 주세요."
-            : result.error,
-        );
-        setConflict(result.status === 409);
+      try {
+        const result = await saveWish(id, body, record.version, requestId);
+        if (result.data) onSaved(result.data);
+        else
+          fail(
+            result.status === 409
+              ? "상대가 위시를 수정했어요. 작성 내용은 남겨뒀어요. 최신 목록으로 돌아가려면 작성 내용을 폐기해 주세요."
+              : result.error,
+            result.status === 409,
+          );
+      } catch {
+        fail("연결을 확인하고 다시 저장해 주세요. 작성 내용은 유지했어요.");
       }
     });
   }
-  return (
-    <section className="plan-editor">
-      <button className="text-button" type="button" disabled={pending} onClick={onClose}>
-        작성 취소
-      </button>
-      <PageHeading>
-        <h1>{wish ? "위시 수정" : "새로운 위시"}</h1>
-      </PageHeading>
+  if (!portal) return null;
+  return createPortal(
+    <dialog
+      ref={dialog}
+      className="wish-sheet"
+      aria-labelledby={`${identity}-heading`}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!pending) onClose();
+      }}
+      onPointerDown={(event) => {
+        if (pending || event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom
+        )
+          onClose();
+      }}
+    >
+      <header className="wish-sheet-heading">
+        <h2 id={`${identity}-heading`}>{record.version ? "위시 수정" : "위시 추가"}</h2>
+        <button
+          className="icon-button"
+          type="button"
+          disabled={pending}
+          onClick={onClose}
+          aria-label="작성 취소"
+          title="닫기"
+        >
+          <X size={21} aria-hidden="true" />
+        </button>
+      </header>
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
+        id={`${identity}-form`}
+        className="wish-sheet-body"
+        onSubmit={(event) => {
+          event.preventDefault();
           save();
         }}
       >
-        <fieldset className="meeting-fields" disabled={pending || conflict}>
-          <div className="auth-field">
-            <label htmlFor="wish-title">위시 이름</label>
-            <input
-              id="wish-title"
-              required
-              maxLength={100}
-              value={content.title}
-              onChange={(e) => setContent({ ...content, title: e.target.value })}
-            />
-          </div>
-          <div className="auth-field">
-            <label htmlFor="wish-kind">위시 종류</label>
-            <select
-              id="wish-kind"
-              value={content.kind}
-              onChange={(e) =>
-                setContent({
-                  ...content,
-                  kind: e.target.value as WishContent["kind"],
-                  place: "",
-                  map_url: "",
-                })
-              }
+        <fieldset className="wish-fields" disabled={pending || conflict}>
+          <fieldset className="wish-kind" aria-label="위시 종류">
+            <button
+              type="button"
+              aria-pressed={content.kind === "place"}
+              onClick={() => change({ kind: "place" })}
             >
-              <option value="place">가고 싶은 곳</option>
-              <option value="activity">해보고 싶은 일</option>
-            </select>
-          </div>
+              장소
+            </button>
+            <button
+              type="button"
+              aria-pressed={content.kind === "activity"}
+              onClick={() => change({ kind: "activity" })}
+            >
+              활동
+            </button>
+          </fieldset>
           {content.kind === "place" && (
             <>
-              <PlaceSearch
-                compact
-                initialQuery={content.place || content.title}
-                onSelect={(place) =>
-                  setContent((current) => ({
-                    ...current,
-                    title: current.title || place.split(" (")[0].slice(0, 100),
-                    place,
-                    map_url: current.place === place ? current.map_url : "",
-                  }))
-                }
-              >
+              <fieldset className="wish-sources" aria-label="장소 입력 방법">
+                <button
+                  type="button"
+                  aria-label="장소 검색"
+                  aria-pressed={source === "search"}
+                  onClick={() => chooseSource("search")}
+                >
+                  <Search size={16} aria-hidden="true" />
+                  검색
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={source === "link"}
+                  onClick={() => chooseSource("link")}
+                >
+                  <Link2 size={16} aria-hidden="true" />
+                  링크
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={source === "favorites"}
+                  onClick={() => chooseSource("favorites")}
+                >
+                  <Star size={16} aria-hidden="true" />
+                  자주 가는 곳
+                </button>
+              </fieldset>
+              {source === "search" && searching && (
+                <PlaceSearchPanel
+                  compact
+                  site={site}
+                  initialQuery={record.query || content.place || content.title}
+                  onQueryChange={(query) => {
+                    record.query = query;
+                  }}
+                  onSelect={select}
+                />
+              )}
+              {source === "favorites" && <FavoritePlaces onSelect={select} />}
+              {source === "link" && (
                 <div className="auth-field">
-                  <label htmlFor="wish-place">장소</label>
+                  <label htmlFor={`${identity}-map`}>네이버 지도 공유 링크</label>
                   <input
-                    id="wish-place"
+                    id={`${identity}-map`}
+                    type="url"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
                     maxLength={200}
-                    value={content.place || ""}
-                    onChange={(event) => setContent({ ...content, place: event.target.value })}
+                    value={content.map_url || ""}
+                    placeholder="https://naver.me/…"
+                    onChange={(event) => change({ map_url: event.target.value.trim() })}
                   />
                 </div>
-              </PlaceSearch>
-              <div className="auth-field">
-                <label htmlFor="wish-map-url">네이버 지도 공유 링크</label>
-                <input
-                  id="wish-map-url"
-                  type="url"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  maxLength={200}
-                  value={content.map_url || ""}
-                  pattern={"https://naver[.]me/[A-Za-z0-9_\\-]{1,80}"}
-                  placeholder="https://naver.me/…"
-                  onChange={(event) =>
-                    setContent({ ...content, map_url: event.target.value.trim() })
-                  }
-                />
-              </div>
+              )}
+              {content.place && (
+                <div className="wish-selected">
+                  <MapPin size={19} aria-hidden="true" />
+                  <div className="auth-field">
+                    <label className="sr-only" htmlFor={`${identity}-place`}>
+                      장소
+                    </label>
+                    <input
+                      id={`${identity}-place`}
+                      maxLength={200}
+                      value={content.place}
+                      onChange={(event) => change({ place: event.target.value, map_url: "" })}
+                    />
+                  </div>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label="장소 선택 해제"
+                    title="선택 해제"
+                    onClick={() => {
+                      change({ place: "", map_url: "" });
+                      record.searching = true;
+                      setSearching(true);
+                    }}
+                  >
+                    <X size={18} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
             </>
           )}
           <div className="auth-field">
-            <label htmlFor="wish-note">위시 메모</label>
-            <textarea
-              id="wish-note"
-              maxLength={1000}
-              rows={4}
-              value={content.note}
-              onChange={(e) => setContent({ ...content, note: e.target.value })}
+            <label htmlFor={`${identity}-title`}>위시 이름</label>
+            <input
+              id={`${identity}-title`}
+              required
+              maxLength={100}
+              value={content.title}
+              placeholder={content.kind === "activity" ? "함께 하고 싶은 일" : "장소 이름"}
+              onChange={(event) => change({ title: event.target.value })}
             />
           </div>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={content.done}
-              onChange={(e) => setContent({ ...content, done: e.target.checked })}
-            />
-            함께 해봤어요
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={content.archived}
-              onChange={(e) => setContent({ ...content, archived: e.target.checked })}
-            />
-            위시 보관 (해제하면 목록으로 복원)
-          </label>
-          <button className="primary-button" type="submit">
-            위시 저장
-          </button>
+          <details className="wish-note-field" open={content.note ? true : undefined}>
+            <summary>메모</summary>
+            <div className="auth-field">
+              <label className="sr-only" htmlFor={`${identity}-note`}>
+                위시 메모
+              </label>
+              <textarea
+                id={`${identity}-note`}
+                rows={3}
+                maxLength={1000}
+                value={content.note}
+                placeholder="기억할 내용"
+                onChange={(event) => change({ note: event.target.value })}
+              />
+            </div>
+          </details>
         </fieldset>
       </form>
-      {error && (
-        <p role="alert" className="error-message">
+      <footer className="wish-sheet-footer">
+        <div className="wish-sheet-message" role={error ? "alert" : undefined}>
           {error}
-        </p>
-      )}
-      {conflict && (
-        <button className="text-button" type="button" onClick={onClose}>
-          작성 내용 폐기
-        </button>
-      )}
-    </section>
+        </div>
+        <div className="wish-save-actions">
+          {conflict && (
+            <button className="text-button" type="button" onClick={onDiscard}>
+              작성 내용 폐기
+            </button>
+          )}
+          <button
+            className="primary-button"
+            type="submit"
+            form={`${identity}-form`}
+            aria-label="위시 저장"
+            disabled={pending || conflict || !content.title.trim()}
+          >
+            {pending ? "저장 중" : "저장"}
+          </button>
+        </div>
+      </footer>
+    </dialog>,
+    portal,
   );
 }

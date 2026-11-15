@@ -52,6 +52,18 @@ class Wish(WishContent):
 SELECT = "id,title,kind,note,place,map_url,done,archived,version,updated_by,updated_at"
 
 
+class WishCounts(BaseModel):
+    planned: int = Field(ge=0)
+    done: int = Field(ge=0)
+    archived: int = Field(ge=0)
+
+
+class WishOverview(BaseModel):
+    items: list[Wish] = Field(max_length=50)
+    counts: WishCounts
+    has_more: bool
+
+
 @router.get("/wishlist", response_model=list[Wish])
 def list_wishes(store: Store, archived: bool = False, offset: int = Query(0, ge=0, le=100000)):
     return store.call(
@@ -65,6 +77,15 @@ def list_wishes(store: Store, archived: bool = False, offset: int = Query(0, ge=
             "limit": "50",
         },
     )
+
+
+@router.get("/wishlist/overview", response_model=WishOverview)
+def wish_overview(
+    store: Store,
+    view: Literal["planned", "done", "archived"] = "planned",
+    offset: int = Query(0, ge=0, le=100000),
+):
+    return store.rpc("wishlist_overview", {"p_view": view, "p_offset": offset})
 
 
 @router.get("/wishlist/{id}", response_model=Wish)

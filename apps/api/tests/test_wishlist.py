@@ -5,6 +5,56 @@ import pytest
 from test_database import USERS, actor, call, connect_pair, reset_database  # noqa: F401
 
 
+def test_overview_counts_pages_statuses_rls_and_read_only_contract(database_url):
+    dsn = database_url
+    connect_pair(dsn)
+    assert call(dsn, USERS[0], "wishlist_overview", "planned", 0)[0]["counts"] == {
+        "planned": 0,
+        "done": 0,
+        "archived": 0,
+    }
+    for index in range(57):
+        call(
+            dsn,
+            USERS[0],
+            "save_wish",
+            uuid4(),
+            f"예시 {index}",
+            "activity",
+            "",
+            index == 55,
+            index == 56,
+            0,
+            uuid4(),
+        )
+    first = call(dsn, USERS[1], "wishlist_overview", "planned", 0)[0]
+    second = call(dsn, USERS[1], "wishlist_overview", "planned", 50)[0]
+    assert first["counts"] == {"planned": 55, "done": 1, "archived": 1}
+    assert len(first["items"]) == 50 and first["has_more"]
+    assert len(second["items"]) == 5 and not second["has_more"]
+    assert not ({x["id"] for x in first["items"]} & {x["id"] for x in second["items"]})
+    assert all(
+        not row["done"] and not row["archived"] and "last_fingerprint" not in row
+        for row in first["items"]
+    )
+    for view in ["done", "archived"]:
+        page = call(dsn, USERS[0], "wishlist_overview", view, 0)[0]
+        assert len(page["items"]) == 1 and not page["has_more"]
+    call(dsn, USERS[2], "create_couple")
+    other = call(dsn, USERS[2], "wishlist_overview", "planned", 0)[0]
+    assert other["items"] == [] and sum(other["counts"].values()) == 0
+    for view, offset in [("invalid", 0), ("planned", -1), ("done", 100001)]:
+        with pytest.raises(psycopg.Error, match="invalid_wish"):
+            call(dsn, USERS[0], "wishlist_overview", view, offset)
+    with (
+        actor(dsn, None, "anon") as connection,
+        pytest.raises(psycopg.errors.InsufficientPrivilege),
+    ):
+        connection.execute("select public.wishlist_overview('planned',0)")
+    with actor(dsn, USERS[0]) as connection:
+        assert connection.execute("select count(*) from public.wishes").fetchone() == (57,)
+
+
 def test_wish_location_roundtrip_retry_legacy_edit_export_and_isolation(database_url):
     from we2day_api.wishlist import WishChange, save_wish
 

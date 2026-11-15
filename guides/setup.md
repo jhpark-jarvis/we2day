@@ -189,7 +189,7 @@ docker compose up --detach --wait
 
 로그인 설정을 마친 뒤 같은 Supabase 프로젝트의 SQL Editor에서 마이그레이션 파일을 적용합니다.
 
-- **처음 설치:** 아래 파일을 001부터 040까지 순서대로 열어 각각 전체 내용을 실행합니다. 매번 `Success`를 확인하고 다음 파일로 넘어갑니다.
+- **처음 설치:** 아래 파일을 001부터 044까지 순서대로 열어 각각 전체 내용을 실행합니다. 매번 `Success`를 확인하고 다음 파일로 넘어갑니다.
 - **기존 설치 업데이트:** 적용 이력을 확인하고 아직 실행하지 않은 파일만 순서대로 적용합니다. 이미 적용한 파일은 다시 실행하지 않습니다.
 
 | 순서 | 실행할 파일 | 추가되는 기능 |
@@ -234,6 +234,10 @@ docker compose up --detach --wait
 | 038 | [`202610260038_ai_provider_allowance.sql`](../supabase/migrations/202610260038_ai_provider_allowance.sql) | AI 제공량 기준과 연속 호출 제한 |
 | 039 | [`202610260039_ai_conversation_history.sql`](../supabase/migrations/202610260039_ai_conversation_history.sql) | 작성자 전용 AI 대화 기록 |
 | 040 | [`202610270040_ai_runtime.sql`](../supabase/migrations/202610270040_ai_runtime.sql) | AI 요청 임대·재조회와 작은 현재 조건 조회 |
+| 041 | [`202611130041_meeting_course_completion.sql`](../supabase/migrations/202611130041_meeting_course_completion.sql) | 만남 저장과 최신 코스 활동 완료 |
+| 042 | [`202611130042_appointment_created_push.sql`](../supabase/migrations/202611130042_appointment_created_push.sql) | 공동 약속 등록 알림과 중복 방지 |
+| 043 | [`202611140043_wish_locations.sql`](../supabase/migrations/202611140043_wish_locations.sql) | 위시 장소와 네이버 지도 공유 링크 |
+| 044 | [`202611150044_wishlist_overview.sql`](../supabase/migrations/202611150044_wishlist_overview.sql) | 위시 상태별 총계와 목록 조회 |
 
 024를 적용해도 자동 알림이 바로 켜지지는 않습니다. 새 예약 역할은 로그인할 수 없는 상태로 생성됩니다. 자동 알림을 사용하려면 [배포 가이드](deployment.md)의 worker 설정과 기기별 동의 절차도 완료해야 합니다.
 

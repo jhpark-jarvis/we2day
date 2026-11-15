@@ -43,12 +43,13 @@ test("record discovery respects sharing and next appointment preserves date-only
     await a.goto("/wishlist");
     await a.getByRole("button", { name: "위시 추가", exact: true }).click();
     await a.getByLabel("위시 이름").fill("우리의 작은 산책");
+    await a.locator(".wish-note-field summary").click();
     await a.getByLabel("위시 메모").fill("물과 우산 준비");
     await a.getByRole("button", { name: "위시 저장", exact: true }).click();
     await expect(a.getByRole("heading", { name: "우리의 작은 산책", exact: true })).toBeVisible();
     await b.goto("/wishlist");
     await expect(b.getByRole("heading", { name: "우리의 작은 산책", exact: true })).toBeVisible();
-    await a.getByRole("link", { name: "이 위시로 플랜 초안 만들기" }).click();
+    await a.getByRole("link", { name: /코스 초안/ }).click();
     await expect(a.getByLabel("활동 1 장소", { exact: true })).toHaveValue("우리의 작은 산책");
     await expect(a.getByLabel("활동 1 메모")).toHaveValue("물과 우산 준비");
     const date = await a.getByLabel("플랜 날짜", { exact: true }).inputValue();

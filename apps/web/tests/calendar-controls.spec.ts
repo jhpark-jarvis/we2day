@@ -69,9 +69,11 @@ test("wish locations and current-day calendar colors survive saving and plan han
   await page.getByRole("button", { name: "검색", exact: true }).click();
   await page.getByRole("button", { name: "합성 카페 선택", exact: true }).click();
   await expect(page.getByLabel("장소", { exact: true })).toHaveValue(/합성 카페/);
+  await page.getByRole("button", { name: "링크", exact: true }).click();
   await page
     .getByLabel("네이버 지도 공유 링크", { exact: true })
     .fill("https://naver.me/fixture123");
+  await page.locator(".wish-note-field summary").click();
   await page.getByLabel("위시 메모", { exact: true }).fill("합성 메모 유지");
   await page.screenshot({ path: info.outputPath("wish-editor.png") });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -84,12 +86,13 @@ test("wish locations and current-day calendar colors survive saving and plan han
   );
   await page.reload();
   await page.getByRole("button", { name: "위시 수정 · 합성 카페", exact: true }).click();
+  await page.getByRole("button", { name: "링크", exact: true }).click();
   await expect(page.getByLabel("네이버 지도 공유 링크", { exact: true })).toHaveValue(
     "https://naver.me/fixture123",
   );
   await expect(page.getByLabel("위시 메모", { exact: true })).toHaveValue("합성 메모 유지");
   await page.getByRole("button", { name: "작성 취소", exact: true }).click();
-  await page.getByRole("link", { name: "이 위시로 플랜 초안 만들기", exact: true }).click();
+  await page.getByRole("link", { name: "합성 카페 코스 초안", exact: true }).click();
   await expect(page.getByLabel("활동 1 장소", { exact: true })).toHaveValue(/합성 카페/);
   await expect(page.getByLabel("네이버 지도 공유 링크", { exact: true })).toHaveValue(
     "https://naver.me/fixture123",

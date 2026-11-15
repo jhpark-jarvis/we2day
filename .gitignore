@@ -75,3 +75,5 @@
 !/apps/web/src/app/api/ai/planner/
 !/apps/web/src/app/api/ai/planner/route.ts
 !supabase/migrations/202611140043_wish_locations.sql
+!supabase/migrations/202611150044_wishlist_overview.sql
+!/apps/web/tests/wishlist.spec.ts
