@@ -46,7 +46,6 @@ test("wish list, explicit saves, status counts and responsive editor retain draf
     await add.click();
     await page.getByRole("button", { name: "활동", exact: true }).click();
     await page.getByLabel("위시 이름").fill("함께 미술관");
-    await page.locator(".wish-note-field summary").click();
     await page.getByLabel("위시 메모").fill("아직 저장하지 않은 메모");
     await page.goBack();
     await expect(dialog).toHaveCount(0);
@@ -84,7 +83,6 @@ test("wish list, explicit saves, status counts and responsive editor retain draf
     await page.getByRole("button", { name: "합성 카페 선택", exact: true }).click();
     await page.getByRole("button", { name: "링크", exact: true }).click();
     await page.getByLabel("네이버 지도 공유 링크").fill("https://naver.me/fixture123");
-    await page.locator(".wish-note-field summary").click();
     await page.getByLabel("위시 메모").fill("산책 후 들를 곳");
     await page.screenshot({ path: info.outputPath("wish-editor.png") });
     const bounds = await dialog.boundingBox();

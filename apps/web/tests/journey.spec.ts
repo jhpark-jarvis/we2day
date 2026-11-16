@@ -37,7 +37,6 @@ test("wishlist to published day and author-controlled report sharing", async ({
     await open(a, "/wishlist");
     await a.getByRole("button", { name: "위시 추가", exact: true }).click();
     await a.getByLabel("위시 이름").fill("우리의 작은 산책");
-    await a.locator(".wish-note-field summary").click();
     await a.getByLabel("위시 메모").fill("물과 우산 준비");
     await a.getByRole("button", { name: "위시 저장", exact: true }).click();
     await expect(a.getByRole("heading", { name: "우리의 작은 산책", exact: true })).toBeVisible();

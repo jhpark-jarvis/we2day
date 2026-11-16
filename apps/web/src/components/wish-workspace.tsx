@@ -742,14 +742,12 @@ function WishEditor({
               onChange={(event) => change({ title: event.target.value })}
             />
           </div>
-          <details className="wish-note-field" open={content.note ? true : undefined}>
-            <summary>메모</summary>
+          <div className="wish-note-field">
             <div className="auth-field">
-              <label className="sr-only" htmlFor={`${identity}-note`}>
-                위시 메모
-              </label>
+              <label htmlFor={`${identity}-note`}>메모</label>
               <textarea
                 id={`${identity}-note`}
+                aria-label="위시 메모"
                 rows={3}
                 maxLength={1000}
                 value={content.note}
@@ -757,7 +755,7 @@ function WishEditor({
                 onChange={(event) => change({ note: event.target.value })}
               />
             </div>
-          </details>
+          </div>
         </fieldset>
       </form>
       <footer className="wish-sheet-footer">

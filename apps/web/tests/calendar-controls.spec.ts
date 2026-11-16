@@ -73,7 +73,6 @@ test("wish locations and current-day calendar colors survive saving and plan han
   await page
     .getByLabel("네이버 지도 공유 링크", { exact: true })
     .fill("https://naver.me/fixture123");
-  await page.locator(".wish-note-field summary").click();
   await page.getByLabel("위시 메모", { exact: true }).fill("합성 메모 유지");
   await page.screenshot({ path: info.outputPath("wish-editor.png") });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
