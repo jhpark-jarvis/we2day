@@ -1,6 +1,7 @@
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RouletteCreate } from "@/components/roulette-editor";
+import { ServerRefresh, TogetherBack } from "@/components/workspace-controls";
 import { callApi } from "@/lib/api";
 import type { RouletteWheel } from "@/lib/roulette";
 import type { Couple } from "@/lib/shared-calendar";
@@ -32,37 +33,45 @@ export default async function RoulettePage({
     );
 
   return (
-    <section className="today-workspace">
+    <section className="together-workspace">
       <PageHeading>
         <p className="eyebrow">PICK ONE, TOGETHER</p>
         <h1>룰렛</h1>
-        <p className="muted">직접 적은 후보 중 하나를 함께 골라요.</p>
       </PageHeading>
-      <div className="roulette-page-toolbar">
+      <div className="together-toolbar">
+        <TogetherBack />
         <nav className="archive-links" aria-label="룰렛 구분">
           <Link href="/roulette" aria-current={!archived ? "page" : undefined}>
             현재
           </Link>
           <Link href="/roulette?archived=true" aria-current={archived ? "page" : undefined}>
-            보관함
+            보관
           </Link>
         </nav>
-        <RouletteCreate />
+        <div className="together-tools">
+          <ServerRefresh label="룰렛 새로고침" />
+          <RouletteCreate />
+        </div>
       </div>
       {result.error && (
         <p role="alert" className="error-message">
           {result.error}
         </p>
       )}
-      <div className="plan-list">
+      <div className="plan-list together-records roulette-records">
         {result.data?.map((wheel) => (
           <article className="plan-card" key={wheel.id}>
             <h2>{wheel.title}</h2>
             <p>
               {wheel.candidates.length}개 후보{wheel.archived ? " · 보관됨" : ""}
             </p>
-            <Link className="text-button" href={`/roulette/${wheel.id}`}>
-              룰렛 열기 · {wheel.title}
+            <Link
+              className="icon-button"
+              href={`/roulette/${wheel.id}`}
+              aria-label={`룰렛 열기 · ${wheel.title}`}
+              title="열기"
+            >
+              <ChevronRight size={20} aria-hidden="true" />
             </Link>
           </article>
         ))}
@@ -78,9 +87,8 @@ export default async function RoulettePage({
           다음 룰렛 보기
         </Link>
       )}
-      <p className="settings-hint">
-        뽑기는 후보 선택만 도와요. 약속·방문·결제나 보상을 자동으로 만들지 않아요.
-      </p>
     </section>
   );
 }
+
+import { ChevronRight } from "lucide-react";

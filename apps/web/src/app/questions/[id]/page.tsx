@@ -1,5 +1,6 @@
 import { PageHeading } from "@/components/page-heading";
 import { AnswerEditor, AnswerRefresh } from "@/components/question-forms";
+import { TogetherBack } from "@/components/workspace-controls";
 import { callApi } from "@/lib/api";
 import type { ProfileView } from "@/lib/profiles";
 import type { QuestionView } from "@/lib/questions";
@@ -18,12 +19,15 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
   const { question, mine, partner } = result.data;
   const profiles = await callApi<ProfileView>("/profiles");
   return (
-    <section className="today-workspace">
+    <section className="together-workspace together-answer-page">
       <PageHeading>
         <p className="eyebrow">OUR ANSWERS</p>
-        <h1>함께 나누는 답변</h1>
+        <h1>답변</h1>
         <p className="muted">{question.date} · 한국 기준</p>
       </PageHeading>
+      <div className="together-toolbar">
+        <TogetherBack href={`/questions?date=${question.date}`} label="질문 목록으로 돌아가기" />
+      </div>
       <h2 className="preserve-lines">{question.prompt}</h2>
       <AnswerEditor id={id} initial={mine} />
       <div className="section-heading">

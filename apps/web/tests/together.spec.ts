@@ -55,12 +55,9 @@ test("direct questions, chosen timezones and durable roulette results", async ({
     await b.getByRole("button", { name: "초대 수락하기" }).click();
     await expect(b.getByRole("status")).toContainText("두 사람이 연결되었어요");
     await open(a, "/questions");
-    await a
-      .locator("summary")
-      .filter({ hasText: /^질문 추가$/ })
-      .click();
-    await a.getByLabel("함께 나눌 질문").fill("다음에 같이 해볼 일은? · 합성 질문");
     await a.getByRole("button", { name: "질문 추가", exact: true }).click();
+    await a.getByLabel("함께 나눌 질문").fill("다음에 같이 해볼 일은? · 합성 질문");
+    await a.getByRole("dialog").getByRole("button", { name: "질문 추가", exact: true }).click();
     await expect(a).toHaveURL(/\/questions\/[a-f0-9-]+$/);
     const questionUrl = a.url();
     await a.getByLabel("답변 내용", { exact: true }).fill("공유하기 전의 개인 답변 · 합성 예시");
@@ -124,12 +121,12 @@ test("direct questions, chosen timezones and durable roulette results", async ({
       await expect(a.locator('main a[href="/together"]')).toHaveCount(0);
     }
     const create = a.getByRole("button", { name: "룰렛 만들기", exact: true });
-    const dialog = a.getByRole("dialog", { name: "룰렛 만들기", exact: true });
+    const dialog = a.getByRole("dialog", { name: "룰렛 추가", exact: true });
     await create.click();
     await expect(dialog).toBeVisible();
     await expect(dialog.locator("summary")).toHaveCount(0);
     await a.getByLabel("룰렛 이름", { exact: true }).fill("닫아도 보존할 작성 내용");
-    await a.getByRole("button", { name: "룰렛 작성 닫기", exact: true }).click();
+    await a.getByRole("button", { name: "룰렛 추가 닫기", exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect(create).toBeFocused();
     await create.click();
@@ -169,13 +166,17 @@ test("direct questions, chosen timezones and durable roulette results", async ({
     const result = await a.getByRole("status").filter({ hasText: "선택 결과" }).textContent();
     await open(b, wheelUrl);
     await expect(b.getByRole("status").filter({ hasText: "선택 결과" })).toHaveText(result || "");
-    await a.getByText("후보 수정", { exact: true }).click();
+    await a.getByRole("button", { name: "룰렛 수정", exact: true }).click();
     await a.getByLabel("후보 (한 줄에 하나, 2~20개)", { exact: true }).fill("카페\n독서");
+    await a.getByRole("button", { name: "룰렛 수정 닫기", exact: true }).click();
     await a.getByRole("button", { name: "최신 결과 불러오기", exact: true }).click();
+    await a.getByRole("button", { name: "룰렛 수정", exact: true }).click();
     await expect(a.getByLabel("후보 (한 줄에 하나, 2~20개)", { exact: true })).toHaveValue(
       "카페\n독서",
     );
+    await a.getByRole("button", { name: "룰렛 수정 닫기", exact: true }).click();
     await expect(a.getByRole("button", { name: "다시 뽑기", exact: true })).toBeDisabled();
+    await a.getByRole("button", { name: "룰렛 수정", exact: true }).click();
     await a.getByRole("button", { name: "룰렛 저장", exact: true }).click();
     await expect(a.getByRole("button", { name: "다시 뽑기", exact: true })).toBeEnabled();
     await a.getByRole("button", { name: "다시 뽑기", exact: true }).click();

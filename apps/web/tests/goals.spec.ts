@@ -16,9 +16,9 @@ test("shared goal separates steps from completion and restores conflicts and arc
   await page.getByRole("button", { name: "목표 만들기", exact: true }).click();
   await page.getByLabel("목표 이름", { exact: true }).fill("함께 걷기 · 합성 목표");
   await page.getByLabel("희망 날짜 (선택)", { exact: true }).fill("2028-02-29");
-  await expect(page.getByRole("group", { name: "단계 진행률", exact: true })).toContainText(
-    "단계 미정",
-  );
+  await expect(
+    page.getByRole("dialog").getByRole("group", { name: "단계 진행률", exact: true }),
+  ).toContainText("단계 미정");
   await page.getByRole("button", { name: "목표 저장", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "목표를 저장했어요." })).toBeVisible();
   await page.reload();
@@ -31,13 +31,13 @@ test("shared goal separates steps from completion and restores conflicts and arc
   await page.getByRole("button", { name: "단계 추가", exact: true }).click();
   await page.getByLabel("단계 2 이름", { exact: true }).fill("코스 정하기");
   await page.getByLabel("단계 1 완료", { exact: true }).check();
-  await expect(page.getByRole("group", { name: "단계 진행률", exact: true })).toContainText(
-    "1 / 2단계 · 50%",
-  );
+  await expect(
+    page.getByRole("dialog").getByRole("group", { name: "단계 진행률", exact: true }),
+  ).toContainText("1 / 2단계 · 50%");
   await page.getByLabel("단계 2 완료", { exact: true }).check();
-  await expect(page.getByRole("group", { name: "단계 진행률", exact: true })).toContainText(
-    "2 / 2단계 · 100%",
-  );
+  await expect(
+    page.getByRole("dialog").getByRole("group", { name: "단계 진행률", exact: true }),
+  ).toContainText("2 / 2단계 · 100%");
   await expect(page.getByLabel("목표 달성 (직접 선택·해제)", { exact: true })).not.toBeChecked();
   await page.getByRole("button", { name: "목표 저장", exact: true }).click();
   await expect(page.getByText("함께 진행 중", { exact: true })).toBeVisible();
@@ -51,7 +51,7 @@ test("shared goal separates steps from completion and restores conflicts and arc
     await expect(page.getByText("달성한 목표", { exact: true })).toBeVisible();
     await stale.getByLabel("목표 이름", { exact: true }).fill("충돌 시 보존할 목표 이름");
     await stale.getByRole("button", { name: "목표 저장", exact: true }).click();
-    await expect(stale.getByRole("main").getByRole("alert")).toContainText(
+    await expect(stale.getByRole("dialog").getByRole("alert")).toContainText(
       "상대가 목표를 수정했어요",
     );
     await expect(stale.getByLabel("목표 이름", { exact: true })).toHaveValue(

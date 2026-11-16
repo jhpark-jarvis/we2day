@@ -1,9 +1,11 @@
 "use client";
 
-import { Pencil, RefreshCw } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { Pencil, Plus, RefreshCw, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { saveChecklist } from "@/app/actions/checklists";
+import { LoadingRegion } from "@/components/loading-region";
 import { PageHeading } from "@/components/page-heading";
+import { TogetherBack, TogetherSheet } from "@/components/workspace-controls";
 import type { Checklist, ChecklistContent, ChecklistItem } from "@/lib/checklists";
 import { useItemHistory } from "@/lib/page-history";
 
@@ -52,44 +54,55 @@ export function ChecklistWorkspace({
       }
     });
   }
-  if (id)
-    return (
-      <ChecklistEditor
-        key={`${id}:${selected?.version || 0}`}
-        id={id}
-        saved={selected}
-        onClose={close}
-        onSaved={(saved) => {
-          setLists((current) =>
-            [saved, ...current.filter((v) => v.id !== saved.id)].filter(
-              (v) => v.archived === archived,
-            ),
-          );
-          finish();
-          setMessage("목록을 저장했어요.");
-        }}
-      />
-    );
+  const [editor, setEditor] = useState<{ id: string; saved: Checklist | null } | null>(null);
+  const newId = useRef("");
+  useEffect(() => {
+    if (id) setEditor((current) => (current?.id === id ? current : { id, saved: selected }));
+  }, [id, selected]);
+  const editorPanel = editor ? (
+    <ChecklistEditor
+      key={editor.id}
+      id={editor.id}
+      visible={id === editor.id}
+      saved={editor.saved}
+      onClose={close}
+      onSaved={(saved) => {
+        setLists((current) =>
+          [saved, ...current.filter((v) => v.id !== saved.id)].filter(
+            (v) => v.archived === archived,
+          ),
+        );
+        finish();
+        setEditor(null);
+        newId.current = "";
+        setMessage("목록을 저장했어요.");
+      }}
+    />
+  ) : null;
   return (
-    <section>
+    <section className="together-workspace">
+      {editorPanel}
       <PageHeading>
         <div>
           <p className="eyebrow">TOGETHER, READY</p>
           <h1>목록</h1>
-          <p className="muted">장보기부터 집 데이트 준비까지, 하나씩 함께 챙겨요.</p>
         </div>
       </PageHeading>
-      <div className="calendar-toolbar">
+      <div className="together-toolbar">
+        <TogetherBack />
         <button
-          className="primary-button"
+          className="icon-button together-add"
+          aria-label="목록 만들기"
+          title="목록 추가"
           type="button"
           disabled={pending}
           onClick={() => {
             setMessage("");
-            open(crypto.randomUUID(), true);
+            newId.current ||= crypto.randomUUID();
+            open(newId.current, true);
           }}
         >
-          목록 만들기
+          <Plus size={20} aria-hidden="true" />
         </button>
         <fieldset className="list-view-toggle" aria-label="목록 구분">
           <button
@@ -121,47 +134,46 @@ export function ChecklistWorkspace({
           <RefreshCw size={18} aria-hidden="true" />
         </button>
       </div>
-      <p className="settings-hint">
-        둘 다 작성하고 체크를 되돌릴 수 있어요. 수정 후 저장하면 상대에게 반영돼요.
-      </p>
       {(error || navigationError) && (
         <p role="alert" className="error-message">
           {error || navigationError}
         </p>
       )}
       {message && <p role="status">{message}</p>}
-      <div className="plan-list">
-        {lists.map((list) => (
-          <article className="plan-card" key={list.id}>
-            <small>
-              {list.items.filter((item) => item.done).length} / {list.items.length}개 준비
-              {list.archived ? " · 보관됨" : ""}
-            </small>
-            <h2>{list.title}</h2>
-            <p className="preserve-lines">{list.note}</p>
-            <ul className="checklist-preview">
-              {list.items.slice(0, 3).map((item) => (
-                <li key={item.id}>
-                  {item.done ? "✓ " : "○ "}
-                  {item.title}
-                  {item.quantity ? ` · ${item.quantity}` : ""}
-                </li>
-              ))}
-            </ul>
-            <button
-              className="icon-button card-edit"
-              aria-label={`목록 열기 · ${list.title}`}
-              title="목록 수정"
-              type="button"
-              onClick={() => {
-                open(list.id);
-              }}
-            >
-              <Pencil size={18} aria-hidden="true" />
-            </button>
-          </article>
-        ))}
-      </div>
+      <LoadingRegion busy={pending} disabled={Boolean(id)} label="목록 불러오는 중">
+        <div className="plan-list together-records" aria-hidden={Boolean(id)}>
+          {lists.map((list) => (
+            <article className="plan-card" key={list.id}>
+              <small>
+                {list.items.filter((item) => item.done).length} / {list.items.length}개 준비
+                {list.archived ? " · 보관됨" : ""}
+              </small>
+              <h2>{list.title}</h2>
+              <p className="preserve-lines">{list.note}</p>
+              <ul className="checklist-preview">
+                {list.items.slice(0, 3).map((item) => (
+                  <li key={item.id}>
+                    {item.done ? "✓ " : "○ "}
+                    {item.title}
+                    {item.quantity ? ` · ${item.quantity}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <button
+                className="icon-button card-edit"
+                aria-label={`목록 열기 · ${list.title}`}
+                title="목록 수정"
+                type="button"
+                onClick={() => {
+                  open(list.id);
+                }}
+              >
+                <Pencil size={18} aria-hidden="true" />
+              </button>
+            </article>
+          ))}
+        </div>
+      </LoadingRegion>
       {!lists.length && !error && (
         <p className="empty-state">
           {archived
@@ -185,11 +197,13 @@ export function ChecklistWorkspace({
 
 function ChecklistEditor({
   id,
+  visible,
   saved,
   onClose,
   onSaved,
 }: {
   id: string;
+  visible: boolean;
   saved: Checklist | null;
   onClose: () => void;
   onSaved: (saved: Checklist) => void;
@@ -251,139 +265,142 @@ function ChecklistEditor({
     });
   }
   return (
-    <section className="plan-editor">
-      <button className="text-button" type="button" disabled={pending} onClick={onClose}>
-        작성 취소
-      </button>
-      <PageHeading>
-        <h1>{base ? "준비 목록 수정" : "새로운 준비 목록"}</h1>
-      </PageHeading>
-      <p className="settings-hint">
-        최대 50개까지 적을 수 있어요. 저장된 항목은 수정·체크 해제할 수 있고 목록은 보관 후 복원할
-        수 있어요.
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          save();
-        }}
-      >
-        <fieldset className="meeting-fields" disabled={pending || conflict}>
-          <div className="auth-field">
-            <label htmlFor="checklist-title">목록 이름</label>
-            <input
-              id="checklist-title"
-              required
-              maxLength={100}
-              value={content.title}
-              onChange={(e) => setContent({ ...content, title: e.target.value })}
-            />
-          </div>
-          <details className="optional-fields">
-            <summary>목록 메모 (선택)</summary>
+    <TogetherSheet
+      open={visible}
+      title={base ? "목록 수정" : "목록 추가"}
+      busy={pending}
+      onClose={onClose}
+    >
+      <section className="together-editor">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+        >
+          <fieldset className="meeting-fields" disabled={pending || conflict}>
             <div className="auth-field">
-              <label htmlFor="checklist-note">목록 메모</label>
-              <textarea
-                id="checklist-note"
-                rows={3}
-                maxLength={1000}
-                value={content.note}
-                onChange={(e) => setContent({ ...content, note: e.target.value })}
+              <label htmlFor="checklist-title">목록 이름</label>
+              <input
+                id="checklist-title"
+                required
+                maxLength={100}
+                value={content.title}
+                onChange={(e) => setContent({ ...content, title: e.target.value })}
               />
             </div>
-          </details>
-          <h2>함께 챙길 항목</h2>
-          {content.items.map((item, index) => (
-            <fieldset key={item.id} className="checklist-item">
-              <legend>항목 {index + 1}</legend>
-              <label className="check-field">
-                <input
-                  type="checkbox"
-                  checked={item.done}
-                  onChange={(e) => changeItem(item.id, { done: e.target.checked })}
-                />
-                항목 {index + 1} 준비 완료
-              </label>
+            <div className="together-note">
               <div className="auth-field">
-                <label htmlFor={`item-${item.id}-title`}>항목 {index + 1} 이름</label>
-                <input
-                  id={`item-${item.id}-title`}
-                  required
-                  maxLength={100}
-                  value={item.title}
-                  onChange={(e) => changeItem(item.id, { title: e.target.value })}
+                <label htmlFor="checklist-note">목록 메모</label>
+                <textarea
+                  id="checklist-note"
+                  rows={3}
+                  maxLength={1000}
+                  value={content.note}
+                  onChange={(e) => setContent({ ...content, note: e.target.value })}
                 />
               </div>
-              <div className="auth-field">
-                <label htmlFor={`item-${item.id}-quantity`}>항목 {index + 1} 수량·참고</label>
-                <input
-                  id={`item-${item.id}-quantity`}
-                  maxLength={100}
-                  value={item.quantity}
-                  onChange={(e) => changeItem(item.id, { quantity: e.target.value })}
-                />
-              </div>
-              {!base?.items.some((v) => v.id === item.id) && (
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() =>
-                    setContent({ ...content, items: content.items.filter((v) => v.id !== item.id) })
-                  }
-                >
-                  새 항목 {index + 1} 취소
-                </button>
-              )}
-            </fieldset>
-          ))}
+            </div>
+            <h2>함께 챙길 항목</h2>
+            {content.items.map((item, index) => (
+              <fieldset key={item.id} className="checklist-item">
+                <legend>항목 {index + 1}</legend>
+                <label className="check-field">
+                  <input
+                    type="checkbox"
+                    checked={item.done}
+                    onChange={(e) => changeItem(item.id, { done: e.target.checked })}
+                  />
+                  항목 {index + 1} 준비 완료
+                </label>
+                <div className="auth-field">
+                  <label htmlFor={`item-${item.id}-title`}>항목 {index + 1} 이름</label>
+                  <input
+                    id={`item-${item.id}-title`}
+                    required
+                    maxLength={100}
+                    value={item.title}
+                    onChange={(e) => changeItem(item.id, { title: e.target.value })}
+                  />
+                </div>
+                <div className="auth-field">
+                  <label htmlFor={`item-${item.id}-quantity`}>항목 {index + 1} 수량·참고</label>
+                  <input
+                    id={`item-${item.id}-quantity`}
+                    maxLength={100}
+                    value={item.quantity}
+                    onChange={(e) => changeItem(item.id, { quantity: e.target.value })}
+                  />
+                </div>
+                {!base?.items.some((v) => v.id === item.id) && (
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`새 항목 ${index + 1} 취소`}
+                    title="추가 취소"
+                    onClick={() =>
+                      setContent({
+                        ...content,
+                        items: content.items.filter((v) => v.id !== item.id),
+                      })
+                    }
+                  >
+                    <X size={18} aria-hidden="true" />
+                  </button>
+                )}
+              </fieldset>
+            ))}
+            <button
+              type="button"
+              className="text-button"
+              disabled={content.items.length >= 50}
+              onClick={() =>
+                setContent({
+                  ...content,
+                  items: [
+                    ...content.items,
+                    { id: crypto.randomUUID(), title: "", quantity: "", done: false },
+                  ],
+                })
+              }
+            >
+              항목 추가
+            </button>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                aria-label="목록 보관 (해제하면 복원)"
+                checked={content.archived}
+                onChange={(e) => setContent({ ...content, archived: e.target.checked })}
+              />
+              보관
+            </label>
+            <button className="primary-button" type="submit" aria-label="목록 저장">
+              저장
+            </button>
+          </fieldset>
+        </form>
+        {error && (
+          <p role="alert" className="error-message">
+            {conflict
+              ? "상대가 목록을 수정했어요. 작성 내용은 유지되며, 자동으로 덮어쓰지 않아요. 최신본을 확인해 주세요."
+              : error}
+          </p>
+        )}
+        {conflict && (
           <button
             type="button"
             className="text-button"
-            disabled={content.items.length >= 50}
-            onClick={() =>
-              setContent({
-                ...content,
-                items: [
-                  ...content.items,
-                  { id: crypto.randomUUID(), title: "", quantity: "", done: false },
-                ],
-              })
-            }
+            disabled={pending}
+            onClick={() => {
+              if (window.confirm("작성 중인 내용을 버리고 최신 저장본을 불러올까요?"))
+                reloadLatest();
+            }}
           >
-            항목 추가
+            작성 내용을 버리고 최신본 불러오기
           </button>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={content.archived}
-              onChange={(e) => setContent({ ...content, archived: e.target.checked })}
-            />
-            목록 보관 (해제하면 복원)
-          </label>
-          <button className="primary-button" type="submit">
-            목록 저장
-          </button>
-        </fieldset>
-      </form>
-      {error && (
-        <p role="alert" className="error-message">
-          {conflict
-            ? "상대가 목록을 수정했어요. 작성 내용은 유지되며, 자동으로 덮어쓰지 않아요. 최신본을 확인해 주세요."
-            : error}
-        </p>
-      )}
-      {conflict && (
-        <button
-          type="button"
-          className="text-button"
-          disabled={pending}
-          onClick={() => {
-            if (window.confirm("작성 중인 내용을 버리고 최신 저장본을 불러올까요?")) reloadLatest();
-          }}
-        >
-          작성 내용을 버리고 최신본 불러오기
-        </button>
-      )}
-    </section>
+        )}
+      </section>
+    </TogetherSheet>
   );
 }

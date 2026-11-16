@@ -15,7 +15,6 @@ test("shared preparation list saves, checks, preserves conflicts and restores", 
   await page.goto("/checklists");
   await page.getByRole("button", { name: "목록 만들기", exact: true }).click();
   await page.getByLabel("목록 이름", { exact: true }).fill("산책 준비 · 합성 예시");
-  await page.getByText("목록 메모 (선택)", { exact: true }).click();
   await page.getByLabel("목록 메모", { exact: true }).fill("함께 챙길 준비물");
   await page.getByRole("button", { name: "항목 추가", exact: true }).click();
   await page.getByLabel("항목 1 이름", { exact: true }).fill("물");
@@ -33,10 +32,9 @@ test("shared preparation list saves, checks, preserves conflicts and restores", 
     await page.getByLabel("항목 1 준비 완료", { exact: true }).check();
     await page.getByRole("button", { name: "목록 저장", exact: true }).click();
     await expect(page.getByText("1 / 1개 준비", { exact: true })).toBeVisible();
-    await stale.getByText("목록 메모 (선택)", { exact: true }).click();
     await stale.getByLabel("목록 메모", { exact: true }).fill("충돌해도 남아야 하는 작성 내용");
     await stale.getByRole("button", { name: "목록 저장", exact: true }).click();
-    await expect(stale.getByRole("main").getByRole("alert")).toContainText(
+    await expect(stale.getByRole("dialog").getByRole("alert")).toContainText(
       "상대가 목록을 수정했어요",
     );
     await expect(stale.getByLabel("목록 메모", { exact: true })).toHaveValue(

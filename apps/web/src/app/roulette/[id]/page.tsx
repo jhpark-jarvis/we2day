@@ -1,6 +1,7 @@
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { RouletteEditor } from "@/components/roulette-editor";
+import { TogetherBack } from "@/components/workspace-controls";
 import { callApi } from "@/lib/api";
 import type { RouletteDraw, RouletteWheel } from "@/lib/roulette";
 export default async function RouletteDetail({
@@ -27,10 +28,16 @@ export default async function RouletteDetail({
     );
   const draws = await callApi<RouletteDraw[]>(`/roulette/${id}/draws?offset=${offset}`);
   return (
-    <section className="today-workspace">
+    <section className="together-workspace together-roulette-page">
       <PageHeading>
         <h1>{wheel.data.title}</h1>
       </PageHeading>
+      <div className="together-toolbar">
+        <TogetherBack
+          href={wheel.data.archived ? "/roulette?archived=true" : "/roulette"}
+          label="룰렛 목록으로 돌아가기"
+        />
+      </div>
       {draws.error && (
         <p role="alert" className="error-message">
           {draws.error}

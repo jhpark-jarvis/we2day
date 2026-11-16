@@ -1,6 +1,7 @@
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { QuestionSearch } from "@/components/question-search";
+import { TogetherBack } from "@/components/workspace-controls";
 import { callApi } from "@/lib/api";
 import { seoulToday } from "@/lib/calendar";
 import type { Couple } from "@/lib/shared-calendar";
@@ -9,12 +10,14 @@ export default async function QuestionSearchPage() {
   const couple = await callApi<Couple | null>("/couple");
   const today = seoulToday();
   return (
-    <section className="today-workspace">
+    <section className="together-workspace together-search-page">
       <PageHeading>
         <p className="eyebrow">OUR QUESTIONS</p>
-        <h1>함께 나눈 질문 찾기</h1>
-        <p className="muted">날짜와 질문 문구로 다시 이야기할 주제를 찾아요.</p>
+        <h1>질문 검색</h1>
       </PageHeading>
+      <div className="together-toolbar">
+        <TogetherBack href="/questions" label="질문 목록으로 돌아가기" />
+      </div>
       {couple.data ? (
         <QuestionSearch start={`${today.slice(0, 8)}01`} end={today} />
       ) : (

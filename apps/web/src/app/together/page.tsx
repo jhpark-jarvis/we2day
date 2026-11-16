@@ -25,10 +25,9 @@ export default function TogetherPage() {
         <div>
           <p className="eyebrow">LITTLE THINGS, TOGETHER</p>
           <h1>함께</h1>
-          <p className="muted">같이 챙길 일과 나누고 싶은 이야기.</p>
         </div>
       </PageHeading>
-      <nav className="together-grid" aria-label="공동 활동">
+      <nav className="together-grid together-menu-list" aria-label="공동 활동">
         {features.map(({ href, label, description, icon: Icon }) => (
           <Link className="together-card" href={href} key={href} aria-label={label}>
             <Icon size={22} aria-hidden="true" />

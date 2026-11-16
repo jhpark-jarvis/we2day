@@ -26,7 +26,7 @@ import { NaverAppHandoff } from "@/components/naver-app-handoff";
 import { PageHeading } from "@/components/page-heading";
 import { PlaceSearchPanel } from "@/components/place-search-panel";
 import Link from "@/components/progress-link";
-import { RefreshButton } from "@/components/workspace-controls";
+import { RefreshButton, TogetherBack } from "@/components/workspace-controls";
 import { naverShareLink } from "@/lib/naver-app";
 import { useItemHistory } from "@/lib/page-history";
 import type { Wish, WishContent, WishOverview, WishView } from "@/lib/wishlist";
@@ -286,6 +286,7 @@ export function WishWorkspace({
         </div>
       </PageHeading>
       <div className="wish-toolbar">
+        <TogetherBack />
         <fieldset className="wish-filters" aria-label="위시 상태">
           {views.map(([key, label]) => (
             <button

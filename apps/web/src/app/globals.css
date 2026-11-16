@@ -996,6 +996,84 @@ body:has(.meeting-record-dialog[open]) { overflow: hidden; }
 
 /* Wishes share their status controls and keep all record actions together. */
 .wish-workspace { min-width:0; }
+
+/* Together uses compact rows and the same mobile-sheet/desktop-panel language as wishes. */
+.together-workspace { min-width:0; }
+.together-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 10px; }
+.together-toolbar > .list-view-toggle,.together-toolbar > .archive-links { order:0; margin:0 auto 0 0; border:0; background:transparent; padding:0; }
+.together-toolbar > .checklist-refresh,.together-toolbar > .workspace-refresh { order:1; }
+.together-toolbar > .together-add { order:2; }
+.together-toolbar .list-view-toggle button,.together-toolbar .archive-links a { min-height:44px; padding:8px 12px; border:0; border-radius:9px; background:transparent; color:var(--foreground); font-size:13px; }
+.together-toolbar .list-view-toggle button[aria-pressed="true"],.together-toolbar .archive-links a[aria-current="page"] { background:var(--soft); color:var(--accent); }
+.together-tools { display:flex; align-items:center; margin-inline-start:auto; gap:2px; }
+.together-workspace .together-records { display:block; margin:0; }
+.together-records .plan-card { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 14px; min-width:0; margin:0; padding:16px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; box-shadow:none; }
+.together-records .plan-card:last-child { border-bottom:0; }
+.together-records .plan-card > :not(.card-edit):not(a) { grid-column:1; min-width:0; }
+.together-records .plan-card h2 { margin:2px 0; font-size:16px; font-weight:500; overflow-wrap:anywhere; }
+.together-records .plan-card > small { color:var(--muted); font-size:11px; }
+.together-records .plan-card > p { margin:2px 0; font-size:13px; color:var(--muted); overflow-wrap:anywhere; }
+.together-records .plan-card > .card-edit,.together-records .plan-card > a { position:static; grid-column:2; grid-row:1 / span 6; align-self:center; }
+.together-records .checklist-preview { display:flex; flex-wrap:wrap; gap:4px 12px; margin:3px 0 0; padding:0; list-style:none; color:var(--muted); font-size:12px; }
+.together-records .checklist-preview li { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.together-records .goal-progress { width:min(300px,100%); margin:2px 0; padding:0; border:0; }
+.together-records .goal-progress p { margin:0 0 4px; font-size:12px; color:var(--muted); }
+.together-records .goal-progress progress { display:block; width:100%; height:5px; accent-color:var(--accent); }
+.together-records .compact-help { margin:3px 0 0; border:0; padding:0; background:transparent; font-size:12px; }
+.together-records .compact-help summary { padding:5px 0; }
+.together-workspace > p[role="status"],.together-workspace > p[role="alert"] { position:fixed; z-index:80; bottom:24px; right:24px; max-width:min(380px,calc(100% - 32px)); margin:0; padding:12px 16px; border:1px solid var(--line); border-radius:12px; background:var(--surface); overflow-wrap:anywhere; }
+.together-sheet { position:fixed; inset:auto 0 0; width:min(560px,100%); max-width:100%; max-height:calc(100dvh - 16px); margin:0 auto; padding:0; border:1px solid var(--line); border-radius:18px 18px 0 0; background:var(--background); color:var(--foreground); overflow:hidden; }
+.together-sheet[open] { display:grid; grid-template-rows:auto minmax(0,1fr); }
+.together-sheet::backdrop { background:rgb(35 27 20 / 28%); }
+.together-sheet-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px 8px; }
+.together-sheet-heading h2 { margin:0; font-size:18px; font-weight:500; }
+.together-sheet-body { min-height:0; min-width:0; overflow-y:auto; overscroll-behavior:contain; padding:0 18px max(18px,env(safe-area-inset-bottom)); }
+.together-sheet .together-editor,.together-sheet .together-roulette-editor { width:100%; max-width:none; margin:0; padding:0; }
+.together-sheet form { margin:0; }
+.together-sheet .meeting-fields { min-width:0; gap:12px; margin:0; padding:0; border:0; }
+.together-sheet .auth-field { min-width:0; margin:0; }
+.together-sheet input:not([type="checkbox"]),.together-sheet textarea { width:100%; min-width:0; max-width:100%; }
+.together-sheet .meeting-fields h2 { margin:8px 0 0; font-size:15px; font-weight:500; }
+.together-sheet .goal-progress { min-width:0; margin:0; padding:8px 0; border:0; }
+.together-sheet .goal-progress p { margin:0 0 5px; color:var(--muted); font-size:12px; }
+.together-sheet .goal-progress progress { width:100%; height:5px; accent-color:var(--accent); }
+.together-sheet .checklist-item { min-width:0; margin:0; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+.together-sheet .checklist-item legend { font-size:12px; color:var(--muted); padding:0 4px; }
+.together-sheet .check-field { min-height:36px; font-size:13px; }
+.together-sheet .meeting-fields > .primary-button { justify-self:end; align-self:flex-end; min-width:104px; margin:6px 0 0 auto; }
+body:has(.together-sheet[open]) { overflow:hidden; }
+.together-date-filter { display:flex; align-items:center; gap:2px; min-width:0; margin:0; }
+.together-date-filter .auth-field { margin:0; min-width:0; }
+.together-date-filter input { width:160px; max-width:100%; min-width:0; font-size:14px; }
+.question-records .plan-card > p { color:var(--foreground); font-size:15px; }
+.together-answer-page > h2 { margin:0 0 20px; font-size:18px; font-weight:500; }
+.together-answer-page .report-workspace { border:0; border-bottom:1px solid var(--line); border-radius:0; padding:0 0 20px; margin:0 0 20px; background:transparent; }
+.together-answer-page .section-heading h2,.together-answer-page .report-workspace h2 { font-size:16px; font-weight:500; }
+.together-answer-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; }
+.together-draw { position:relative; display:flex; flex-direction:column; align-items:center; gap:12px; padding:8px 0 24px; border-bottom:1px solid var(--line); }
+.together-detail-tools { display:flex; justify-content:flex-end; width:100%; }
+.together-draw .roulette-disc { max-width:240px; width:min(240px,75%); margin:0; }
+.together-draw .checklist-preview { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 20px; margin:0; padding:0 20px; }
+.together-draw .roulette-result { width:100%; margin:4px 0; text-align:center; }
+.together-roulette-editor .roulette-history { padding:0; list-style:none; }
+.together-roulette-editor .roulette-history > li { margin:0; padding:14px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+.together-menu-list { display:block; }
+.together-menu-list .together-card { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:2px 12px; margin:0; padding:16px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+.together-menu-list .together-card:last-child { border-bottom:0; }
+.together-menu-list .together-card > svg:first-child { grid-column:1; grid-row:1 / span 2; }
+.together-menu-list .together-card strong { grid-column:2; font-size:16px; }
+.together-menu-list .together-card > span { grid-column:2; font-size:12px; }
+.together-menu-list .card-chevron { position:static; grid-column:3; grid-row:1 / span 2; }
+@media (min-width:900px) { .together-sheet { inset:0 0 0 auto; width:440px; height:100dvh; max-height:100dvh; margin:0; border-radius:0; border-block:0; border-inline-end:0; } }
+@media (max-width:640px) {
+  .together-sheet input,.together-sheet textarea,.together-date-filter input { font-size:16px; }
+  .together-workspace > p[role="status"],.together-workspace > p[role="alert"] { right:16px; bottom:calc(84px + env(safe-area-inset-bottom)); }
+  .together-answer-actions { justify-content:stretch; }
+  .together-answer-actions button { flex:1 1 auto; }
+  .question-toolbar { gap:6px; }
+  .question-toolbar .together-date-filter { flex:1 1 172px; }
+  .question-toolbar .together-tools { flex-shrink:0; }
+}
 .wish-filters,.wish-kind,.wish-sources { min-width:0; margin:0; padding:0; border:0; }
 .wish-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; margin-bottom:10px; }
 .wish-filters { display:flex; min-width:0; gap:2px; }
@@ -1071,3 +1149,5 @@ body:has(.wish-sheet[open]) { overflow:hidden; }
   .wish-feedback { right:16px; bottom:calc(84px + env(safe-area-inset-bottom)); }
   .wish-sheet input,.wish-sheet textarea { font-size:16px; }
 }
+
+.together-toolbar > .together-back { order:-1; flex-shrink:0; }

@@ -24,7 +24,8 @@ export function QuestionForm({ date }: { date: string }) {
   const request = useRef<{ id: string; signature: string; requestId: string } | null>(null);
   return (
     <form
-      className="meeting-fields"
+      className="meeting-fields together-question-form"
+      aria-busy={pending}
       onSubmit={(e) => {
         e.preventDefault();
         const signature = JSON.stringify([date, prompt]);
@@ -52,9 +53,7 @@ export function QuestionForm({ date }: { date: string }) {
             onChange={(e) => setPrompt(e.target.value)}
           />
         </div>
-        <p className="settings-hint">
-          질문은 저장 후 그대로 유지돼요. 다른 질문은 새로 추가해 주세요.
-        </p>
+        <p className="settings-hint">저장한 질문은 수정할 수 없어요.</p>
         <button className="primary-button" type="submit">
           질문 추가
         </button>
@@ -130,20 +129,34 @@ export function AnswerEditor({ id, initial }: { id: string; initial: Answer | nu
             onChange={(e) => setContent(e.target.value)}
           />
         </div>
-        <button type="button" className="primary-button" onClick={() => save(false, false)}>
-          {mine?.shared ? "공유 철회하고 개인 저장" : "개인 답변 저장"}
-        </button>
-        <button
-          type="button"
-          className="text-button"
-          disabled={!content.trim()}
-          onClick={() => save(true, false)}
-        >
-          {mine?.shared ? "수정한 답변 공유" : "이 답변을 상대와 공유"}
-        </button>
-        <button type="button" className="text-button" onClick={() => save(false, true)}>
-          이 질문 건너뛰기·공유 철회
-        </button>
+        <div className="together-answer-actions">
+          <button
+            type="button"
+            className="primary-button"
+            aria-label={mine?.shared ? "공유 철회하고 개인 저장" : "개인 답변 저장"}
+            onClick={() => save(false, false)}
+          >
+            {mine?.shared ? "공유 해제·저장" : "저장"}
+          </button>
+          <button
+            type="button"
+            className="text-button"
+            disabled={!content.trim()}
+            aria-label={mine?.shared ? "수정한 답변 공유" : "이 답변을 상대와 공유"}
+            onClick={() => save(true, false)}
+          >
+            {mine?.shared ? "공유 갱신" : "공유"}
+          </button>
+          <button
+            type="button"
+            className="text-button"
+            aria-label="이 질문 건너뛰기·공유 철회"
+            title="공유 해제 후 건너뛰기"
+            onClick={() => save(false, true)}
+          >
+            건너뛰기
+          </button>
+        </div>
       </fieldset>
       {message && <p role="status">{message}</p>}
       {error && (

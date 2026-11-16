@@ -1,7 +1,8 @@
-import { Search } from "lucide-react";
+import { CalendarDays, MessagesSquare, Search } from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import Link from "@/components/progress-link";
 import { QuestionForm } from "@/components/question-forms";
+import { ServerRefresh, TogetherBack, TogetherCreate } from "@/components/workspace-controls";
 import { callApi } from "@/lib/api";
 import { isSupportedDate, seoulToday } from "@/lib/calendar";
 import type { CoupleQuestion } from "@/lib/questions";
@@ -35,42 +36,62 @@ export default async function QuestionsPage({
     );
 
   return (
-    <section className="today-workspace">
+    <section className="together-workspace">
       <PageHeading>
         <p className="eyebrow">A QUESTION FOR US</p>
         <h1>질문</h1>
-        <p className="muted">함께 고른 질문에 각자의 답변을 남겨요.</p>
       </PageHeading>
-      <Link className="text-button" href="/questions/search">
-        날짜·문구로 질문 찾기
-      </Link>
-      <form className="calendar-toolbar">
-        <div className="auth-field">
-          <label htmlFor="question-date">질문 날짜 (한국 기준)</label>
-          <input
-            id="question-date"
-            name="date"
-            type="date"
-            min="2000-01-01"
-            max="2100-12-31"
-            defaultValue={date}
-          />
+      <div className="together-toolbar question-toolbar">
+        <TogetherBack />
+        <form className="together-date-filter">
+          <div className="auth-field">
+            <label className="sr-only" htmlFor="question-date">
+              질문 날짜 (한국 기준)
+            </label>
+            <input
+              id="question-date"
+              name="date"
+              type="date"
+              min="2000-01-01"
+              max="2100-12-31"
+              defaultValue={date}
+            />
+          </div>
+          <button type="submit" className="icon-button" aria-label="이 날짜 보기" title="날짜 조회">
+            <CalendarDays size={19} aria-hidden="true" />
+          </button>
+        </form>
+        <div className="together-tools">
+          <Link
+            className="icon-button"
+            href="/questions/search"
+            aria-label="날짜·문구로 질문 찾기"
+            title="질문 검색"
+          >
+            <Search size={19} aria-hidden="true" />
+          </Link>
+          <ServerRefresh label="질문 새로고침" />
+          <TogetherCreate title="질문 추가">
+            <QuestionForm key={date} date={date} />
+          </TogetherCreate>
         </div>
-        <button type="submit" className="icon-button" aria-label="이 날짜 보기" title="날짜 조회">
-          <Search size={19} aria-hidden="true" />
-        </button>
-      </form>
+      </div>
       {result.error && (
         <p role="alert" className="error-message">
           {result.error}
         </p>
       )}
-      <div className="plan-list">
+      <div className="plan-list together-records question-records">
         {result.data?.map((q) => (
           <article className="plan-card" key={q.id}>
             <p className="preserve-lines">{q.prompt}</p>
-            <Link className="text-button" href={`/questions/${q.id}`}>
-              답변 쓰기·보기
+            <Link
+              className="icon-button"
+              href={`/questions/${q.id}`}
+              aria-label="답변 쓰기·보기"
+              title="답변"
+            >
+              <MessagesSquare size={20} aria-hidden="true" />
             </Link>
           </article>
         ))}
@@ -86,10 +107,6 @@ export default async function QuestionsPage({
           다음 질문 보기
         </Link>
       )}
-      <details className="editor-disclosure">
-        <summary>질문 추가</summary>
-        <QuestionForm key={date} date={date} />
-      </details>
     </section>
   );
 }

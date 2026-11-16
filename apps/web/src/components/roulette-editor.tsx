@@ -1,9 +1,9 @@
 "use client";
-import { Plus, X } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { drawRoulette, readRouletteDraws, saveRoulette } from "@/app/actions/together";
-import { RefreshButton } from "@/components/workspace-controls";
+import { RefreshButton, TogetherCreate, TogetherSheet } from "@/components/workspace-controls";
 import type { RouletteDraw, RouletteWheel } from "@/lib/roulette";
 import { zonedTimestamp } from "@/lib/timezones";
 export function RouletteEditor({
@@ -15,6 +15,7 @@ export function RouletteEditor({
 }) {
   const router = useRouter();
   const [wheel, setWheel] = useState(initialWheel);
+  const [editing, setEditing] = useState(false);
   const [id] = useState(() => wheel?.id || crypto.randomUUID());
   const [title, setTitle] = useState(wheel?.title || "");
   const [lines, setLines] = useState(wheel?.candidates.join("\n") || "");
@@ -53,8 +54,31 @@ export function RouletteEditor({
       }
     });
   }
+  const feedback = (
+    <>
+      {error && (
+        <p role="alert" className="error-message">
+          {error}
+          {conflict ? " 작성 내용은 유지돼요. 최신 결과를 확인해 주세요." : ""}
+        </p>
+      )}
+      {conflict && (
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => {
+            if (window.confirm("작성 중인 후보를 버리고 저장된 내용을 불러올까요?"))
+              window.location.reload();
+          }}
+        >
+          작성 내용을 버리고 최신 룰렛 불러오기
+        </button>
+      )}
+    </>
+  );
   const editorForm = (
     <form
+      aria-busy={pending}
       onSubmit={(e) => {
         e.preventDefault();
         const signature = JSON.stringify([title, candidates, archived, wheel?.version || 0]);
@@ -72,6 +96,7 @@ export function RouletteEditor({
           );
           if (result.data) {
             setWheel(result.data);
+            setEditing(false);
             setError("");
             router.push(`/roulette/${id}`);
             router.refresh();
@@ -111,21 +136,34 @@ export function RouletteEditor({
         <label className="check-field">
           <input
             type="checkbox"
+            aria-label="룰렛 보관 (해제하면 복원)"
             checked={archived}
             onChange={(e) => setArchived(e.target.checked)}
           />
-          룰렛 보관 (해제하면 복원)
+          보관
         </label>
-        <button className="primary-button" type="submit">
-          룰렛 저장
+        <button className="primary-button" type="submit" aria-label="룰렛 저장">
+          저장
         </button>
       </fieldset>
+      {feedback}
     </form>
   );
   return (
-    <div className="plan-editor">
+    <div className="together-roulette-editor">
       {wheel && (
-        <section aria-label="저장된 후보 뽑기">
+        <section className="together-draw" aria-label="저장된 후보 뽑기">
+          <div className="together-detail-tools">
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="룰렛 수정"
+              title="룰렛 수정"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil size={19} aria-hidden="true" />
+            </button>
+          </div>
           <RouletteDisc candidates={wheel.candidates} />
           <ol className="checklist-preview">
             {wheel.candidates.map((v) => (
@@ -169,31 +207,18 @@ export function RouletteEditor({
         </section>
       )}
       {wheel ? (
-        <details className="editor-disclosure">
-          <summary>후보 수정</summary>
+        <TogetherSheet
+          open={editing}
+          title="룰렛 수정"
+          busy={pending}
+          onClose={() => setEditing(false)}
+        >
           {editorForm}
-        </details>
+        </TogetherSheet>
       ) : (
         editorForm
       )}
-      {error && (
-        <p role="alert" className="error-message">
-          {error}
-          {conflict ? " 작성 내용은 유지돼요. 최신 결과를 확인해 주세요." : ""}
-        </p>
-      )}
-      {conflict && (
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => {
-            if (window.confirm("작성 중인 후보를 버리고 저장된 내용을 불러올까요?"))
-              window.location.reload();
-          }}
-        >
-          작성 내용을 버리고 최신 룰렛 불러오기
-        </button>
-      )}
+      {wheel && !editing && feedback}
       {history.length > 0 && (
         <section>
           <h2>함께 뽑은 기록</h2>
@@ -258,41 +283,9 @@ function RouletteDisc({ candidates }: { candidates: string[] }) {
 }
 
 export function RouletteCreate() {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
   return (
-    <>
-      <button
-        type="button"
-        ref={trigger}
-        className="icon-button roulette-create-trigger"
-        aria-label="룰렛 만들기"
-        title="룰렛 만들기"
-        aria-haspopup="dialog"
-        onClick={() => dialog.current?.showModal()}
-      >
-        <Plus size={22} aria-hidden="true" />
-      </button>
-      <dialog
-        ref={dialog}
-        className="roulette-create-dialog"
-        onClose={() => trigger.current?.focus()}
-        aria-labelledby="roulette-create-title"
-      >
-        <div className="section-heading roulette-create-heading">
-          <h2 id="roulette-create-title">룰렛 만들기</h2>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="룰렛 작성 닫기"
-            title="닫기"
-            onClick={() => dialog.current?.close()}
-          >
-            <X size={20} aria-hidden="true" />
-          </button>
-        </div>
-        <RouletteEditor wheel={null} draws={[]} />
-      </dialog>
-    </>
+    <TogetherCreate title="룰렛 추가" label="룰렛 만들기">
+      <RouletteEditor wheel={null} draws={[]} />
+    </TogetherCreate>
   );
 }
