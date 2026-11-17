@@ -39,6 +39,72 @@ def fixture():
     return session
 
 
+@pytest.mark.parametrize("completed", [True, False])
+def test_engine_related_review_uses_the_same_fixed_protocol_and_reports_completion(completed):
+    session = fixture()
+    session.responses_api = True
+    requests = []
+    stats = RunStats("test")
+    stats.counts["model_calls"] = 2
+
+    def provider(request):
+        data = json.loads(request.content)
+        requests.append(data)
+        assert request.url.path.endswith("/responses")
+        assert data["text"]["format"] == {"type": "text"}
+        assert data["temperature"] == 0.6 and data["reasoning"] == {"effort": "low"}
+        assert data["store"] is False and data["stream"] is False
+        raw = json.dumps(data, ensure_ascii=False)
+        assert "서울 성수동 1" not in raw and "이 설명과 주소" not in raw
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed" if completed else "incomplete",
+                "usage": {"input_tokens": 100, "output_tokens": 20},
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "status": "completed",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": json.dumps(
+                                    {
+                                        "decisions": [
+                                            {
+                                                "index": 0,
+                                                "evidence": "베트남음식",
+                                                "relation": "related_cuisine",
+                                            }
+                                        ]
+                                    }
+                                ),
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+
+    async def execute():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(provider)) as client:
+            io = SimpleNamespace(
+                settings=SimpleNamespace(
+                    cloudflare_account_id="a" * 32, cloudflare_api_token="synthetic"
+                ),
+                client=client,
+                stats=stats,
+                budget=Budget(),
+            )
+            return await enrich_candidates(session, io)
+
+    assert asyncio.run(execute()) is completed
+    assert session.relevance_completed is completed and len(requests) == 1
+    assert bool(session.visible_candidates()) is completed
+    assert stats.counts["model_calls"] == 3 and stats.counts["relevance_completion_tokens"] == 20
+
+
 @pytest.mark.parametrize(
     "kind,target",
     [

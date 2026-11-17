@@ -770,7 +770,6 @@ test("place and candidate dialogs preserve composer space, selection and convers
 }) => {
   test.setTimeout(180_000);
   const browserErrors: string[] = [];
-  page.on("pageerror", (error) => browserErrors.push(error.message));
   await fixtureLogin(page);
   let placeFailure = true;
   let acceptedVersion = 1;
@@ -824,6 +823,8 @@ test("place and candidate dialogs preserve composer space, selection and convers
     });
   });
   await page.goto("/plans/ai");
+  // Setup leaves /couple and may cancel its prefetches; observe the AI interaction scope.
+  page.on("pageerror", (error) => browserErrors.push(error.message));
   const input = page.getByLabel("위투 AI에게 보낼 내용", { exact: true });
   await expect(input).toBeEditable();
   await input.fill("첫 대화의 미전송 문장");
@@ -922,7 +923,6 @@ test("history recovery, new-conversation scroll, ephemeral drafts and message re
 }) => {
   test.setTimeout(180_000);
   const browserErrors: string[] = [];
-  page.on("pageerror", (error) => browserErrors.push(error.message));
   await fixtureLogin(page);
   let historyFailure = true,
     replyFailure = true;
@@ -952,6 +952,8 @@ test("history recovery, new-conversation scroll, ephemeral drafts and message re
     });
   });
   await page.goto("/plans/ai");
+  // Setup leaves /couple and may cancel its prefetches; observe the AI interaction scope.
+  page.on("pageerror", (error) => browserErrors.push(error.message));
   const history = page.getByRole("region", { name: "저장한 대화", exact: true });
   await expect(history.getByRole("alert")).toContainText("불러오지 못했어요");
   await expect(history.getByText("저장한 대화가 없어요.", { exact: true })).toHaveCount(0);

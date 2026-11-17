@@ -10,3 +10,8 @@ def model_parameters(settings) -> dict[str, str]:
     if not getattr(settings, "ai_planner_enabled", True):
         raise HTTPException(503, "ai_unavailable")
     return {"model": MODEL_ID, "reasoning_effort": REASONING_EFFORT}
+
+
+def structured_parameters(settings) -> dict[str, str | float]:
+    """One fixed sampling profile for the evaluated structured Responses path."""
+    return {**model_parameters(settings), "temperature": 0.6, "top_p": 1.0}

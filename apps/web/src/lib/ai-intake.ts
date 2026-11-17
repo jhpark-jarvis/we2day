@@ -21,6 +21,7 @@ export type IntakeContext = {
   place_search?: unknown;
   location_request?: { version: 1; basis: number } | null;
   control?: { last_action?: { operation: string } | null; outcome?: string };
+  turn_engine?: { version: number; unverified_fields?: string[] };
   dialogue?: { cleared_date?: boolean; pending?: { resume: string } | null };
   activity_edit?: unknown;
   pending_fields?: unknown;
@@ -104,7 +105,11 @@ export function currentBrief(context: IntakeContext): PlanningBrief {
     ...emptyBrief(),
     ...context.intake?.data,
     date: context.date ?? null,
-    region: context.region || "",
+    region:
+      context.turn_engine?.unverified_fields?.includes("region") ||
+      (!context.turn_engine && context.control)
+        ? ""
+        : context.region || "",
     budget: context.budget ?? null,
     transport: (["자동차", "대중교통", "도보"].includes(context.transport || "")
       ? context.transport

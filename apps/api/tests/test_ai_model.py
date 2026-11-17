@@ -2,10 +2,24 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from we2day_api.ai_model import MODEL_ID, model_parameters
+from we2day_api.ai_model import MODEL_ID, model_parameters, structured_parameters
 from we2day_api.config import Settings
 from we2day_api.data import require_data
 from we2day_api.main import create_app
+
+
+def test_structured_sampling_is_fixed_without_changing_the_legacy_or_model_profile():
+    settings = Settings(_env_file=None)
+    actual = structured_parameters(settings)
+    assert actual == {
+        "model": MODEL_ID,
+        "reasoning_effort": "low",
+        "temperature": 0.6,
+        "top_p": 1.0,
+    }
+    actual["temperature"] = 0.0
+    assert structured_parameters(settings)["temperature"] == 0.6
+    assert model_parameters(settings) == {"model": MODEL_ID, "reasoning_effort": "low"}
 
 
 def test_server_profile_is_fixed_and_request_local():

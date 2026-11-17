@@ -468,7 +468,7 @@ def test_initial_optional_preparation_padding_cannot_invalidate_required_plan():
         session.candidate_kinds[place.ref] = "cafe"
 
         def model(request):
-            schema = json.loads(request.content)["response_format"]["json_schema"]["schema"]
+            schema = json.loads(request.content)["response_format"]["json_schema"]
             assert schema["$defs"]["ModelPlan"]["properties"]["preparation"]["maxItems"] == 0
             return httpx.Response(
                 200,

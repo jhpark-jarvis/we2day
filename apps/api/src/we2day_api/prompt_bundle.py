@@ -19,6 +19,9 @@ class PromptBundle:
     relevance: str = ""
     route: str = ""
     retrieval: str = ""
+    turn: str = ""
+    turn_route: str = ""
+    turn_operations: str = ""
 
 
 def read_bundle(root: Traversable) -> PromptBundle:
@@ -44,12 +47,39 @@ def read_bundle(root: Traversable) -> PromptBundle:
         names.append("route")
     if int(version.rsplit("v", 1)[1]) >= 26:
         names.append("retrieval")
+    if int(version.rsplit("v", 1)[1]) >= 28:
+        names.append("turn")
+    if int(version.rsplit("v", 1)[1]) >= 36:
+        names.append("turn_route")
+    if int(version.rsplit("v", 1)[1]) >= 42:
+        names.append("turn_operations")
     for name in names:
         content = root.joinpath(version, f"{name}.txt").read_bytes()
         if not content or len(content) > 16384:
             raise ValueError("Invalid prompt section size")
         # Git CRLF checkout must produce the same instructions/digest as Linux packaging.
         sections[name] = content.decode("utf-8").replace("\r\n", "\n")
+    if "turn_operations" in sections:
+        operations = json.loads(sections["turn_operations"])
+        expected_operations = {
+            "date",
+            "status",
+            "help",
+            "chat",
+            "read",
+            "search",
+            "plan",
+            "edit",
+            "resume",
+            "clarify",
+            "cancel",
+        }
+        if (
+            not isinstance(operations, dict)
+            or set(operations) != expected_operations
+            or any(not isinstance(v, str) or not v.strip() for v in operations.values())
+        ):
+            raise ValueError("Invalid operation prompts")
     canonical = json.dumps(sections, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     actual = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     if actual != expected:

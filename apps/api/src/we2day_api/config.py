@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     cloudflare_api_token: str | None = Field(default=None, repr=False)
     ai_planner_enabled: bool = True
     ai_capabilities_enabled: bool = False
+    ai_dialogue_engine_enabled: bool = False
     push_enabled: bool = False
     push_automatic_enabled: bool = False
     push_private_key: str | None = Field(default=None, repr=False)

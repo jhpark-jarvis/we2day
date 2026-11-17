@@ -32,7 +32,7 @@ from we2day_api.ai_dialogue import (
 from we2day_api.ai_dialogue import explicit_date as explicit_date
 from we2day_api.ai_edits import cancel_request
 from we2day_api.ai_intake import PlanningBrief, window_checks
-from we2day_api.ai_model import MODEL_ID, model_parameters
+from we2day_api.ai_model import MODEL_ID, model_parameters, structured_parameters
 from we2day_api.ai_place_answers import (
     candidate_reply,
     claims_place_search,
@@ -70,6 +70,13 @@ from we2day_api.ai_tools import (
     check_course,
     place_options,
 )
+from we2day_api.ai_wire import (
+    inference_usage,
+    responses_inputs,
+    responses_result,
+    validate_json_schema,
+    workers_ai_inputs,
+)
 from we2day_api.calendar import Store
 from we2day_api.plans import Activity, PlanContent
 from we2day_api.prompt_bundle import PROMPT
@@ -105,7 +112,7 @@ def _answer_schema_json():
     return json.dumps(schema, separators=(",", ":"))
 
 
-def answer_format(plan_date=None, activity_limit=None, no_preparation=False):
+def answer_format(plan_date=None, activity_limit=None, no_preparation=False, allowed_refs=None):
     # Fresh mutable schema per request, backed by an immutable static JSON template.
     schema = json.loads(_answer_schema_json())
     if plan_date:
@@ -114,6 +121,10 @@ def answer_format(plan_date=None, activity_limit=None, no_preparation=False):
     if activity_limit:
         schema["$defs"]["ModelPlan"]["properties"]["activities"]["maxItems"] = activity_limit
         schema["$defs"]["ModelPlan"]["properties"]["activities"]["minItems"] = activity_limit
+    if allowed_refs:
+        schema["$defs"]["ModelActivity"]["properties"]["place_ref"]["enum"] = sorted(
+            set(allowed_refs)
+        )
     if no_preparation:
         schema["$defs"]["ModelPlan"]["properties"]["preparation"]["maxItems"] = 0
     return {
@@ -212,6 +223,7 @@ async def complete(
                         session.plan_date,
                         session.activity_limit,
                         session.initial_activities is not None and session.previous_plan is None,
+                        allowed_refs=session.candidates,
                     )
                     if session and session.require_plan
                     else ANSWER_FORMAT
@@ -231,6 +243,17 @@ async def complete(
                     or tool["function"]["name"] in session.allowed_tools
                 ]
                 inputs["tool_choice"] = "auto"
+            use_responses = bool(session and getattr(session, "responses_api", False))
+            if use_responses:
+                inputs.update(structured_parameters(settings))
+            output_schema = (
+                inputs["response_format"]["json_schema"]["schema"] if use_responses else None
+            )
+            inputs = (
+                responses_inputs(inputs, constrained=False)
+                if use_responses
+                else workers_ai_inputs(inputs)
+            )
             if len(json.dumps(inputs, ensure_ascii=False).encode()) > 48000:
                 raise HTTPException(422, "ai_context_too_long")
             encoded = json.dumps(inputs, ensure_ascii=False, separators=(",", ":")).encode()
@@ -241,10 +264,11 @@ async def complete(
                     client,
                     "POST",
                     f"https://api.cloudflare.com/client/v4/accounts/"
-                    f"{settings.cloudflare_account_id}/ai/v1/chat/completions",
+                    f"{settings.cloudflare_account_id}/ai/v1/"
+                    + ("responses" if use_responses else "chat/completions"),
                     budget,
                     limit=65536,
-                    seconds=28,
+                    seconds=45,
                     headers={
                         "Authorization": f"Bearer {settings.cloudflare_api_token}",
                         "Content-Type": "application/json",
@@ -268,7 +292,9 @@ async def complete(
             if payload.get("success") is False:
                 raise HTTPException(503, "ai_unavailable")
             result = payload.get("result", payload)
-            stats.usage(payload if "usage" in payload else result, role="completion")
+            stats.usage(inference_usage(result), role="completion")
+            if use_responses:
+                result = responses_result(result)
             if "choices" in result:
                 message = result["choices"][0]["message"]
                 truncated = result["choices"][0].get("finish_reason") == "length"
@@ -375,6 +401,10 @@ async def complete(
                         stats.counts.get("optional_normalizations", 0) + 1
                     )
                 model_answer = ModelAnswer.model_validate(text)
+                if use_responses:
+                    # Only declared defaults are filled. Explicit values and
+                    # unknown fields still undergo strict Pydantic validation.
+                    validate_json_schema(model_answer.model_dump(), output_schema)
                 if (
                     session
                     and session.require_plan
@@ -785,6 +815,27 @@ async def _chat(body, settings, store, client, budget, stats):
         today = datetime.now(ZoneInfo("Asia/Seoul")).date()
         before_context = current_context(context.model_dump(), body.version)
         context = StoredContext.model_validate(before_context)
+        if getattr(settings, "ai_dialogue_engine_enabled", False):
+            # One active engine per request. No per-turn fallback to legacy parsing.
+            import sys
+
+            from we2day_api.ai_turn_engine import run_turn
+
+            answer, candidates = await run_turn(
+                body,
+                before_context,
+                proposal,
+                today,
+                settings,
+                store,
+                client,
+                budget,
+                stats,
+                sys.modules[__name__],
+            )
+            result = await _finish_result(body, latest, answer, candidates, store, stats, lease)
+            finished = True
+            return result
         selection, private_replies, private_reports, pending = None, [], [], None
 
         async def terminal(reply, reports):

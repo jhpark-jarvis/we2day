@@ -274,7 +274,7 @@ class PlacePolicy:
             if kind != args.kind:
                 continue
             expected = self.keyword or query
-            if args.area and norm(args.area) not in norm(expected):
+            if args.mode != "exact_name" and args.area and norm(args.area) not in norm(expected):
                 expected = f"{args.area} {expected}"[:100]
             if norm(expected) == norm(args.query):
                 matches.add((kind, target))

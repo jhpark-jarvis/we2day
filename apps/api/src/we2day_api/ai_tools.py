@@ -368,6 +368,7 @@ class ToolSession:
         self.fresh_refs: set[str] = set()
         self.relevance_pool: list[tuple] = []
         self.relevance_attempted = False
+        self.relevance_completed = False
         self.activity_limit: int | None = None
         self.initial_activities: list[str] | None = None
         self.requested_activities: list[str] | None = None

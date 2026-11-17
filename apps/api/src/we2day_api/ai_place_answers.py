@@ -19,8 +19,12 @@ from we2day_api.ai_tool_runtime import execute_batch
 
 
 def private_anchor(area):
-    value = norm(area)
-    return not kinds(area) and bool(re.fullmatch(r"[가-힣A-Za-z0-9]{0,12}(?:집|회사|직장)", value))
+    # Relative qualifiers do not turn a private alias into a public location.
+    prefix = re.split(r"\s*(?:근처|주변|인근|주위)", area, maxsplit=1)[0]
+    value = norm(prefix)
+    return not kinds(prefix) and bool(
+        re.fullmatch(r"[가-힣A-Za-z0-9]{0,100}(?:집|회사|직장)", value)
+    )
 
 
 def address_area(address, *, allow_road=False):

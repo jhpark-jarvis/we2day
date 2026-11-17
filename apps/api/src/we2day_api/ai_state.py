@@ -20,6 +20,13 @@ def current_context(value, version):
         item = result.get(name)
         if item and item.get("basis") != version:
             result[name] = None
+    engine = result.get("turn_engine")
+    if engine and engine.get("basis", version) != version:
+        engine["pending"] = None
+        if result.get("region"):
+            engine["unverified_fields"] = sorted(
+                set(engine.get("unverified_fields", [])) | {"region"}
+            )
     return result
 
 
@@ -33,7 +40,7 @@ def advance_context(value, version):
         item = result.get(name)
         if item and item.get("turn_version", 0) == version:
             item["turn_version"] = version + 1
-    for name in ("location_request", "schedule_read", "control"):
+    for name in ("location_request", "schedule_read", "control", "turn_engine"):
         item = result.get(name)
         if item and item.get("basis") == version:
             item["basis"] = version + 1

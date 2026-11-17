@@ -383,7 +383,13 @@ def test_multi_step_provider_executes_tools_then_grounded_plan(monkeypatch):
             )
         assert body["messages"][-2]["role"] == "tool"
         assert "가상 도서관" in body["messages"][-2]["content"]
-        assert body["response_format"] == ai_planner.ANSWER_FORMAT
+        assert body["response_format"] == {
+            "type": "json_schema",
+            "json_schema": {
+                **ai_planner.ANSWER_FORMAT["json_schema"]["schema"],
+                "title": "we2day_answer",
+            },
+        }
         return httpx.Response(
             200,
             json={
@@ -565,7 +571,7 @@ def test_required_plan_cannot_be_replaced_by_a_success_claim(monkeypatch, repair
     def handler(request):
         body = json.loads(request.content)
         calls.append(body)
-        schema = body["response_format"]["json_schema"]["schema"]
+        schema = body["response_format"]["json_schema"]
         assert schema["properties"]["plan"] == {"$ref": "#/$defs/ModelPlan"}
         assert schema["$defs"]["ModelPlan"]["properties"]["date"]["const"] == "2030-01-01"
         answer = {"reply": "코스 완성", "plan": None}

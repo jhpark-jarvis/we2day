@@ -7,9 +7,10 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from we2day_api.ai_model import model_parameters
+from we2day_api.ai_model import model_parameters, structured_parameters
 from we2day_api.ai_place_policy import kinds, norm, plain, source_kind
 from we2day_api.ai_runtime import bounded_response
+from we2day_api.ai_wire import inference_usage, responses_inputs, responses_result
 from we2day_api.prompt_bundle import PROMPT
 
 
@@ -35,7 +36,7 @@ class RelevanceAnswer(BaseModel):
 async def enrich_candidates(session, io):
     """One optional inference shares the existing three-inference request budget."""
     if session.relevance_attempted:
-        return
+        return session.relevance_completed
     session.relevance_attempted = True
     pool, inputs = [], []
     seen = set()
@@ -66,10 +67,13 @@ async def enrich_candidates(session, io):
                 "category": plain(item.category)[:160],
             }
         )
-    if not inputs or not hasattr(io, "stats") or io.stats.counts.get("model_calls", 0) >= 3:
-        return
+    if not inputs:
+        session.relevance_completed = True
+        return True
+    if not hasattr(io, "stats") or io.stats.counts.get("model_calls", 0) >= 3:
+        return False
     if io.budget.remaining() < 3:
-        return
+        return False
     body = {
         **model_parameters(io.settings),
         "messages": [
@@ -80,6 +84,18 @@ async def enrich_candidates(session, io):
         "temperature": 0,
         "max_tokens": 2048,
     }
+    use_responses = getattr(session, "responses_api", False)
+    if use_responses:
+        body.update(structured_parameters(io.settings))
+        body["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "we2day_relevance",
+                "strict": True,
+                "schema": RelevanceAnswer.model_json_schema(),
+            },
+        }
+        body = responses_inputs(body, constrained=False)
     encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
     io.stats.counts["model_calls"] += 1
     io.stats.counts["request_bytes"] += len(encoded)
@@ -88,7 +104,8 @@ async def enrich_candidates(session, io):
             status, raw = await bounded_response(
                 io.client,
                 "POST",
-                f"https://api.cloudflare.com/client/v4/accounts/{io.settings.cloudflare_account_id}/ai/v1/chat/completions",
+                f"https://api.cloudflare.com/client/v4/accounts/{io.settings.cloudflare_account_id}/ai/v1/"
+                + ("responses" if use_responses else "chat/completions"),
                 io.budget,
                 limit=12000,
                 seconds=10,
@@ -100,15 +117,18 @@ async def enrich_candidates(session, io):
             )
         io.stats.counts["response_bytes"] += len(raw)
         if status != 200:
-            return
+            return False
         payload = json.loads(raw)
-        io.stats.usage(payload, role="relevance")
-        choice = payload["choices"][0]
+        result = payload.get("result", payload)
+        io.stats.usage(inference_usage(result), role="relevance")
+        if use_responses:
+            result = responses_result(result)
+        choice = result["choices"][0]
         if choice.get("finish_reason") == "length":
-            return
+            return False
         answer = RelevanceAnswer.model_validate_json(choice["message"]["content"])
         if sorted(d.index for d in answer.decisions) != list(range(len(pool))):
-            return
+            return False
     except (
         httpx.HTTPError,
         HTTPException,
@@ -121,7 +141,7 @@ async def enrich_candidates(session, io):
     ):
         # Optional suggestions fail closed; direct search evidence remains usable.
         io.budget.remaining()
-        return
+        return False
     for decision in answer.decisions:
         index = decision.index
         key, args, item = pool[index]
@@ -145,3 +165,5 @@ async def enrich_candidates(session, io):
         if key in session.search_reports:
             session.search_reports[key]["count"] = len(session.searches[key])
     session.order_search_results()
+    session.relevance_completed = True
+    return True

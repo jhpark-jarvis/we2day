@@ -10,6 +10,7 @@ from we2day_api.ai_model import model_parameters
 from we2day_api.ai_place_policy import LABELS, kinds
 from we2day_api.ai_runtime import bounded_response
 from we2day_api.ai_search_spec import SearchSpec, broad_goal, saved_spec
+from we2day_api.ai_wire import workers_ai_inputs
 from we2day_api.prompt_bundle import PROMPT
 
 
@@ -69,6 +70,7 @@ async def plan_retrieval(control, settings, client, budget, stats):
             },
         },
     }
+    body = workers_ai_inputs(body)
     encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
     stats.counts["model_calls"] += 1
     stats.counts["request_bytes"] += len(encoded)
